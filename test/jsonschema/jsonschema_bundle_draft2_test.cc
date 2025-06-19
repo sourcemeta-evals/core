@@ -24,10 +24,8 @@ TEST(JSONSchema_bundle_draft2, no_references_no_id) {
     "$schema": "http://json-schema.org/draft-02/schema#"
   })JSON");
 
-  EXPECT_THROW(
-      sourcemeta::core::bundle(
-          document, sourcemeta::core::schema_official_walker, test_resolver),
-      sourcemeta::core::SchemaError);
+  EXPECT_NO_THROW(sourcemeta::core::bundle(
+      document, sourcemeta::core::schema_official_walker, test_resolver));
 }
 
 TEST(JSONSchema_bundle_draft2, const_no_references_no_id) {
@@ -35,10 +33,8 @@ TEST(JSONSchema_bundle_draft2, const_no_references_no_id) {
     "$schema": "http://json-schema.org/draft-02/schema#"
   })JSON");
 
-  EXPECT_THROW(
-      sourcemeta::core::bundle(
-          document, sourcemeta::core::schema_official_walker, test_resolver),
-      sourcemeta::core::SchemaError);
+  EXPECT_NO_THROW(sourcemeta::core::bundle(
+      document, sourcemeta::core::schema_official_walker, test_resolver));
 }
 
 TEST(JSONSchema_bundle_draft2, simple_bundling) {

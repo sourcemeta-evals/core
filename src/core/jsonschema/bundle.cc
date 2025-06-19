@@ -177,6 +177,14 @@ auto bundle(sourcemeta::core::JSON &schema, const SchemaWalker &walker,
     bundle_schema(schema, {"definitions"}, schema, frame, walker, resolver,
                   default_dialect, paths);
   } else {
+    // For pre-Draft 4 schemas, check if they have external references
+    // by analyzing with a resolver that only resolves official schemas
+    frame.analyse(schema, walker, sourcemeta::core::schema_official_resolver,
+                  default_dialect, std::nullopt, paths);
+    if (frame.standalone()) {
+      // Schema has no external references, so bundling is essentially a no-op
+      return;
+    }
     // We don't attempt to bundle on dialects where we
     // don't know where to put the embedded schemas
     throw sourcemeta::core::SchemaError(
