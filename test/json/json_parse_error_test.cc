@@ -664,7 +664,7 @@ TEST(JSON_parse_error, read_json_invalid_1) {
     sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
                                 "stub_invalid_1.json");
   } catch (const sourcemeta::core::JSONFileParseError &error) {
-    EXPECT_EQ(error.path(),
+    EXPECT_EQ(error.path,
               std::filesystem::path{TEST_DIRECTORY} / "stub_invalid_1.json");
     EXPECT_EQ(error.line(), 3);
     EXPECT_EQ(error.column(), 9);
@@ -679,7 +679,7 @@ TEST(JSON_parse_error, read_json_invalid_2) {
     sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
                                 "stub_invalid_2.json");
   } catch (const sourcemeta::core::JSONFileParseError &error) {
-    EXPECT_EQ(error.path(),
+    EXPECT_EQ(error.path,
               std::filesystem::path{TEST_DIRECTORY} / "stub_invalid_2.json");
     EXPECT_EQ(error.line(), 2);
     EXPECT_EQ(error.column(), 1);
@@ -694,7 +694,7 @@ TEST(JSON_parse_error, read_json_invalid_bigint) {
     sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
                                 "stub_bigint.json");
   } catch (const sourcemeta::core::JSONFileParseError &error) {
-    EXPECT_EQ(error.path(),
+    EXPECT_EQ(error.path,
               std::filesystem::path{TEST_DIRECTORY} / "stub_bigint.json");
     EXPECT_EQ(error.line(), 1);
     EXPECT_EQ(error.column(), 1);

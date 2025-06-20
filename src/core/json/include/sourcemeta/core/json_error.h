@@ -70,24 +70,18 @@ public:
 class SOURCEMETA_CORE_JSON_EXPORT JSONFileParseError : public JSONParseError {
 public:
   /// Create a file parsing error
-  JSONFileParseError(const std::filesystem::path &path,
+  JSONFileParseError(const std::filesystem::path &path_,
                      const std::uint64_t line, const std::uint64_t column,
                      std::string message)
-      : JSONParseError{line, column, std::move(message)}, path_{path} {}
+      : JSONParseError{line, column, std::move(message)}, path{path_} {}
 
   /// Create a file parsing error from a parse error
-  JSONFileParseError(const std::filesystem::path &path,
+  JSONFileParseError(const std::filesystem::path &path_,
                      const JSONParseError &parent)
       : JSONParseError{parent.line(), parent.column(), parent.what()},
-        path_{path} {}
+        path{path_} {}
 
-  /// Get the file path of the error
-  [[nodiscard]] auto path() const noexcept -> const std::filesystem::path {
-    return path_;
-  }
-
-private:
-  std::filesystem::path path_;
+  std::filesystem::path path;
 };
 
 #if defined(_MSC_VER)
