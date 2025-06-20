@@ -82,7 +82,8 @@ public:
         path_{path} {}
 
   /// Get the file path of the error
-  [[nodiscard]] auto path() const noexcept -> const std::filesystem::path {
+  [[nodiscard]] auto path() const noexcept
+      -> std::remove_reference_t<const std::filesystem::path &> {
     return path_;
   }
 
