@@ -31,6 +31,12 @@
                        "The JSON value is not representable by the IETF RFC "  \
                        "8259 interoperable signed integer range");
 
+TEST(JSON_parse_error, file_parse_error_no_copy) {
+  using ReturnType =
+      decltype(std::declval<sourcemeta::core::JSONFileParseError>().path());
+  static_assert(std::is_same_v<ReturnType, const std::filesystem::path &>);
+}
+
 TEST(JSON_parse_error, boolean_true_invalid) {
   std::istringstream input{"trrue"};
   EXPECT_PARSE_ERROR(input, 1, 3);
