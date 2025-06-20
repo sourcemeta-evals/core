@@ -82,9 +82,12 @@ public:
         path_{path} {}
 
   /// Get the file path of the error
-  [[nodiscard]] auto path() const noexcept -> const std::filesystem::path {
+  [[nodiscard]] auto path() const noexcept -> const std::filesystem::path & {
     return path_;
   }
+
+  /// Get the file path of the error
+  [[nodiscard]] auto path() -> std::filesystem::path & { return path_; }
 
 private:
   std::filesystem::path path_;
