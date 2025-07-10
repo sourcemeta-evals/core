@@ -24,10 +24,15 @@ TEST(JSONSchema_bundle_draft1, no_references_no_id) {
     "$schema": "http://json-schema.org/draft-01/schema#"
   })JSON");
 
-  EXPECT_THROW(
-      sourcemeta::core::bundle(
-          document, sourcemeta::core::schema_official_walker, test_resolver),
-      sourcemeta::core::SchemaError);
+  // Should not throw for standalone schemas
+  EXPECT_NO_THROW(sourcemeta::core::bundle(
+      document, sourcemeta::core::schema_official_walker, test_resolver));
+
+  // Document should remain unchanged since no bundling is needed
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-01/schema#"
+  })JSON");
+  EXPECT_EQ(document, expected);
 }
 
 TEST(JSONSchema_bundle_draft1, const_no_references_no_id) {
@@ -35,10 +40,15 @@ TEST(JSONSchema_bundle_draft1, const_no_references_no_id) {
     "$schema": "http://json-schema.org/draft-01/schema#"
   })JSON");
 
-  EXPECT_THROW(
-      sourcemeta::core::bundle(
-          document, sourcemeta::core::schema_official_walker, test_resolver),
-      sourcemeta::core::SchemaError);
+  // Should not throw for standalone schemas
+  const sourcemeta::core::JSON result = sourcemeta::core::bundle(
+      document, sourcemeta::core::schema_official_walker, test_resolver);
+
+  // Result should be the same as input since no bundling is needed
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-01/schema#"
+  })JSON");
+  EXPECT_EQ(result, expected);
 }
 
 TEST(JSONSchema_bundle_draft1, simple_bundling) {

@@ -177,6 +177,15 @@ auto bundle(sourcemeta::core::JSON &schema, const SchemaWalker &walker,
     bundle_schema(schema, {"definitions"}, schema, frame, walker, resolver,
                   default_dialect, paths);
   } else {
+    // For older dialects, we can still bundle if the schema is standalone
+    // (has no external references)
+    frame.analyse(schema, walker, resolver, default_dialect, std::nullopt,
+                  paths);
+    if (frame.standalone()) {
+      // Schema has no external references, so bundling is not needed
+      return;
+    }
+
     // We don't attempt to bundle on dialects where we
     // don't know where to put the embedded schemas
     throw sourcemeta::core::SchemaError(
