@@ -328,6 +328,36 @@ auto URI::fragment() const -> std::optional<std::string_view> {
   return this->fragment_;
 }
 
+auto URI::fragment(const std::string &fragment) -> URI & {
+  if (fragment.empty()) {
+    this->fragment_ = std::nullopt;
+    return *this;
+  }
+
+  if (fragment.front() == '#') {
+    this->fragment_ = fragment.substr(1);
+  } else {
+    this->fragment_ = fragment;
+  }
+
+  return *this;
+}
+
+auto URI::fragment(std::string &&fragment) -> URI & {
+  if (fragment.empty()) {
+    this->fragment_ = std::nullopt;
+    return *this;
+  }
+
+  if (fragment.front() == '#') {
+    this->fragment_ = fragment.substr(1);
+  } else {
+    this->fragment_ = std::move(fragment);
+  }
+
+  return *this;
+}
+
 auto URI::query() const -> std::optional<std::string_view> {
   return this->query_;
 }
