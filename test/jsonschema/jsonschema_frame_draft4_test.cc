@@ -764,3 +764,22 @@ TEST(JSONSchema_frame_draft4, relative_base_uri_with_ref) {
   EXPECT_STATIC_REFERENCE(frame, "/allOf/0/$ref", "common#foo", "common", "foo",
                           "#foo");
 }
+
+TEST(JSONSchema_frame_draft4, trailing_hash_with_internal_ref) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://example.com/schemas/draft4-trailing-hash-with-ref.json#",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+        "foo": { "$ref": "#/properties/bar" },
+        "bar": {}
+    }
+  })JSON");
+
+  sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Instances};
+  frame.analyse(document, sourcemeta::core::schema_official_walker,
+                sourcemeta::core::schema_official_resolver);
+
+  EXPECT_GT(frame.locations().size(), 0);
+  EXPECT_GT(frame.references().size(), 0);
+}
