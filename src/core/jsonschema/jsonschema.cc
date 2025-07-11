@@ -731,7 +731,7 @@ auto sourcemeta::core::wrap(const sourcemeta::core::JSON &schema,
   // at least an artificial one, otherwise a standalone instance of `$schema`
   // outside of the root of a schema resource is not valid according to
   // JSON Schema
-  constexpr auto WRAPPER_IDENTIFIER{"tag:core.sourcemeta.com,2025:wrap"};
+  constexpr auto WRAPPER_IDENTIFIER{"relative"};
   const auto id{identify(copy, resolver, SchemaIdentificationStrategy::Strict,
                          default_dialect)
                     .value_or(WRAPPER_IDENTIFIER)};

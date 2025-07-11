@@ -54,11 +54,11 @@ TEST(JSONSchema_wrap, schema_without_identifier) {
 
   const auto expected{sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$ref": "tag:core.sourcemeta.com,2025:wrap#/items",
+    "$ref": "relative#/items",
     "$defs": {
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "tag:core.sourcemeta.com,2025:wrap",
+        "$id": "relative",
         "items": {
           "type": "string"
         }
@@ -82,11 +82,11 @@ TEST(JSONSchema_wrap, schema_without_identifier_with_default_dialect) {
 
   const auto expected{sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$ref": "tag:core.sourcemeta.com,2025:wrap#/items",
+    "$ref": "relative#/items",
     "$defs": {
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "tag:core.sourcemeta.com,2025:wrap",
+        "$id": "relative",
         "items": {
           "type": "string"
         }
@@ -112,11 +112,11 @@ TEST(JSONSchema_wrap,
 
   const auto expected{sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$ref": "tag:core.sourcemeta.com,2025:wrap#/items",
+    "$ref": "relative#/items",
     "$defs": {
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "tag:core.sourcemeta.com,2025:wrap",
+        "$id": "relative",
         "items": {
           "type": "string"
         }
@@ -337,6 +337,22 @@ TEST(JSONSchema_wrap, schema_with_identifier_with_fragment) {
         }
       }
     }
+  })JSON")};
+
+  EXPECT_EQ(result, expected);
+}
+TEST(JSONSchema_wrap, schema_without_identifier_preserves_relative_references) {
+  const auto schema{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "relative"
+  })JSON")};
+
+  const auto result{sourcemeta::core::wrap(
+      schema, {}, sourcemeta::core::schema_official_resolver)};
+
+  const auto expected{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "relative"
   })JSON")};
 
   EXPECT_EQ(result, expected);
