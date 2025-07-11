@@ -580,6 +580,10 @@ auto URI::from_fragment(std::string_view fragment) -> URI {
   return {uri.str()};
 }
 
+auto URI::canonicalize(const std::string &input) -> std::string {
+  return URI{input}.canonicalize().recompose();
+}
+
 auto URI::try_resolve_from(const URI &base) -> URI & {
   if (base.is_absolute()) {
     return this->resolve_from(base);

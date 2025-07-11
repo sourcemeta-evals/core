@@ -355,6 +355,19 @@ public:
   /// ```
   static auto from_fragment(std::string_view fragment) -> URI;
 
+  /// Canonicalize a URI string. This is a shorthand for the common pattern
+  /// `URI{input}.canonicalize().recompose()`. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/uri.h>
+  /// #include <cassert>
+  ///
+  /// const std::string result{
+  ///   sourcemeta::core::URI::canonicalize("hTtP://exAmpLe.com:80/TEST")};
+  /// assert(result == "http://example.com/TEST");
+  /// ```
+  static auto canonicalize(const std::string &input) -> std::string;
+
   /// Get the user information part of the URI, if any. For example:
   ///
   /// ```cpp

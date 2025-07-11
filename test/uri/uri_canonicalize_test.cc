@@ -141,3 +141,43 @@ TEST(URI_canonicalize, empty_fragment) {
   uri.canonicalize();
   EXPECT_EQ(uri.recompose(), "");
 }
+
+TEST(URI_canonicalize_static, example_1) {
+  const std::string result{sourcemeta::core::URI::canonicalize(
+      "https://example.com/foo?bar=baz#test")};
+  EXPECT_EQ(result, "https://example.com/foo?bar=baz#test");
+}
+
+TEST(URI_canonicalize_static, example_2) {
+  const std::string result{
+      sourcemeta::core::URI::canonicalize("http://example.com/foo#")};
+  EXPECT_EQ(result, "http://example.com/foo");
+}
+
+TEST(URI_canonicalize_static, example_3) {
+  const std::string result{sourcemeta::core::URI::canonicalize(
+      "http://example.com:80/default/port")};
+  EXPECT_EQ(result, "http://example.com/default/port");
+}
+
+TEST(URI_canonicalize_static, example_4) {
+  const std::string result{sourcemeta::core::URI::canonicalize(
+      "https://example.com:443/default/port")};
+  EXPECT_EQ(result, "https://example.com/default/port");
+}
+
+TEST(URI_canonicalize_static, case_insensitive) {
+  const std::string result{sourcemeta::core::URI::canonicalize(
+      "hTtP://exAmpLe.com/case-insensitive")};
+  EXPECT_EQ(result, "http://example.com/case-insensitive");
+}
+
+TEST(URI_canonicalize_static, relative_uri) {
+  const std::string result{sourcemeta::core::URI::canonicalize("./foo")};
+  EXPECT_EQ(result, "foo");
+}
+
+TEST(URI_canonicalize_static, empty_fragment) {
+  const std::string result{sourcemeta::core::URI::canonicalize("#")};
+  EXPECT_EQ(result, "");
+}
