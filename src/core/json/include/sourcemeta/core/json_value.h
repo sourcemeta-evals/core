@@ -1161,6 +1161,32 @@ public:
   /// ```
   [[nodiscard]] auto contains(const String::value_type input) const -> bool;
 
+  /// This method trims whitespace characters from both ends of a JSON string
+  /// and returns a new JSON string with the trimmed content. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/json.h>
+  /// #include <cassert>
+  ///
+  /// const sourcemeta::core::JSON document{"  foo bar  "};
+  /// const auto trimmed = document.trim();
+  /// assert(trimmed.to_string() == "foo bar");
+  /// ```
+  [[nodiscard]] auto trim() const -> JSON;
+
+  /// This method trims whitespace characters from both ends of a JSON string
+  /// in-place, modifying the original string. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/json.h>
+  /// #include <cassert>
+  ///
+  /// sourcemeta::core::JSON document{"  foo bar  "};
+  /// document.trim();
+  /// assert(document.to_string() == "foo bar");
+  /// ```
+  auto trim() -> void;
+
   /// This method checks if an JSON array does not contain duplicated items. For
   /// example:
   ///

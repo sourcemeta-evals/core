@@ -108,3 +108,76 @@ TEST(JSON_string, contains_character_false) {
   const sourcemeta::core::JSON document{"foo"};
   EXPECT_FALSE(document.contains('b'));
 }
+
+TEST(JSON_string, trim_const_basic) {
+  const sourcemeta::core::JSON document{"  foo bar  "};
+  const auto trimmed = document.trim();
+  EXPECT_EQ(trimmed.to_string(), "foo bar");
+  EXPECT_EQ(document.to_string(), "  foo bar  ");
+}
+
+TEST(JSON_string, trim_const_all_whitespace_types) {
+  const sourcemeta::core::JSON document{" \t\n\r\f\vfoo\t\n "};
+  const auto trimmed = document.trim();
+  EXPECT_EQ(trimmed.to_string(), "foo");
+}
+
+TEST(JSON_string, trim_const_empty_string) {
+  const sourcemeta::core::JSON document{""};
+  const auto trimmed = document.trim();
+  EXPECT_EQ(trimmed.to_string(), "");
+}
+
+TEST(JSON_string, trim_const_all_whitespace) {
+  const sourcemeta::core::JSON document{"   \t\n\r  "};
+  const auto trimmed = document.trim();
+  EXPECT_EQ(trimmed.to_string(), "");
+}
+
+TEST(JSON_string, trim_const_no_whitespace) {
+  const sourcemeta::core::JSON document{"foo"};
+  const auto trimmed = document.trim();
+  EXPECT_EQ(trimmed.to_string(), "foo");
+}
+
+TEST(JSON_string, trim_const_left_only) {
+  const sourcemeta::core::JSON document{"  foo"};
+  const auto trimmed = document.trim();
+  EXPECT_EQ(trimmed.to_string(), "foo");
+}
+
+TEST(JSON_string, trim_const_right_only) {
+  const sourcemeta::core::JSON document{"foo  "};
+  const auto trimmed = document.trim();
+  EXPECT_EQ(trimmed.to_string(), "foo");
+}
+
+TEST(JSON_string, trim_inplace_basic) {
+  sourcemeta::core::JSON document{"  foo bar  "};
+  document.trim();
+  EXPECT_EQ(document.to_string(), "foo bar");
+}
+
+TEST(JSON_string, trim_inplace_all_whitespace_types) {
+  sourcemeta::core::JSON document{" \t\n\r\f\vfoo\t\n "};
+  document.trim();
+  EXPECT_EQ(document.to_string(), "foo");
+}
+
+TEST(JSON_string, trim_inplace_empty_string) {
+  sourcemeta::core::JSON document{""};
+  document.trim();
+  EXPECT_EQ(document.to_string(), "");
+}
+
+TEST(JSON_string, trim_inplace_all_whitespace) {
+  sourcemeta::core::JSON document{"   \t\n\r  "};
+  document.trim();
+  EXPECT_EQ(document.to_string(), "");
+}
+
+TEST(JSON_string, trim_inplace_no_whitespace) {
+  sourcemeta::core::JSON document{"foo"};
+  document.trim();
+  EXPECT_EQ(document.to_string(), "foo");
+}

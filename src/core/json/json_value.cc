@@ -737,6 +737,41 @@ JSON::defines_any(std::initializer_list<JSON::String> keys) const -> bool {
   return this->to_string().find(input) != JSON::String::npos;
 }
 
+[[nodiscard]] auto JSON::trim() const -> JSON {
+  assert(this->is_string());
+  const auto &str = this->to_string();
+
+  const auto whitespace = " \t\n\r\f\v";
+
+  const auto start = str.find_first_not_of(whitespace);
+  if (start == String::npos) {
+    return JSON{String{}};
+  }
+
+  const auto end = str.find_last_not_of(whitespace);
+
+  return JSON{str.substr(start, end - start + 1)};
+}
+
+auto JSON::trim() -> void {
+  assert(this->is_string());
+  auto &str = this->data_string;
+
+  const auto whitespace = " \t\n\r\f\v";
+
+  const auto start = str.find_first_not_of(whitespace);
+  if (start == String::npos) {
+    str.clear();
+    return;
+  }
+
+  const auto end = str.find_last_not_of(whitespace);
+
+  if (start > 0 || end < str.length() - 1) {
+    str = str.substr(start, end - start + 1);
+  }
+}
+
 [[nodiscard]] auto JSON::unique() const -> bool {
   assert(this->is_array());
   const auto &items{this->data_array.data};
