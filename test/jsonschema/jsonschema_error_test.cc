@@ -25,3 +25,25 @@ TEST(JSONSchema, resolution_error_throw) {
   EXPECT_EQ(std::string{exception.what()}, "My error");
   EXPECT_EQ(exception.id(), "https://sourcemeta.com/test");
 }
+
+TEST(JSONSchema, unknown_base_dialect_error_throw) {
+  static_assert(
+      std::is_base_of_v<std::exception,
+                        sourcemeta::core::SchemaUnknownBaseDialectError>,
+      "Must subclass std::exception");
+  auto exception{
+      sourcemeta::core::SchemaUnknownBaseDialectError("Unknown base dialect")};
+  EXPECT_THROW(throw exception,
+               sourcemeta::core::SchemaUnknownBaseDialectError);
+  EXPECT_EQ(std::string{exception.what()}, "Unknown base dialect");
+}
+
+TEST(JSONSchema, unknown_dialect_error_throw) {
+  static_assert(std::is_base_of_v<std::exception,
+                                  sourcemeta::core::SchemaUnknownDialectError>,
+                "Must subclass std::exception");
+  auto exception{
+      sourcemeta::core::SchemaUnknownDialectError("Unknown dialect")};
+  EXPECT_THROW(throw exception, sourcemeta::core::SchemaUnknownDialectError);
+  EXPECT_EQ(std::string{exception.what()}, "Unknown dialect");
+}

@@ -261,7 +261,7 @@ TEST(JSONSchema_identify, anonymize_with_unknown_base_dialect) {
 
   EXPECT_THROW(sourcemeta::core::anonymize(
                    document, "https://www.sourcemeta.com/invalid-base-dialect"),
-               sourcemeta::core::SchemaError);
+               sourcemeta::core::SchemaUnknownBaseDialectError);
 }
 
 TEST(JSONSchema_identify, reidentify_boolean) {
@@ -269,5 +269,5 @@ TEST(JSONSchema_identify, reidentify_boolean) {
   EXPECT_THROW(
       sourcemeta::core::reidentify(document, "https://example.com/my-new-id",
                                    sourcemeta::core::schema_official_resolver),
-      sourcemeta::core::SchemaError);
+      sourcemeta::core::SchemaUnknownBaseDialectError);
 }
