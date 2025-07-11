@@ -588,7 +588,7 @@ auto sourcemeta::core::reference_visit(
     // Assume the base is canonicalized already
     assert(
         sourcemeta::core::URI{entry.second.base}.canonicalize().recompose() ==
-        base.recompose());
+        sourcemeta::core::URI{base}.canonicalize().recompose());
     for (const auto &property : subschema.as_object()) {
       const auto walker_result{
           walker(property.first, frame.vocabularies(entry.second, resolver))};

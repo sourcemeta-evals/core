@@ -382,3 +382,30 @@ TEST(JSONSchema_relativize, camelcase_paths_are_sensitive) {
 
   EXPECT_EQ(schema, expected);
 }
+
+TEST(JSONSchema_relativize, draft4_empty_fragment_assertion) {
+  auto schema = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://example.com/schemas/draft4-trailing-hash-with-ref.json#",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+      "foo": { "$ref": "#/properties/bar" },
+      "bar": {}
+    }
+  })JSON");
+
+  sourcemeta::core::reference_visit(
+      schema, sourcemeta::core::schema_official_walker,
+      sourcemeta::core::schema_official_resolver,
+      sourcemeta::core::reference_visitor_relativize);
+
+  const auto expected = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://example.com/schemas/draft4-trailing-hash-with-ref.json#",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+      "foo": { "$ref": "#/properties/bar" },
+      "bar": {}
+    }
+  })JSON");
+
+  EXPECT_EQ(schema, expected);
+}
