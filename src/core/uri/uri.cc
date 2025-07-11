@@ -250,6 +250,8 @@ auto URI::is_mailto() const -> bool {
 
 auto URI::is_ipv6() const -> bool { return this->is_ipv6_; }
 
+auto URI::empty() const noexcept -> bool { return this->data.empty(); }
+
 auto URI::is_fragment_only() const -> bool {
   return !this->scheme().has_value() && !this->host().has_value() &&
          !this->port().has_value() && !this->path().has_value() &&
