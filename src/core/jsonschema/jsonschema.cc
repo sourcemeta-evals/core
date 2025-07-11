@@ -52,7 +52,7 @@ static auto id_keyword(const std::string &base_dialect) -> std::string {
 
   std::ostringstream error;
   error << "Unrecognized base dialect: " << base_dialect;
-  throw sourcemeta::core::SchemaError(error.str());
+  throw sourcemeta::core::SchemaUnknownBaseDialectError(error.str());
 }
 
 auto sourcemeta::core::identify(
@@ -164,7 +164,7 @@ auto sourcemeta::core::reidentify(
   const auto base_dialect{
       sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
   if (!base_dialect.has_value()) {
-    throw sourcemeta::core::SchemaError(
+    throw sourcemeta::core::SchemaUnknownBaseDialectError(
         "Could not determine the base dialect of the schema");
   }
 
@@ -237,7 +237,7 @@ auto sourcemeta::core::metaschema(
     const std::optional<std::string> &default_dialect) -> JSON {
   const auto maybe_dialect{sourcemeta::core::dialect(schema, default_dialect)};
   if (!maybe_dialect.has_value()) {
-    throw sourcemeta::core::SchemaError(
+    throw sourcemeta::core::SchemaUnknownDialectError(
         "Could not determine dialect of the schema");
   }
 
@@ -326,7 +326,7 @@ auto core_vocabulary(std::string_view base_dialect) -> std::string {
   } else {
     std::ostringstream error;
     error << "Unrecognized base dialect: " << base_dialect;
-    throw sourcemeta::core::SchemaError(error.str());
+    throw sourcemeta::core::SchemaUnknownBaseDialectError(error.str());
   }
 }
 } // namespace
@@ -339,7 +339,7 @@ auto sourcemeta::core::vocabularies(
   const std::optional<std::string> maybe_base_dialect{
       sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
   if (!maybe_base_dialect.has_value()) {
-    throw sourcemeta::core::SchemaError(
+    throw sourcemeta::core::SchemaUnknownBaseDialectError(
         "Could not determine base dialect of the schema");
   }
 
@@ -349,7 +349,7 @@ auto sourcemeta::core::vocabularies(
     // If the schema has no declared metaschema and the user didn't
     // provide a explicit default, then we cannot do anything.
     // Better to abort instead of trying to guess.
-    throw sourcemeta::core::SchemaError(
+    throw sourcemeta::core::SchemaUnknownDialectError(
         "Could not determine the dialect of the schema");
   }
 
@@ -718,7 +718,8 @@ auto sourcemeta::core::wrap(const sourcemeta::core::JSON &schema,
   if (effective_dialect.has_value()) {
     copy.assign("$schema", JSON{effective_dialect.value()});
   } else {
-    throw SchemaError("Could not determine the base dialect of the schema");
+    throw sourcemeta::core::SchemaUnknownBaseDialectError(
+        "Could not determine the base dialect of the schema");
   }
 
   auto result{JSON::make_object()};
