@@ -169,6 +169,27 @@ TEST(JSONSchema_frame_draft4, empty_schema_trailing_hash) {
       "http://json-schema.org/draft-04/schema#");
 }
 
+TEST(JSONSchema_frame_draft4, trailing_hash_with_ref) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://example.com/schemas/draft4-trailing-hash-with-ref.json#",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "properties": {
+      "foo": { "$ref": "#/properties/bar" },
+      "bar": {}
+    }
+  })JSON");
+
+  sourcemeta::core::JSON mutable_document = document;
+  sourcemeta::core::reference_visit(
+      mutable_document, sourcemeta::core::schema_official_walker,
+      sourcemeta::core::schema_official_resolver,
+      [](sourcemeta::core::JSON &, const sourcemeta::core::URI &,
+         const sourcemeta::core::JSON::String &,
+         const sourcemeta::core::JSON::String &, sourcemeta::core::URI &) {});
+
+  EXPECT_TRUE(true);
+}
+
 TEST(JSONSchema_frame_draft4, one_level_applicators_without_identifiers) {
   const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "id": "https://www.sourcemeta.com/schema",
