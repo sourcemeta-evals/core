@@ -2197,3 +2197,56 @@ TEST(JSONSchema_frame, stringify_mode_locations) {
 
   EXPECT_EQ(result.str(), expected);
 }
+
+TEST(JSONSchema_frame, standalone_schema_with_internal_refs) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$id": "https://www.example.com",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "items": {
+      "$anchor": "helper",
+      "$ref": "#/$defs/helper"
+    },
+    "$defs": {
+      "helper": true
+    }
+  })JSON");
+
+  sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::References};
+  frame.analyse(document, sourcemeta::core::schema_official_walker,
+                sourcemeta::core::schema_official_resolver);
+
+  EXPECT_TRUE(frame.standalone());
+}
+
+TEST(JSONSchema_frame, standalone_schema_no_refs) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$id": "https://www.example.com",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "string"
+  })JSON");
+
+  sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::References};
+  frame.analyse(document, sourcemeta::core::schema_official_walker,
+                sourcemeta::core::schema_official_resolver);
+
+  EXPECT_TRUE(frame.standalone());
+}
+
+TEST(JSONSchema_frame, non_standalone_schema_with_external_refs) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "foo": { "$ref": "https://www.example.com" },
+      "bar": { "$ref": "https://www.example.com/test#foo" }
+    }
+  })JSON");
+
+  sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::References};
+  frame.analyse(document, sourcemeta::core::schema_official_walker,
+                sourcemeta::core::schema_official_resolver);
+
+  EXPECT_FALSE(frame.standalone());
+}

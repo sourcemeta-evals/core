@@ -1125,6 +1125,23 @@ auto SchemaFrame::references() const noexcept -> const References & {
   return this->references_;
 }
 
+auto SchemaFrame::standalone() const noexcept -> bool {
+  // A schema is standalone if all references can be resolved within itself
+  return std::all_of(
+      this->references_.cbegin(), this->references_.cend(),
+      [&](const auto &reference) {
+        assert(!reference.first.second.empty());
+        assert(reference.first.second.back().is_property());
+        // TODO: This check might need to be more elaborate given
+        // https://github.com/sourcemeta/core/issues/1390
+        return reference.first.second.back().to_property() == "$schema" ||
+               this->locations_.contains({SchemaReferenceType::Static,
+                                          reference.second.destination}) ||
+               this->locations_.contains({SchemaReferenceType::Dynamic,
+                                          reference.second.destination});
+      });
+}
+
 auto SchemaFrame::vocabularies(const Location &location,
                                const SchemaResolver &resolver) const
     -> Vocabularies {

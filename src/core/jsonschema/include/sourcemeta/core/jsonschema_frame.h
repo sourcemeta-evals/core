@@ -233,6 +233,9 @@ public:
   auto references_to(const Pointer &pointer) const -> std::vector<
       std::reference_wrapper<const typename References::value_type>>;
 
+  /// Check if the schema is standalone (has no unresolved external references)
+  auto standalone() const noexcept -> bool;
+
 private:
   Mode mode_;
 // Exporting symbols that depends on the standard C++ library is considered
