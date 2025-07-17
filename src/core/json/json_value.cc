@@ -682,6 +682,21 @@ JSON::try_at(const String &key,
   return object.data.try_at(key, hash);
 }
 
+auto JSON::at_or(const JSON::String &key, const JSON &default_value) const
+    -> JSON {
+  assert(this->is_object());
+  const auto *result = this->try_at(key);
+  return result ? *result : default_value;
+}
+
+auto JSON::at_or(const String &key,
+                 const typename Object::Container::hash_type hash,
+                 const JSON &default_value) const -> JSON {
+  assert(this->is_object());
+  const auto *result = this->try_at(key, hash);
+  return result ? *result : default_value;
+}
+
 [[nodiscard]] auto JSON::defines(const JSON::String &key) const -> bool {
   assert(this->is_object());
   const auto &object{this->data_object};

@@ -1000,6 +1000,44 @@ public:
          const typename Object::Container::hash_type hash) const
       -> const JSON *;
 
+  /// This method returns the value at a given key if it exists, or returns
+  /// the provided default value if the key is not found. This is analogous
+  /// to std::optional::value_or. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/json.h>
+  /// #include <cassert>
+  ///
+  /// const sourcemeta::core::JSON document =
+  ///   sourcemeta::core::parse_json("{ \"foo\": 1 }");
+  /// assert(document.is_object());
+  /// const auto result = document.at_or("foo", sourcemeta::core::JSON{42});
+  /// assert(result.to_integer() == 1);
+  /// const auto fallback = document.at_or("bar", sourcemeta::core::JSON{42});
+  /// assert(fallback.to_integer() == 42);
+  /// ```
+  [[nodiscard]] auto at_or(const String &key, const JSON &default_value) const
+      -> JSON;
+
+  /// This method returns the value at a given key if it exists, or returns
+  /// the provided default value if the key is not found, using a pre-calculated
+  /// hash. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/json.h>
+  /// #include <cassert>
+  ///
+  /// const sourcemeta::core::JSON document =
+  ///   sourcemeta::core::parse_json("{ \"foo\": 1 }");
+  /// assert(document.is_object());
+  /// const auto result = document.at_or("foo",
+  ///   document.as_object().hash("foo"), sourcemeta::core::JSON{42});
+  /// assert(result.to_integer() == 1);
+  /// ```
+  [[nodiscard]] auto at_or(const String &key,
+                           const typename Object::Container::hash_type hash,
+                           const JSON &default_value) const -> JSON;
+
   /// This method checks whether an input JSON object defines a specific key.
   /// For example:
   ///

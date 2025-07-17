@@ -779,3 +779,50 @@ TEST(JSON_object, merge_with_overlap) {
   EXPECT_FALSE(document.at("bar").to_boolean());
   EXPECT_EQ(document.at("baz").to_integer(), 9);
 }
+
+TEST(JSON_object, at_or_existing_key) {
+  const sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":5}");
+  EXPECT_TRUE(document.is_object());
+  const auto result = document.at_or("foo", sourcemeta::core::JSON{42});
+  EXPECT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 5);
+}
+
+TEST(JSON_object, at_or_missing_key) {
+  const sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":5}");
+  EXPECT_TRUE(document.is_object());
+  const auto result = document.at_or("bar", sourcemeta::core::JSON{42});
+  EXPECT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 42);
+}
+
+TEST(JSON_object, at_or_with_hash_existing_key) {
+  const sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":5}");
+  EXPECT_TRUE(document.is_object());
+  const auto result = document.at_or("foo", document.as_object().hash("foo"),
+                                     sourcemeta::core::JSON{42});
+  EXPECT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 5);
+}
+
+TEST(JSON_object, at_or_with_hash_missing_key) {
+  const sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":5}");
+  EXPECT_TRUE(document.is_object());
+  const auto result = document.at_or("bar", document.as_object().hash("bar"),
+                                     sourcemeta::core::JSON{42});
+  EXPECT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 42);
+}
+
+TEST(JSON_object, at_or_different_types) {
+  const sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":\"hello\"}");
+  EXPECT_TRUE(document.is_object());
+  const auto result = document.at_or("bar", sourcemeta::core::JSON{true});
+  EXPECT_TRUE(result.is_boolean());
+  EXPECT_TRUE(result.to_boolean());
+}
