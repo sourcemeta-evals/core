@@ -13,7 +13,9 @@ auto sourcemeta::core::is_schema(const sourcemeta::core::JSON &schema) -> bool {
   return schema.is_object() || schema.is_boolean();
 }
 
-static auto id_keyword_guess(const sourcemeta::core::JSON &schema)
+namespace {
+
+auto id_keyword_guess(const sourcemeta::core::JSON &schema)
     -> std::optional<std::string> {
   if (schema.defines("$id") && schema.at("$id").is_string()) {
     if (!schema.defines("id") ||
@@ -28,7 +30,7 @@ static auto id_keyword_guess(const sourcemeta::core::JSON &schema)
   return std::nullopt;
 }
 
-static auto id_keyword(const std::string &base_dialect) -> std::string {
+auto id_keyword(const std::string &base_dialect) -> std::string {
   if (base_dialect == "https://json-schema.org/draft/2020-12/schema" ||
       base_dialect == "https://json-schema.org/draft/2020-12/hyper-schema" ||
       base_dialect == "https://json-schema.org/draft/2019-09/schema" ||
@@ -54,6 +56,8 @@ static auto id_keyword(const std::string &base_dialect) -> std::string {
   error << "Unrecognized base dialect: " << base_dialect;
   throw sourcemeta::core::SchemaError(error.str());
 }
+
+} // anonymous namespace
 
 auto sourcemeta::core::identify(
     const sourcemeta::core::JSON &schema, const SchemaResolver &resolver,

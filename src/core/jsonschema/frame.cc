@@ -10,10 +10,12 @@
 #include <utility>    // std::pair, std::move
 #include <vector>     // std::vector
 
+namespace {
+
 enum class AnchorType : std::uint8_t { Static, Dynamic, All };
 
-static auto find_anchors(const sourcemeta::core::JSON &schema,
-                         const sourcemeta::core::Vocabularies &vocabularies)
+auto find_anchors(const sourcemeta::core::JSON &schema,
+                  const sourcemeta::core::Vocabularies &vocabularies)
     -> std::map<sourcemeta::core::JSON::String, AnchorType> {
   std::map<sourcemeta::core::JSON::String, AnchorType> result;
 
@@ -98,7 +100,7 @@ static auto find_anchors(const sourcemeta::core::JSON &schema,
   return result;
 }
 
-static auto find_nearest_bases(
+auto find_nearest_bases(
     const std::map<sourcemeta::core::Pointer,
                    std::vector<sourcemeta::core::JSON::String>> &bases,
     const sourcemeta::core::Pointer &pointer,
@@ -118,7 +120,7 @@ static auto find_nearest_bases(
   return {{}, sourcemeta::core::empty_pointer};
 }
 
-static auto find_every_base(
+auto find_every_base(
     const std::map<sourcemeta::core::Pointer,
                    std::vector<sourcemeta::core::JSON::String>> &bases,
     const sourcemeta::core::Pointer &pointer)
@@ -227,7 +229,7 @@ struct InternalEntry {
   const std::optional<sourcemeta::core::JSON::String> id;
 };
 
-static auto traverse_origin_instance_locations(
+auto traverse_origin_instance_locations(
     const sourcemeta::core::SchemaFrame &frame,
     const sourcemeta::core::SchemaFrame::Instances &instances,
     const sourcemeta::core::Pointer &current,
@@ -264,7 +266,7 @@ struct CacheSubschema {
   const std::optional<sourcemeta::core::Pointer> parent;
 };
 
-static auto repopulate_instance_locations(
+auto repopulate_instance_locations(
     const sourcemeta::core::SchemaFrame &frame,
     const sourcemeta::core::SchemaFrame::Instances &instances,
     const std::map<sourcemeta::core::Pointer, CacheSubschema> &cache,
@@ -313,6 +315,8 @@ static auto repopulate_instance_locations(
     }
   }
 }
+
+} // anonymous namespace
 
 namespace sourcemeta::core {
 
