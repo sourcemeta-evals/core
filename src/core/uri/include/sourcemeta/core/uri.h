@@ -228,6 +228,9 @@ public:
   /// ```
   [[nodiscard]] auto fragment() const -> std::optional<std::string_view>;
 
+  auto fragment(const std::string &fragment) -> URI &;
+  auto fragment(std::string &&fragment) -> URI &;
+
   /// Get the non-dissected query part of the URI, if any. For example:
   ///
   /// ```cpp

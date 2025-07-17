@@ -741,10 +741,10 @@ auto sourcemeta::core::wrap(const sourcemeta::core::JSON &schema,
   // Add a reference to the schema
   const URI uri{id};
   if (!uri.fragment().has_value() || uri.fragment().value().empty()) {
-    std::ostringstream effective_uri;
-    effective_uri << uri.recompose_without_fragment().value_or("")
-                  << to_uri(pointer).recompose();
-    result.assign("$ref", JSON{effective_uri.str()});
+    URI effective_uri{uri.recompose_without_fragment().value_or("")};
+    const auto pointer_uri = to_uri(pointer);
+    effective_uri.fragment(std::string{pointer_uri.fragment().value_or("")});
+    result.assign("$ref", JSON{effective_uri.recompose()});
   } else {
     result.assign(
         "$ref",

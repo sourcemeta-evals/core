@@ -216,11 +216,13 @@ auto SchemaTransformer::apply(
           // user's references when only fixing up their pointer fragments
           const auto original_base{
               URI{reference.second.original}.recompose_without_fragment()};
-          // TODO: This is a silly dance just because we don't have a
-          // .fragment() setter in the URI class
           if (original_base.has_value()) {
-            set(schema, reference.first.second,
-                JSON{to_uri(new_fragment, original_base.value()).recompose()});
+            URI new_uri{original_base.value()};
+            const auto new_pointer_uri = to_uri(new_fragment);
+            new_uri
+                .fragment(std::string{new_pointer_uri.fragment().value_or("")})
+                .canonicalize();
+            set(schema, reference.first.second, JSON{new_uri.recompose()});
           } else {
             set(schema, reference.first.second,
                 JSON{to_uri(new_fragment).recompose()});
