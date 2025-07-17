@@ -247,6 +247,11 @@ private:
   Locations locations_;
   References references_;
   Instances instances_;
+  mutable bool references_cache_built_{false};
+  mutable std::map<Pointer, std::vector<std::reference_wrapper<
+                                const typename References::value_type>>>
+      references_cache_;
+  auto build_references_cache() const -> void;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251 4275)
 #endif
