@@ -384,6 +384,47 @@ TEST(JSON_value, try_at_fail) {
   const auto result = document.try_at("boo");
   EXPECT_FALSE(result);
 }
+TEST(JSON_value, at_or_present) {
+  const sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":5}");
+  const sourcemeta::core::JSON fallback{42};
+  EXPECT_TRUE(document.is_object());
+  const auto result = document.at_or("foo", fallback);
+  EXPECT_EQ(result.to_integer(), 5);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_EQ(document.at("foo").to_integer(), 5);
+}
+
+TEST(JSON_value, at_or_fail) {
+  const sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":5}");
+  const sourcemeta::core::JSON fallback{42};
+  EXPECT_TRUE(document.is_object());
+  const auto result = document.at_or("bar", fallback);
+  EXPECT_EQ(result.to_integer(), 42);
+  EXPECT_EQ(document.size(), 1);
+  EXPECT_FALSE(document.defines("bar"));
+}
+
+TEST(JSON_value, at_or_hashed_present) {
+  const sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":5}");
+  const sourcemeta::core::JSON fallback{42};
+  EXPECT_TRUE(document.is_object());
+  const auto hash = document.as_object().hash("foo");
+  const auto result = document.at_or("foo", hash, fallback);
+  EXPECT_EQ(result.to_integer(), 5);
+}
+
+TEST(JSON_value, at_or_hashed_fail) {
+  const sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":5}");
+  const sourcemeta::core::JSON fallback{42};
+  EXPECT_TRUE(document.is_object());
+  const auto hash = document.as_object().hash("bar");
+  const auto result = document.at_or("bar", hash, fallback);
+  EXPECT_EQ(result.to_integer(), 42);
+}
 
 TEST(JSON_value, unordered_set_with_custom_hash) {
   std::unordered_set<sourcemeta::core::JSON,

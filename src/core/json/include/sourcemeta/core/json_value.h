@@ -999,6 +999,27 @@ public:
   try_at(const String &key,
          const typename Object::Container::hash_type hash) const
       -> const JSON *;
+  /// This method returns the value for a given key if the input JSON object
+  /// defines it; otherwise it returns the provided fallback value. This is
+  /// analogous to `std::optional::value_or`. For example:
+  ///
+  /// ```cpp
+  /// #include &lt;sourcemeta/core/json.h&gt;
+  /// #include &lt;cassert&gt;
+  ///
+  /// const sourcemeta::core::JSON document =
+  ///   sourcemeta::core::parse_json("{ \&quot;foo\&quot;: 1 }");
+  /// const sourcemeta::core::JSON fallback{42};
+  ///
+  /// assert(document.at_or("foo", fallback).to_integer() == 1);
+  /// assert(document.at_or("bar", fallback).to_integer() == 42);
+  /// ```
+  [[nodiscard]] auto at_or(const String &key, const JSON &fallback) const
+      -> JSON;
+  /// Like the overload above but given a pre-calculated hash for faster lookup.
+  [[nodiscard]] auto at_or(const String &key,
+                           const typename Object::Container::hash_type hash,
+                           const JSON &fallback) const -> JSON;
 
   /// This method checks whether an input JSON object defines a specific key.
   /// For example:
