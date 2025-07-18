@@ -359,7 +359,7 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
     return false;
   } else if (this->is_real()) {
     const auto value{this->to_real()};
-    Real integral;
+    Real integral = NAN;
     return !std::isinf(value) && !std::isnan(value) &&
            std::modf(value, &integral) == 0.0;
   } else {
