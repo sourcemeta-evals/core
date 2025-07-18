@@ -1017,7 +1017,7 @@ auto SchemaFrame::analyse(const JSON &root, const SchemaWalker &walker,
   }
 
   // A schema is standalone if all references can be resolved within itself
-  const bool standalone{std::all_of(
+  const bool standalone = std::all_of(
       this->references_.cbegin(), this->references_.cend(),
       [&](const auto &reference) {
         assert(!reference.first.second.empty());
@@ -1029,7 +1029,7 @@ auto SchemaFrame::analyse(const JSON &root, const SchemaWalker &walker,
                                           reference.second.destination}) ||
                this->locations_.contains({SchemaReferenceType::Dynamic,
                                           reference.second.destination});
-      })};
+      });
 
   if (standalone) {
     // Find all dynamic anchors
