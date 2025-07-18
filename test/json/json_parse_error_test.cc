@@ -5,6 +5,10 @@
 #include <exception>
 #include <sstream>
 
+#include <filesystem>
+#include <type_traits>
+#include <utility>
+
 #define __EXPECT_PARSE_ERROR(input, expected_line, expected_column,            \
                              expected_error, expected_message)                 \
   try {                                                                        \
@@ -30,6 +34,12 @@
                        JSONParseIntegerLimitError,                             \
                        "The JSON value is not representable by the IETF RFC "  \
                        "8259 interoperable signed integer range");
+
+static_assert(
+    std::is_same_v<
+        decltype(std::declval<const sourcemeta::core::JSONFileParseError &>()
+                     .path()),
+        const std::filesystem::path &>);
 
 TEST(JSON_parse_error, boolean_true_invalid) {
   std::istringstream input{"trrue"};
