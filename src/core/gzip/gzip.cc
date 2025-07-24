@@ -45,4 +45,51 @@ auto gzip(std::string_view input) -> std::optional<std::string> {
   return compressed.str();
 }
 
+auto gunzip(std::istream &stream) -> std::optional<std::string> {
+  z_stream zstream{};
+  if (inflateInit2(&zstream, 16 + MAX_WBITS) != Z_OK) {
+    return std::nullopt;
+  }
+
+  constexpr auto ZLIB_BUFFER_SIZE{4096};
+  std::string decompressed;
+  decompressed.reserve(ZLIB_BUFFER_SIZE);
+
+  std::array<char, ZLIB_BUFFER_SIZE> buffer_input;
+  std::array<char, ZLIB_BUFFER_SIZE> buffer_output;
+
+  auto code{Z_OK};
+  while (code != Z_STREAM_END) {
+    if (zstream.avail_in == 0 && stream) {
+      stream.read(buffer_input.data(), buffer_input.size());
+      const auto count{stream.gcount()};
+      if (count > 0) {
+        zstream.next_in = reinterpret_cast<Bytef *>(buffer_input.data());
+        zstream.avail_in = static_cast<uInt>(count);
+      } else {
+        break;
+      }
+    }
+
+    zstream.next_out = reinterpret_cast<Bytef *>(buffer_output.data());
+    zstream.avail_out = static_cast<uInt>(buffer_output.size());
+
+    code = inflate(&zstream, Z_NO_FLUSH);
+    if (code != Z_OK && code != Z_STREAM_END) {
+      inflateEnd(&zstream);
+      return std::nullopt;
+    } else {
+      decompressed.append(buffer_output.data(),
+                          buffer_output.size() - zstream.avail_out);
+    }
+  }
+
+  code = inflateEnd(&zstream);
+  if (code != Z_OK) {
+    return std::nullopt;
+  }
+
+  return decompressed;
+}
+
 } // namespace sourcemeta::core
