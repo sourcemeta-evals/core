@@ -35,6 +35,21 @@ TEST(JSONSchema_SchemaMapResolver, single_schema) {
   EXPECT_EQ(resolver("https://www.sourcemeta.com/test").value(), document);
 }
 
+TEST(JSONSchema_SchemaMapResolver, add_test) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$id": "https://www.sourcemeta.com/test",
+    "$schema": "https://json-schema.org/draft/2020-12/schema"
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/test").has_value());
+  EXPECT_EQ(resolver("https://www.sourcemeta.com/test").value(), document);
+}
+
 TEST(JSONSchema_SchemaMapResolver, single_schema_with_default_dialect) {
   sourcemeta::core::SchemaMapResolver resolver;
 

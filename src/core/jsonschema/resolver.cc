@@ -10,6 +10,25 @@ SchemaMapResolver::SchemaMapResolver() = default;
 SchemaMapResolver::SchemaMapResolver(SchemaResolver resolver)
     : default_resolver{std::move(resolver)} {}
 
+template <typename T>
+static auto assign_id(JSON &subschema, const JSON &identifier,
+                      const T &subschema_vocabularies) -> void {
+  if (subschema_vocabularies.contains(
+          "http://json-schema.org/draft-04/schema#") ||
+      subschema_vocabularies.contains(
+          "http://json-schema.org/draft-03/schema#") ||
+      subschema_vocabularies.contains(
+          "http://json-schema.org/draft-02/schema#") ||
+      subschema_vocabularies.contains(
+          "http://json-schema.org/draft-01/schema#") ||
+      subschema_vocabularies.contains(
+          "http://json-schema.org/draft-00/schema#")) {
+    subschema.assign("id", identifier);
+  } else {
+    subschema.assign("$id", identifier);
+  }
+}
+
 auto SchemaMapResolver::add(
     const JSON &schema, const std::optional<std::string> &default_dialect,
     const std::optional<std::string> &default_id,
@@ -35,21 +54,7 @@ auto SchemaMapResolver::add(
     // resolve their dialect and identifiers, otherwise the
     // consumer might have no idea what to do with them
     subschema.assign("$schema", JSON{entry.dialect});
-    // TODO: De-duplicate this id-set functionality from bundle.cc too
-    if (subschema_vocabularies.contains(
-            "http://json-schema.org/draft-04/schema#") ||
-        subschema_vocabularies.contains(
-            "http://json-schema.org/draft-03/schema#") ||
-        subschema_vocabularies.contains(
-            "http://json-schema.org/draft-02/schema#") ||
-        subschema_vocabularies.contains(
-            "http://json-schema.org/draft-01/schema#") ||
-        subschema_vocabularies.contains(
-            "http://json-schema.org/draft-00/schema#")) {
-      subschema.assign("id", JSON{key.second});
-    } else {
-      subschema.assign("$id", JSON{key.second});
-    }
+    assign_id(subschema, JSON{key.second}, subschema_vocabularies);
 
     const auto result{this->schemas.emplace(key.second, subschema)};
     if (!result.second && result.first->second != schema) {
