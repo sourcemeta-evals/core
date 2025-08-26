@@ -902,4 +902,61 @@ auto JSON::maybe_destruct_union() -> void {
   this->current_type = Type::Null;
 }
 
+auto JSON::trim() const -> JSON {
+  assert(this->is_string());
+  const auto &s = this->data_string;
+  const auto is_ws = [](const Char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' ||
+           c == '\f';
+  };
+
+  std::size_t start = 0;
+  const std::size_t n = s.size();
+  while (start < n && is_ws(s[start])) {
+    start += 1;
+  }
+
+  if (start == n) {
+    return JSON{String{}};
+  }
+
+  std::size_t end = n - 1;
+  while (end > start && is_ws(s[end])) {
+    end -= 1;
+  }
+
+  return JSON{String{s.substr(start, end - start + 1)}};
+}
+
+auto JSON::trim() -> void {
+  assert(this->is_string());
+  auto &s = this->data_string;
+  const auto is_ws = [](const Char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' ||
+           c == '\f';
+  };
+
+  std::size_t start = 0;
+  const std::size_t n = s.size();
+  while (start < n && is_ws(s[start])) {
+    start += 1;
+  }
+
+  if (start == n) {
+    s.clear();
+    return;
+  }
+
+  std::size_t end = n - 1;
+  while (end > start && is_ws(s[end])) {
+    end -= 1;
+  }
+
+  if (start == 0 && end == n - 1) {
+    return;
+  }
+
+  s = s.substr(start, end - start + 1);
+}
+
 } // namespace sourcemeta::core

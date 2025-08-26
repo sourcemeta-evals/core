@@ -1473,6 +1473,40 @@ public:
     this->erase_keys(blacklist.cbegin(), blacklist.cend());
   }
 
+  /// This method trims leading and trailing whitespace from a JSON string and
+  /// returns a new JSON instance with the trimmed result. Whitespace includes:
+  /// space, tab, line feed, carriage return, vertical tab, and form feed.
+  ///
+  /// For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/json.h>
+  /// #include <cassert>
+  ///
+  /// const sourcemeta::core::JSON document{" \t\nfoo bar\r\v\f "};
+  /// const auto trimmed{document.trim()};
+  /// assert(trimmed.is_string());
+  /// assert(trimmed.to_string() == "foo bar");
+  /// ```
+  [[nodiscard]] auto trim() const -> JSON;
+
+  /// This method trims leading and trailing whitespace from a JSON string
+  /// in-place. Whitespace includes: space, tab, line feed, carriage return,
+  /// vertical tab, and form feed.
+  ///
+  /// For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/json.h>
+  /// #include <cassert>
+  ///
+  /// sourcemeta::core::JSON document{" \t\nfoo bar\r\v\f "};
+  /// document.trim();
+  /// assert(document.is_string());
+  /// assert(document.to_string() == "foo bar");
+  /// ```
+  auto trim() -> void;
+
   /// This method deletes all members of an object except for the JSON keys
   /// declares as the second argument. For example:
   ///
