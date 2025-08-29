@@ -45,6 +45,11 @@ public:
     return column_;
   }
 
+public:
+  [[nodiscard]] auto message() const noexcept -> const std::string & {
+    return message_;
+  }
+
 private:
   std::uint64_t line_;
   std::uint64_t column_;
@@ -77,7 +82,7 @@ public:
 
   /// Create a file parsing error from a parse error
   JSONFileParseError(std::filesystem::path path, const JSONParseError &parent)
-      : JSONParseError{parent.line(), parent.column(), parent.what()},
+      : JSONParseError{parent.line(), parent.column(), parent.message()},
         path_{std::move(path)} {}
 
   /// Get the file path of the error
