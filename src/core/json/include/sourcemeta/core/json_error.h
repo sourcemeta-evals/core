@@ -85,6 +85,12 @@ public:
     return path_;
   }
 
+  /// Get the file path as a string to avoid temporary object creation in
+  /// comparisons
+  [[nodiscard]] auto path_string() const noexcept -> std::string {
+    return path_.string();
+  }
+
 private:
   std::filesystem::path path_;
 };
