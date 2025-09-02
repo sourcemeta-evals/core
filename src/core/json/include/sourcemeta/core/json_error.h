@@ -77,7 +77,8 @@ public:
 
   /// Create a file parsing error from a parse error
   JSONFileParseError(std::filesystem::path path, const JSONParseError &parent)
-      : JSONParseError{parent.line(), parent.column(), parent.what()},
+      : JSONParseError{parent.line(), parent.column(),
+                       std::string{parent.what()}},
         path_{std::move(path)} {}
 
   /// Get the file path of the error
