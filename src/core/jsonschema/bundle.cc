@@ -250,6 +250,15 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  if (default_id.has_value()) {
+    const auto current_id =
+        identify(schema, resolver, SchemaIdentificationStrategy::Strict,
+                 default_dialect);
+    if (!current_id.has_value()) {
+      reidentify(schema, default_id.value(), resolver, default_dialect);
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
