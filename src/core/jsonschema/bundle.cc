@@ -12,8 +12,7 @@ namespace {
 
 auto is_official_metaschema_reference(const sourcemeta::core::Pointer &pointer,
                                       const std::string &destination) -> bool {
-  assert(!pointer.empty());
-  assert(pointer.back().is_property());
+  assert(!pointer.empty() && pointer.back().is_property());
   return pointer.back().to_property() == "$schema" &&
          sourcemeta::core::schema_official_resolver(destination).has_value();
 }
@@ -240,8 +239,6 @@ auto dependencies(const JSON &schema, const SchemaWalker &walker,
                         default_id, paths, visited);
 }
 
-// TODO: Refactor this function to internally rely on the `.dependencies()`
-// function
 auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaResolver &resolver,
             const std::optional<std::string> &default_dialect,
@@ -256,6 +253,17 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
     bundle_schema(schema, default_container.value(), schema, frame, walker,
                   resolver, default_dialect, default_id, paths);
     return;
+  }
+
+  // If the schema identifier is implicit, add it to the top-level of the
+  // bundled schema. Otherwise, potential relative references based on this
+  // implicit base URI will likely not resolve unless end users happen to
+  // know that this implicit base URI is.
+  if (default_id.has_value() &&
+      !identify(schema, resolver, SchemaIdentificationStrategy::Strict,
+                default_dialect)
+           .has_value()) {
+    reidentify(schema, default_id.value(), resolver, default_dialect);
   }
 
   const auto vocabularies{

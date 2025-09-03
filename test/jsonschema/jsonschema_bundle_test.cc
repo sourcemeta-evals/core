@@ -170,7 +170,7 @@ TEST(JSONSchema_bundle, across_dialects_const) {
 TEST(JSONSchema_bundle, with_default_id) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "items": { "$ref": "test-2" }
+    "additionalProperties": { "$ref": "test-2" }
   })JSON");
 
   sourcemeta::core::bundle(document, sourcemeta::core::schema_official_walker,
@@ -179,7 +179,8 @@ TEST(JSONSchema_bundle, with_default_id) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "items": { "$ref": "test-2" },
+    "$id": "https://www.sourcemeta.com/default",
+    "additionalProperties": { "$ref": "test-2" },
     "$defs": {
       "https://www.sourcemeta.com/test-2": {
         "$schema": "https://json-schema.org/draft/2019-09/schema",
