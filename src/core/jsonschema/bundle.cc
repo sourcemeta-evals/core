@@ -248,6 +248,7 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const std::optional<std::string> &default_id,
             const std::optional<Pointer> &default_container,
             const SchemaFrame::Paths &paths) -> void {
+
   SchemaFrame frame{SchemaFrame::Mode::References};
 
   if (default_container.has_value()) {
@@ -266,6 +267,23 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
           "https://json-schema.org/draft/2019-09/vocab/core")) {
     bundle_schema(schema, {"$defs"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
+
+    // Add identifier to root schema if default_id is provided and schema lacks
+    // one
+    if (default_id.has_value()) {
+      const auto current_id = sourcemeta::core::identify(
+          schema, resolver,
+          sourcemeta::core::SchemaIdentificationStrategy::Strict,
+          default_dialect, default_id);
+      if (!current_id.has_value()) {
+        const auto base_dialect_value =
+            sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+        if (base_dialect_value.has_value()) {
+          sourcemeta::core::reidentify(schema, default_id.value(),
+                                       base_dialect_value.value());
+        }
+      }
+    }
     return;
   } else if (vocabularies.contains("http://json-schema.org/draft-07/schema#") ||
              vocabularies.contains(
@@ -278,6 +296,23 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
                  "http://json-schema.org/draft-04/hyper-schema#")) {
     bundle_schema(schema, {"definitions"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
+
+    // Add identifier to root schema if default_id is provided and schema lacks
+    // one
+    if (default_id.has_value()) {
+      const auto current_id = sourcemeta::core::identify(
+          schema, resolver,
+          sourcemeta::core::SchemaIdentificationStrategy::Strict,
+          default_dialect, default_id);
+      if (!current_id.has_value()) {
+        const auto base_dialect_value =
+            sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+        if (base_dialect_value.has_value()) {
+          sourcemeta::core::reidentify(schema, default_id.value(),
+                                       base_dialect_value.value());
+        }
+      }
+    }
     return;
   } else if (vocabularies.contains(
                  "http://json-schema.org/draft-03/hyper-schema#") ||
