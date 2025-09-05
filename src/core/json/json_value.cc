@@ -812,6 +812,13 @@ auto JSON::assign_if_missing(const JSON::String &key, JSON &&value) -> void {
   }
 }
 
+auto JSON::merge(const JSON::Object &source) -> void {
+  assert(this->is_object());
+  for (const auto &entry : source) {
+    this->assign(entry.first, entry.second);
+  }
+}
+
 auto JSON::erase(const JSON::String &key) -> typename Object::size_type {
   assert(this->is_object());
   return this->data_object.data.erase(key);

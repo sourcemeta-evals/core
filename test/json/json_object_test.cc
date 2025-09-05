@@ -755,3 +755,86 @@ TEST(JSON_object, rename_match_destination_exists) {
   EXPECT_TRUE(document.at("bar").is_boolean());
   EXPECT_TRUE(document.at("bar").to_boolean());
 }
+
+TEST(JSON_object, merge_empty_source) {
+  sourcemeta::core::JSON document{{"foo", sourcemeta::core::JSON{1}},
+                                  {"bar", sourcemeta::core::JSON{2}}};
+  const sourcemeta::core::JSON source = sourcemeta::core::JSON::make_object();
+
+  EXPECT_EQ(document.size(), 2);
+  document.merge(source.as_object());
+  EXPECT_EQ(document.size(), 2);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_TRUE(document.defines("bar"));
+  EXPECT_EQ(document.at("foo").to_integer(), 1);
+  EXPECT_EQ(document.at("bar").to_integer(), 2);
+}
+
+TEST(JSON_object, merge_empty_target) {
+  sourcemeta::core::JSON document = sourcemeta::core::JSON::make_object();
+  const sourcemeta::core::JSON source{{"foo", sourcemeta::core::JSON{1}},
+                                      {"bar", sourcemeta::core::JSON{2}}};
+
+  EXPECT_EQ(document.size(), 0);
+  document.merge(source.as_object());
+  EXPECT_EQ(document.size(), 2);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_TRUE(document.defines("bar"));
+  EXPECT_EQ(document.at("foo").to_integer(), 1);
+  EXPECT_EQ(document.at("bar").to_integer(), 2);
+}
+
+TEST(JSON_object, merge_no_overlap) {
+  sourcemeta::core::JSON document{{"foo", sourcemeta::core::JSON{1}},
+                                  {"bar", sourcemeta::core::JSON{2}}};
+  const sourcemeta::core::JSON source{{"baz", sourcemeta::core::JSON{3}},
+                                      {"qux", sourcemeta::core::JSON{4}}};
+
+  EXPECT_EQ(document.size(), 2);
+  document.merge(source.as_object());
+  EXPECT_EQ(document.size(), 4);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_TRUE(document.defines("bar"));
+  EXPECT_TRUE(document.defines("baz"));
+  EXPECT_TRUE(document.defines("qux"));
+  EXPECT_EQ(document.at("foo").to_integer(), 1);
+  EXPECT_EQ(document.at("bar").to_integer(), 2);
+  EXPECT_EQ(document.at("baz").to_integer(), 3);
+  EXPECT_EQ(document.at("qux").to_integer(), 4);
+}
+
+TEST(JSON_object, merge_with_overlap) {
+  sourcemeta::core::JSON document{{"foo", sourcemeta::core::JSON{1}},
+                                  {"bar", sourcemeta::core::JSON{2}}};
+  const sourcemeta::core::JSON source{{"bar", sourcemeta::core::JSON{3}},
+                                      {"baz", sourcemeta::core::JSON{4}}};
+
+  EXPECT_EQ(document.size(), 2);
+  document.merge(source.as_object());
+  EXPECT_EQ(document.size(), 3);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_TRUE(document.defines("bar"));
+  EXPECT_TRUE(document.defines("baz"));
+  EXPECT_EQ(document.at("foo").to_integer(), 1);
+  EXPECT_EQ(document.at("bar").to_integer(), 3);
+  EXPECT_EQ(document.at("baz").to_integer(), 4);
+}
+
+TEST(JSON_object, merge_different_types) {
+  sourcemeta::core::JSON document{{"foo", sourcemeta::core::JSON{1}},
+                                  {"bar", sourcemeta::core::JSON{"string"}}};
+  const sourcemeta::core::JSON source{{"bar", sourcemeta::core::JSON{true}},
+                                      {"baz", sourcemeta::core::JSON{3.14}}};
+
+  EXPECT_EQ(document.size(), 2);
+  document.merge(source.as_object());
+  EXPECT_EQ(document.size(), 3);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_TRUE(document.defines("bar"));
+  EXPECT_TRUE(document.defines("baz"));
+  EXPECT_EQ(document.at("foo").to_integer(), 1);
+  EXPECT_TRUE(document.at("bar").is_boolean());
+  EXPECT_TRUE(document.at("bar").to_boolean());
+  EXPECT_TRUE(document.at("baz").is_real());
+  EXPECT_EQ(document.at("baz").to_real(), 3.14);
+}
