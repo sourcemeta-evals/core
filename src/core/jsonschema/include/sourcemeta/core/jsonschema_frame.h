@@ -108,7 +108,7 @@ public:
   /// intensive
   enum class Mode { Locations, References, Instances };
 
-  SchemaFrame(const Mode mode) : mode_{mode} {}
+  SchemaFrame(const Mode mode) : mode_{mode}, standalone_{false} {}
 
   // Query the current mode that the schema frame was configured with
   auto mode() const noexcept -> Mode { return this->mode_; }
@@ -200,6 +200,10 @@ public:
   /// Access the analysed schema references
   auto references() const noexcept -> const References &;
 
+  /// Check if the analyzed schema is standalone (has no unresolved external
+  /// references)
+  auto standalone() const noexcept -> bool;
+
   /// Get the vocabularies associated with a location entry
   auto vocabularies(const Location &location,
                     const SchemaResolver &resolver) const -> Vocabularies;
@@ -244,6 +248,7 @@ private:
   Locations locations_;
   References references_;
   Instances instances_;
+  bool standalone_;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251 4275)
 #endif
