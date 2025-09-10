@@ -3,6 +3,7 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -614,6 +615,69 @@ TEST(JSONSchema_transformer, remove_rule_by_name) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (const auto &rule : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_NE(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  std::vector<std::string> rule_names;
+  for (const auto &rule : bundle) {
+    count++;
+    rule_names.push_back(rule.first);
+    EXPECT_NE(rule.second.get(), nullptr);
+    EXPECT_EQ(rule.second->name(), rule.first);
+  }
+  EXPECT_EQ(count, 1);
+  EXPECT_EQ(rule_names.at(0), "example_rule_1");
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::size_t count = 0;
+  std::set<std::string> rule_names;
+  for (const auto &rule : bundle) {
+    count++;
+    rule_names.insert(rule.first);
+    EXPECT_NE(rule.second.get(), nullptr);
+    EXPECT_EQ(rule.second->name(), rule.first);
+  }
+  EXPECT_EQ(count, 3);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, iterator_rule_introspection) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  for (const auto &rule : bundle) {
+    EXPECT_EQ(rule.first, "example_rule_1");
+    EXPECT_EQ(rule.second->name(), "example_rule_1");
+    EXPECT_EQ(rule.second->message(), "Keyword foo is not permitted");
+  }
 }
 
 TEST(JSONSchema_transformer, unfixable_apply_without_description) {
