@@ -239,4 +239,44 @@ auto SchemaTransformer::remove(const std::string &name) -> bool {
   return this->rules.erase(name) > 0;
 }
 
+SchemaTransformer::const_iterator::const_iterator(
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        iter)
+    : iter_(iter) {}
+
+auto SchemaTransformer::const_iterator::operator*() const -> value_type {
+  return {iter_->first, *iter_->second};
+}
+
+auto SchemaTransformer::const_iterator::operator++() -> const_iterator & {
+  ++iter_;
+  return *this;
+}
+
+auto SchemaTransformer::const_iterator::operator==(
+    const const_iterator &other) const -> bool {
+  return iter_ == other.iter_;
+}
+
+auto SchemaTransformer::const_iterator::operator!=(
+    const const_iterator &other) const -> bool {
+  return iter_ != other.iter_;
+}
+
+auto SchemaTransformer::begin() const -> const_iterator {
+  return const_iterator(this->rules.begin());
+}
+
+auto SchemaTransformer::end() const -> const_iterator {
+  return const_iterator(this->rules.end());
+}
+
+auto SchemaTransformer::cbegin() const -> const_iterator {
+  return const_iterator(this->rules.cbegin());
+}
+
+auto SchemaTransformer::cend() const -> const_iterator {
+  return const_iterator(this->rules.cend());
+}
+
 } // namespace sourcemeta::core

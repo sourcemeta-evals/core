@@ -205,6 +205,31 @@ public:
   auto operator=(SchemaTransformer &&) -> SchemaTransformer & = default;
 #endif
 
+  /// @ingroup jsonschema
+  /// A const iterator for read-only access to transformation rules
+  class SOURCEMETA_CORE_JSONSCHEMA_EXPORT const_iterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type =
+        std::pair<const std::string &, const SchemaTransformRule &>;
+    using pointer = const value_type *;
+    using reference = const value_type &;
+
+    const_iterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator iter);
+
+    auto operator*() const -> value_type;
+    auto operator++() -> const_iterator &;
+    auto operator==(const const_iterator &other) const -> bool;
+    auto operator!=(const const_iterator &other) const -> bool;
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        iter_;
+  };
+
   /// Add a rule to the bundle
   template <std::derived_from<SchemaTransformRule> T, typename... Args>
   auto add(Args &&...args) -> void {
@@ -216,6 +241,12 @@ public:
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// Iterator support for read-only access to rules
+  auto begin() const -> const_iterator;
+  auto end() const -> const_iterator;
+  auto cbegin() const -> const_iterator;
+  auto cend() const -> const_iterator;
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:

@@ -3,6 +3,7 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1186,4 +1187,82 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  int count = 0;
+  for (const auto &rule : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+
+  int count = 0;
+  for (const auto &rule : bundle) {
+    EXPECT_EQ(rule.first, "example_rule_1");
+    EXPECT_EQ(rule.second.name(), "example_rule_1");
+    EXPECT_EQ(rule.second.message(), "Keyword foo is not permitted");
+    count++;
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::set<std::string> rule_names;
+  int count = 0;
+  for (const auto &rule : bundle) {
+    rule_names.insert(rule.first);
+    EXPECT_EQ(rule.first, rule.second.name());
+    count++;
+  }
+
+  EXPECT_EQ(count, 3);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, iterator_read_only_access) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  for (const auto &rule : bundle) {
+    EXPECT_FALSE(rule.second.name().empty());
+    EXPECT_FALSE(rule.second.message().empty());
+
+    EXPECT_EQ(rule.first, rule.second.name());
+  }
+}
+
+TEST(JSONSchema_transformer, iterator_after_rule_removal) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_TRUE(bundle.remove("example_rule_1"));
+
+  int count = 0;
+  for (const auto &rule : bundle) {
+    EXPECT_EQ(rule.first, "example_rule_2");
+    EXPECT_EQ(rule.second.name(), "example_rule_2");
+    count++;
+  }
+  EXPECT_EQ(count, 1);
 }
