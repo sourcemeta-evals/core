@@ -25,6 +25,9 @@
 
 namespace sourcemeta::core {
 
+// Forward declaration
+class SchemaTransformerIterator;
+
 /// @ingroup jsonschema
 ///
 /// A class that represents a transformation rule. Clients of this class
@@ -217,6 +220,13 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Iterator support for read-only introspection of registered rules
+  using const_iterator = SchemaTransformerIterator;
+  auto begin() const -> const_iterator;
+  auto end() const -> const_iterator;
+  auto cbegin() const -> const_iterator;
+  auto cend() const -> const_iterator;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
@@ -253,6 +263,31 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif
+};
+
+/// @ingroup jsonschema
+/// A read-only iterator for SchemaTransformer rules that provides access to
+/// rule metadata
+class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformerIterator {
+public:
+  using iterator_category = std::forward_iterator_tag;
+  using difference_type = std::ptrdiff_t;
+  using value_type = std::pair<const std::string &, const std::string &>;
+  using pointer = const value_type *;
+  using reference = const value_type &;
+
+  SchemaTransformerIterator(
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator iter);
+
+  auto operator*() const -> value_type;
+  auto operator++() -> SchemaTransformerIterator &;
+  auto operator==(const SchemaTransformerIterator &other) const -> bool;
+  auto operator!=(const SchemaTransformerIterator &other) const -> bool;
+
+private:
+  std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+      iter_;
 };
 
 } // namespace sourcemeta::core
