@@ -25,3 +25,20 @@ TEST(JSONSchema, resolution_error_throw) {
   EXPECT_EQ(std::string{exception.what()}, "My error");
   EXPECT_EQ(exception.id(), "https://sourcemeta.com/test");
 }
+
+TEST(JSONSchema, broken_reference_error_throw) {
+  static_assert(std::is_base_of_v<sourcemeta::core::SchemaReferenceError,
+                                  sourcemeta::core::SchemaBrokenReferenceError>,
+                "Must subclass SchemaReferenceError");
+  static_assert(std::is_base_of_v<std::exception,
+                                  sourcemeta::core::SchemaBrokenReferenceError>,
+                "Must subclass std::exception");
+  auto exception{sourcemeta::core::SchemaBrokenReferenceError(
+      "https://example.com#/broken", sourcemeta::core::Pointer{"ref"},
+      "Broken reference")};
+  EXPECT_THROW(throw exception, sourcemeta::core::SchemaBrokenReferenceError);
+  EXPECT_THROW(throw exception, sourcemeta::core::SchemaReferenceError);
+  EXPECT_EQ(std::string{exception.what()}, "Broken reference");
+  EXPECT_EQ(exception.id(), "https://example.com#/broken");
+  EXPECT_EQ(sourcemeta::core::to_string(exception.location()), "/ref");
+}
