@@ -98,15 +98,15 @@ public:
       return false;
     }
 
-    if (vocabularies.contains(
-            "http://json-schema.org/draft-02/hyper-schema#") &&
+    if (vocabularies.contains("http://json-schema.org/draft-02/schema#") &&
         schema.defines_any({"enum", "disallow", "extends"})) {
+      std::cerr << "DRAFT 2\n";
       return false;
     }
 
-    if (vocabularies.contains(
-            "http://json-schema.org/draft-01/hyper-schema#") &&
+    if (vocabularies.contains("http://json-schema.org/draft-01/schema#") &&
         schema.defines_any({"enum", "disallow", "extends"})) {
+      std::cerr << "DRAFT 1\n";
       return false;
     }
 

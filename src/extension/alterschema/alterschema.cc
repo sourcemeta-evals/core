@@ -5,6 +5,7 @@
 // For built-in rules
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <iterator>
 #include <utility>
 namespace sourcemeta::core {
