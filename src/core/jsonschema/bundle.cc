@@ -266,6 +266,13 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
           "https://json-schema.org/draft/2019-09/vocab/core")) {
     bundle_schema(schema, {"$defs"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
+
+    if (default_id.has_value() && !schema.defines("$id") &&
+        !schema.defines("id")) {
+      sourcemeta::core::reidentify(
+          schema, default_id.value(),
+          "https://json-schema.org/draft/2020-12/schema");
+    }
     return;
   } else if (vocabularies.contains("http://json-schema.org/draft-07/schema#") ||
              vocabularies.contains(
@@ -278,6 +285,13 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
                  "http://json-schema.org/draft-04/hyper-schema#")) {
     bundle_schema(schema, {"definitions"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
+
+    if (default_id.has_value() && !schema.defines("$id") &&
+        !schema.defines("id")) {
+      sourcemeta::core::reidentify(
+          schema, default_id.value(),
+          "https://json-schema.org/draft/2020-12/schema");
+    }
     return;
   } else if (vocabularies.contains(
                  "http://json-schema.org/draft-03/hyper-schema#") ||
@@ -293,6 +307,33 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
              vocabularies.contains("http://json-schema.org/draft-00/schema#")) {
     frame.analyse(schema, walker, resolver, default_dialect, default_id);
     if (frame.standalone()) {
+      if (default_id.has_value()) {
+        const auto base_dialect_result =
+            sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+        if (base_dialect_result.has_value()) {
+          const auto keyword =
+              (base_dialect_result.value() ==
+                   "http://json-schema.org/draft-04/schema#" ||
+               base_dialect_result.value() ==
+                   "http://json-schema.org/draft-04/hyper-schema#" ||
+               base_dialect_result.value() ==
+                   "http://json-schema.org/draft-03/schema#" ||
+               base_dialect_result.value() ==
+                   "http://json-schema.org/draft-03/hyper-schema#" ||
+               base_dialect_result.value() ==
+                   "http://json-schema.org/draft-02/hyper-schema#" ||
+               base_dialect_result.value() ==
+                   "http://json-schema.org/draft-01/hyper-schema#" ||
+               base_dialect_result.value() ==
+                   "http://json-schema.org/draft-00/hyper-schema#")
+                  ? "id"
+                  : "$id";
+          if (!schema.defines(keyword)) {
+            sourcemeta::core::reidentify(schema, default_id.value(),
+                                         base_dialect_result.value());
+          }
+        }
+      }
       return;
     }
   }
