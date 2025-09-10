@@ -2,6 +2,7 @@
 
 #include <cassert>       // assert
 #include <cstdint>       // std::uint64_t
+#include <iostream>      // std::cerr
 #include <limits>        // std::numeric_limits
 #include <numeric>       // std::accumulate
 #include <sstream>       // std::ostringstream

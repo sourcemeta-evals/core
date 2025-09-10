@@ -101,7 +101,7 @@ public:
     return this->message_.c_str();
   }
 
-  [[nodiscard]] auto id() const noexcept -> std::string_view {
+  [[nodiscard]] auto id() const noexcept -> const auto & {
     return this->identifier_;
   }
 
@@ -113,6 +113,11 @@ private:
   std::string identifier_;
   Pointer schema_location_;
   std::string message_;
+};
+
+class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaBrokenReferenceError
+    : public SchemaReferenceError {
+  using SchemaReferenceError::SchemaReferenceError;
 };
 
 /// @ingroup jsonschema
