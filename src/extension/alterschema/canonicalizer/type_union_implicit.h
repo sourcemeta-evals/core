@@ -98,6 +98,11 @@ public:
       return false;
     }
 
+    if (vocabularies.contains("http://json-schema.org/draft-02/schema#") &&
+        vocabularies.contains("http://json-schema.org/draft-01/schema#")) {
+      return false;
+    }
+
     if (vocabularies.contains(
             "http://json-schema.org/draft-02/hyper-schema#") &&
         schema.defines_any({"enum", "disallow", "extends"})) {
