@@ -1187,3 +1187,59 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 0);
+}
+
+TEST(JSONSchema_transformer, iterator_with_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_NE(bundle.cbegin(), bundle.cend());
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 2);
+
+  std::vector<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    rule_names.push_back(entry.first);
+    EXPECT_NE(entry.second.get(), nullptr);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(std::is_sorted(rule_names.begin(), rule_names.end()));
+}
+
+TEST(JSONSchema_transformer, const_iterator_all_of) {
+  const sourcemeta::core::SchemaTransformer bundle = []() {
+    sourcemeta::core::SchemaTransformer b;
+    b.add<ExampleRule1>();
+    b.add<ExampleRule2>();
+    return b;
+  }();
+
+  const bool result =
+      std::all_of(bundle.cbegin(), bundle.cend(), [](const auto &entry) {
+        return !entry.first.empty() && entry.second != nullptr;
+      });
+  EXPECT_TRUE(result);
+}
+
+TEST(JSONSchema_transformer, iterator_for_each) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> rule_names;
+  std::for_each(bundle.begin(), bundle.end(), [&rule_names](const auto &entry) {
+    rule_names.push_back(entry.first);
+  });
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(std::is_sorted(rule_names.begin(), rule_names.end()));
+}
