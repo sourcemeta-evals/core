@@ -1187,3 +1187,58 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_functionality) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  // Test empty transformer
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 0);
+
+  // Add some rules
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  // Test iteration over rules
+  std::set<std::string> rule_names;
+  for (const auto &rule_pair : bundle) {
+    rule_names.insert(rule_pair.first);
+    EXPECT_NE(rule_pair.second.get(), nullptr);
+  }
+
+  // Verify all expected rules are present
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_3"));
+
+  // Test const iteration
+  const auto &const_bundle = bundle;
+  std::set<std::string> const_rule_names;
+  for (auto it = const_bundle.cbegin(); it != const_bundle.cend(); ++it) {
+    const_rule_names.insert(it->first);
+    EXPECT_NE(it->second.get(), nullptr);
+  }
+
+  EXPECT_EQ(const_rule_names, rule_names);
+
+  // Test iterator distance
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 3);
+  EXPECT_EQ(std::distance(bundle.cbegin(), bundle.cend()), 3);
+
+  // Test rule removal affects iteration
+  EXPECT_TRUE(bundle.remove("example_rule_2"));
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 2);
+
+  std::set<std::string> remaining_names;
+  for (const auto &rule_pair : bundle) {
+    remaining_names.insert(rule_pair.first);
+  }
+
+  EXPECT_EQ(remaining_names.size(), 2);
+  EXPECT_TRUE(remaining_names.contains("example_rule_1"));
+  EXPECT_FALSE(remaining_names.contains("example_rule_2"));
+  EXPECT_TRUE(remaining_names.contains("example_rule_3"));
+}
