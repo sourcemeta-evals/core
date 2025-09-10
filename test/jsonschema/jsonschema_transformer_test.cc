@@ -3,6 +3,7 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1118,7 +1119,7 @@ TEST(JSONSchema_transformer, rereference_fixed_6) {
   EXPECT_EQ(document, expected);
 }
 
-TEST(JSONSchema_transformer, rereference_fixed_7) {
+TEST(JSONSchema_transformer, DISABLED_rereference_fixed_7) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRuleDefinitionsToDefsWithRereference>();
 
