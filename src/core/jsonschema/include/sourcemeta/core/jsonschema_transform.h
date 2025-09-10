@@ -242,6 +242,16 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// Get const iterator to the beginning of the rules map
+  [[nodiscard]] auto begin() const
+      -> std::map<std::string,
+                  std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get const iterator to the end of the rules map
+  [[nodiscard]] auto end() const
+      -> std::map<std::string,
+                  std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
