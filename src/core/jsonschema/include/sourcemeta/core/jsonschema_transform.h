@@ -242,6 +242,9 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  auto get_rules()
+      -> const std::map<std::string, std::unique_ptr<SchemaTransformRule>> &;
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.

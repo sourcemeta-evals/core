@@ -779,3 +779,8 @@ auto sourcemeta::core::wrap(const sourcemeta::core::JSON &schema,
 
   return result;
 }
+
+auto sourcemeta::core::SchemaTransformer::get_rules()
+    -> const std::map<std::string, std::unique_ptr<SchemaTransformRule>> & {
+  return this->rules;
+};
