@@ -1187,3 +1187,46 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_support) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  // Test empty transformer
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  // Add some rules
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  // Test iterator functionality
+  auto it = bundle.begin();
+  EXPECT_NE(it, bundle.end());
+
+  // Count rules using iterator
+  std::size_t count = 0;
+  for (auto iter = bundle.begin(); iter != bundle.end(); ++iter) {
+    count++;
+    // Verify we can access rule name and object
+    EXPECT_FALSE(iter->first.empty());      // Rule name should not be empty
+    EXPECT_NE(iter->second.get(), nullptr); // Rule pointer should not be null
+  }
+  EXPECT_EQ(count, 2);
+
+  // Test range-based for loop
+  count = 0;
+  for (const auto &rule_pair : bundle) {
+    count++;
+    EXPECT_FALSE(rule_pair.first.empty());
+    EXPECT_NE(rule_pair.second.get(), nullptr);
+  }
+  EXPECT_EQ(count, 2);
+
+  // Test const iterators
+  const auto &const_bundle = bundle;
+  count = 0;
+  for (auto iter = const_bundle.cbegin(); iter != const_bundle.cend(); ++iter) {
+    count++;
+  }
+  EXPECT_EQ(count, 2);
+}
