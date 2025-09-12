@@ -266,7 +266,6 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
           "https://json-schema.org/draft/2019-09/vocab/core")) {
     bundle_schema(schema, {"$defs"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
-    return;
   } else if (vocabularies.contains("http://json-schema.org/draft-07/schema#") ||
              vocabularies.contains(
                  "http://json-schema.org/draft-07/hyper-schema#") ||
@@ -278,7 +277,6 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
                  "http://json-schema.org/draft-04/hyper-schema#")) {
     bundle_schema(schema, {"definitions"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
-    return;
   } else if (vocabularies.contains(
                  "http://json-schema.org/draft-03/hyper-schema#") ||
              vocabularies.contains("http://json-schema.org/draft-03/schema#") ||
@@ -293,14 +291,47 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
              vocabularies.contains("http://json-schema.org/draft-00/schema#")) {
     frame.analyse(schema, walker, resolver, default_dialect, default_id);
     if (frame.standalone()) {
+      // Add identifier to root schema if default_id is provided and schema
+      // lacks one
+      if (default_id.has_value()) {
+        const auto current_id = sourcemeta::core::identify(
+            schema, resolver,
+            sourcemeta::core::SchemaIdentificationStrategy::Strict,
+            default_dialect, std::nullopt);
+        if (!current_id.has_value()) {
+          const auto base_dialect =
+              sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+          if (base_dialect.has_value()) {
+            sourcemeta::core::reidentify(schema, default_id.value(),
+                                         base_dialect.value());
+          }
+        }
+      }
       return;
     }
+  } else {
+    // We don't attempt to bundle on dialects where we
+    // don't know where to put the embedded schemas
+    throw SchemaError(
+        "Could not determine how to perform bundling in this dialect");
   }
 
-  // We don't attempt to bundle on dialects where we
-  // don't know where to put the embedded schemas
-  throw SchemaError(
-      "Could not determine how to perform bundling in this dialect");
+  // Add identifier to root schema if default_id is provided and schema lacks
+  // one
+  if (default_id.has_value()) {
+    const auto current_id = sourcemeta::core::identify(
+        schema, resolver,
+        sourcemeta::core::SchemaIdentificationStrategy::Strict, default_dialect,
+        std::nullopt);
+    if (!current_id.has_value()) {
+      const auto base_dialect =
+          sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+      if (base_dialect.has_value()) {
+        sourcemeta::core::reidentify(schema, default_id.value(),
+                                     base_dialect.value());
+      }
+    }
+  }
 }
 
 auto bundle(const JSON &schema, const SchemaWalker &walker,
