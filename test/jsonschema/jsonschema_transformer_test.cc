@@ -1187,3 +1187,51 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterate_over_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  // Test const iteration using range-based for loop
+  std::vector<std::string> rule_names;
+  for (const auto &rule_entry : bundle) {
+    rule_names.push_back(rule_entry.first);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") != rule_names.end());
+
+  // Test explicit iterator methods
+  auto it = bundle.begin();
+  EXPECT_NE(it, bundle.end());
+
+  // Test cbegin/cend methods
+  auto cit = bundle.cbegin();
+  EXPECT_NE(cit, bundle.cend());
+
+  // Verify iterator count matches expected
+  std::size_t count = 0;
+  for (auto iter = bundle.begin(); iter != bundle.end(); ++iter) {
+    count++;
+  }
+  EXPECT_EQ(count, 2);
+}
+
+TEST(JSONSchema_transformer, iterate_over_empty_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  // Test iteration over empty bundle
+  std::size_t count = 0;
+  for (const auto &rule_entry : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+
+  // Test that begin equals end for empty bundle
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
