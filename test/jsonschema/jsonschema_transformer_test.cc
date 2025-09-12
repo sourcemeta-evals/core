@@ -3,6 +3,8 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <iterator>
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1186,4 +1188,87 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  int count = 0;
+  for (const auto &rule : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 1);
+  EXPECT_EQ(std::distance(bundle.cbegin(), bundle.cend()), 1);
+
+  int count = 0;
+  for (const auto &rule : bundle) {
+    count++;
+    EXPECT_EQ(rule.first, "example_rule_1");
+    EXPECT_NE(rule.second.get(), nullptr);
+    EXPECT_EQ(rule.second->name(), "example_rule_1");
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 3);
+  EXPECT_EQ(std::distance(bundle.cbegin(), bundle.cend()), 3);
+
+  std::set<std::string> rule_names;
+  for (const auto &rule : bundle) {
+    rule_names.insert(rule.first);
+    EXPECT_NE(rule.second.get(), nullptr);
+    EXPECT_EQ(rule.second->name(), rule.first);
+  }
+
+  std::set<std::string> expected_names = {"example_rule_1", "example_rule_2",
+                                          "example_rule_3"};
+  EXPECT_EQ(rule_names, expected_names);
+}
+
+TEST(JSONSchema_transformer, iterator_after_rule_removal) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 2);
+
+  EXPECT_TRUE(bundle.remove("example_rule_1"));
+
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 1);
+
+  for (const auto &rule : bundle) {
+    EXPECT_EQ(rule.first, "example_rule_2");
+    EXPECT_EQ(rule.second->name(), "example_rule_2");
+  }
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  auto it = const_bundle.begin();
+  auto cit = const_bundle.cbegin();
+
+  EXPECT_EQ(it, cit);
+  EXPECT_EQ(const_bundle.end(), const_bundle.cend());
+
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_NE(it->second.get(), nullptr);
 }
