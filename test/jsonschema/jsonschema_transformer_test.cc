@@ -1187,3 +1187,46 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterator_empty) {
+  sourcemeta::core::SchemaTransformer transformer;
+
+  EXPECT_EQ(transformer.begin(), transformer.end());
+  EXPECT_EQ(transformer.cbegin(), transformer.cend());
+
+  std::size_t count = 0;
+  for (const auto &rule : transformer) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_with_rules) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+  transformer.add<ExampleRule2>();
+
+  std::vector<std::string> rule_names;
+  for (const auto &rule : transformer) {
+    rule_names.push_back(rule.first);
+    EXPECT_FALSE(rule.second->name().empty());
+    EXPECT_FALSE(rule.second->message().empty());
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") != rule_names.end());
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+
+  const auto &const_transformer = transformer;
+
+  auto it = const_transformer.cbegin();
+  EXPECT_NE(it, const_transformer.cend());
+
+  EXPECT_FALSE(it->second->name().empty());
+}
