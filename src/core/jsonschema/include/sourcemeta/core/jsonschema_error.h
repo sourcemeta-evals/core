@@ -159,6 +159,17 @@ public:
   }
 };
 
+/// @ingroup jsonschema
+/// An error that represents a schema reference that broke after transformation
+class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaBrokenReferenceError
+    : public SchemaReferenceError {
+public:
+  SchemaBrokenReferenceError(std::string identifier, Pointer schema_location,
+                             std::string message)
+      : SchemaReferenceError{std::move(identifier), std::move(schema_location),
+                             std::move(message)} {}
+};
+
 #if defined(_MSC_VER)
 #pragma warning(default : 4251 4275)
 #endif
