@@ -1187,3 +1187,94 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty) {
+  sourcemeta::core::SchemaTransformer transformer;
+
+  EXPECT_EQ(transformer.begin(), transformer.end());
+  EXPECT_EQ(transformer.cbegin(), transformer.cend());
+
+  std::size_t count = 0;
+  for (const auto &rule : transformer) {
+    (void)rule;
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRuleDefinitionsToDefsWithRereference>();
+
+  EXPECT_NE(transformer.begin(), transformer.end());
+  EXPECT_NE(transformer.cbegin(), transformer.cend());
+
+  std::size_t count = 0;
+  std::string found_name;
+  for (const auto &[name, rule] : transformer) {
+    found_name = name;
+    EXPECT_NE(rule.get(), nullptr);
+    count++;
+  }
+  EXPECT_EQ(count, 1);
+  EXPECT_EQ(found_name, "example_rule_definitions_to_defs_with_rereference");
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRuleDefinitionsToDefsWithRereference>();
+  transformer.add<ExampleRuleDefinitionsToDefsNoRereference>();
+
+  EXPECT_NE(transformer.begin(), transformer.end());
+  EXPECT_NE(transformer.cbegin(), transformer.cend());
+
+  std::set<std::string> found_names;
+  std::size_t count = 0;
+  for (const auto &[name, rule] : transformer) {
+    found_names.insert(name);
+    EXPECT_NE(rule.get(), nullptr);
+    count++;
+  }
+  EXPECT_EQ(count, 2);
+  EXPECT_TRUE(found_names.contains(
+      "example_rule_definitions_to_defs_with_rereference"));
+  EXPECT_TRUE(
+      found_names.contains("example_rule_definitions_to_defs_no_rereference"));
+}
+
+TEST(JSONSchema_transformer, iterator_after_remove) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRuleDefinitionsToDefsWithRereference>();
+  transformer.add<ExampleRuleDefinitionsToDefsNoRereference>();
+
+  EXPECT_TRUE(
+      transformer.remove("example_rule_definitions_to_defs_with_rereference"));
+
+  std::size_t count = 0;
+  std::string found_name;
+  for (const auto &[name, rule] : transformer) {
+    found_name = name;
+    EXPECT_NE(rule.get(), nullptr);
+    count++;
+  }
+  EXPECT_EQ(count, 1);
+  EXPECT_EQ(found_name, "example_rule_definitions_to_defs_no_rereference");
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRuleDefinitionsToDefsWithRereference>();
+
+  const auto &const_transformer = transformer;
+
+  auto it = const_transformer.begin();
+  auto cit = const_transformer.cbegin();
+
+  EXPECT_EQ(it, cit);
+  EXPECT_NE(it, const_transformer.end());
+  EXPECT_NE(cit, const_transformer.cend());
+
+  const auto &[name, rule] = *it;
+  EXPECT_EQ(name, "example_rule_definitions_to_defs_with_rereference");
+  EXPECT_NE(rule.get(), nullptr);
+}
