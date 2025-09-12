@@ -12,6 +12,7 @@
 
 #include <cassert>     // assert
 #include <concepts>    // std::derived_from
+#include <cstddef>     // std::size_t
 #include <functional>  // std::function
 #include <map>         // std::map
 #include <memory>      // std::make_unique, std::unique_ptr
@@ -241,6 +242,29 @@ public:
              const std::optional<JSON::String> &default_dialect = std::nullopt,
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
+
+  /// Iterator support for read-only access to rules
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get const iterator to beginning of rules
+  auto begin() const -> const_iterator;
+
+  /// Get const iterator to end of rules
+  auto end() const -> const_iterator;
+
+  /// Get const iterator to beginning of rules
+  auto cbegin() const -> const_iterator;
+
+  /// Get const iterator to end of rules
+  auto cend() const -> const_iterator;
+
+  /// Get number of registered rules
+  auto size() const -> std::size_t;
+
+  /// Check if no rules are registered
+  auto empty() const -> bool;
 
 private:
 // Exporting symbols that depends on the standard C++ library is considered
