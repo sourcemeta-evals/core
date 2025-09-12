@@ -217,6 +217,29 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Iterator support for read-only introspection of registered rules
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get iterator to the beginning of the rules collection
+  auto begin() const -> const_iterator;
+
+  /// Get iterator to the end of the rules collection
+  auto end() const -> const_iterator;
+
+  /// Get const iterator to the beginning of the rules collection
+  auto cbegin() const -> const_iterator;
+
+  /// Get const iterator to the end of the rules collection
+  auto cend() const -> const_iterator;
+
+  /// Get the number of registered rules
+  auto size() const -> std::size_t;
+
+  /// Check if the transformer has no registered rules
+  auto empty() const -> bool;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///

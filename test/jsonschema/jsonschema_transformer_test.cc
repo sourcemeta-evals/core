@@ -1187,3 +1187,67 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_TRUE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iterator_with_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 2);
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_NE(bundle.cbegin(), bundle.cend());
+
+  // Test iteration over rules
+  std::set<std::string> rule_names;
+  for (const auto &rule_pair : bundle) {
+    rule_names.insert(rule_pair.first);
+    EXPECT_NE(rule_pair.second.get(), nullptr);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  // Test that const iterators work
+  auto it = const_bundle.cbegin();
+  EXPECT_NE(it, const_bundle.cend());
+
+  // Test that we can access rule name and rule object
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_NE(it->second.get(), nullptr);
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+}
+
+TEST(JSONSchema_transformer, iterator_range_based_loop) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> rule_names;
+  for (const auto &[name, rule] : bundle) {
+    rule_names.push_back(name);
+    EXPECT_EQ(name, rule->name());
+  }
+
+  std::sort(rule_names.begin(), rule_names.end());
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+}
