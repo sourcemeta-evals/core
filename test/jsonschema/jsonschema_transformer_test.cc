@@ -1187,3 +1187,80 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  int count = 0;
+  for (const auto &[name, rule] : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+
+  auto it = bundle.begin();
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second.name(), "example_rule_1");
+  EXPECT_EQ(it->second.message(), "Keyword foo is not permitted");
+
+  ++it;
+  EXPECT_EQ(it, bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::set<std::string> expected_names{"example_rule_1", "example_rule_2",
+                                       "example_rule_3"};
+  std::set<std::string> actual_names;
+
+  for (const auto &[name, rule] : bundle) {
+    actual_names.insert(name);
+    EXPECT_EQ(name, rule.name());
+    EXPECT_FALSE(rule.message().empty());
+  }
+
+  EXPECT_EQ(actual_names, expected_names);
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  auto it = const_bundle.cbegin();
+  EXPECT_NE(it, const_bundle.cend());
+
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second.name(), "example_rule_1");
+  EXPECT_EQ(it->second.message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, iterator_increment_operators) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  auto it1 = bundle.begin();
+  auto it2 = bundle.begin();
+
+  ++it1;
+  EXPECT_NE(it1, it2);
+
+  auto it3 = it2++;
+  EXPECT_EQ(it1, it2);
+  EXPECT_NE(it2, it3);
+}

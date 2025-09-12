@@ -239,4 +239,65 @@ auto SchemaTransformer::remove(const std::string &name) -> bool {
   return this->rules.erase(name) > 0;
 }
 
+SchemaTransformer::const_iterator::const_iterator(
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it)
+    : iter_(it) {}
+
+auto SchemaTransformer::const_iterator::operator*() const
+    -> std::pair<const std::string &, const SchemaTransformRule &> {
+  return {iter_->first, *iter_->second};
+}
+
+auto SchemaTransformer::const_iterator::operator->() const
+    -> const std::pair<const std::string &, const SchemaTransformRule &> * {
+  struct PairProxy {
+    const std::string *first;
+    const SchemaTransformRule *second;
+  };
+  static thread_local PairProxy proxy;
+  proxy.first = &iter_->first;
+  proxy.second = iter_->second.get();
+  return reinterpret_cast<
+      const std::pair<const std::string &, const SchemaTransformRule &> *>(
+      &proxy);
+}
+
+auto SchemaTransformer::const_iterator::operator++() -> const_iterator & {
+  ++iter_;
+  return *this;
+}
+
+auto SchemaTransformer::const_iterator::operator++(int) -> const_iterator {
+  const_iterator temp = *this;
+  ++iter_;
+  return temp;
+}
+
+auto SchemaTransformer::const_iterator::operator==(
+    const const_iterator &other) const -> bool {
+  return iter_ == other.iter_;
+}
+
+auto SchemaTransformer::const_iterator::operator!=(
+    const const_iterator &other) const -> bool {
+  return iter_ != other.iter_;
+}
+
+auto SchemaTransformer::begin() const -> const_iterator {
+  return const_iterator(this->rules.cbegin());
+}
+
+auto SchemaTransformer::end() const -> const_iterator {
+  return const_iterator(this->rules.cend());
+}
+
+auto SchemaTransformer::cbegin() const -> const_iterator {
+  return const_iterator(this->rules.cbegin());
+}
+
+auto SchemaTransformer::cend() const -> const_iterator {
+  return const_iterator(this->rules.cend());
+}
+
 } // namespace sourcemeta::core

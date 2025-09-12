@@ -194,6 +194,43 @@ public:
   /// Create a transform bundle
   SchemaTransformer() = default;
 
+  /// Iterator for read-only access to registered rules
+  class const_iterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type =
+        std::pair<const std::string &, const SchemaTransformRule &>;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const value_type *;
+    using reference = const value_type &;
+
+    const_iterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator it);
+
+    auto operator*() const
+        -> std::pair<const std::string &, const SchemaTransformRule &>;
+    auto operator->() const
+        -> const std::pair<const std::string &, const SchemaTransformRule &> *;
+    auto operator++() -> const_iterator &;
+    auto operator++(int) -> const_iterator;
+    auto operator==(const const_iterator &other) const -> bool;
+    auto operator!=(const const_iterator &other) const -> bool;
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        iter_;
+  };
+
+  /// Get iterator to beginning of rules collection
+  auto begin() const -> const_iterator;
+  /// Get iterator to end of rules collection
+  auto end() const -> const_iterator;
+  /// Get const iterator to beginning of rules collection
+  auto cbegin() const -> const_iterator;
+  /// Get const iterator to end of rules collection
+  auto cend() const -> const_iterator;
+
   // Not worth documenting these details
 #if !defined(DOXYGEN)
   // Explicitly disallow copying, as this class makes use of unique pointers,
