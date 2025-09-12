@@ -3,6 +3,7 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1186,4 +1187,77 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (const auto &rule : bundle) {
+    (void)rule;
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_NE(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (const auto &rule : bundle) {
+    EXPECT_EQ(rule.first, "example_rule_1");
+    EXPECT_EQ(rule.second->name(), "example_rule_1");
+    EXPECT_EQ(rule.second->message(), "Keyword foo is not permitted");
+    count++;
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::set<std::string> expected_names{"example_rule_1", "example_rule_2",
+                                       "example_rule_3"};
+  std::set<std::string> actual_names;
+
+  for (const auto &rule : bundle) {
+    actual_names.insert(rule.first);
+    EXPECT_EQ(rule.first, rule.second->name());
+  }
+
+  EXPECT_EQ(actual_names, expected_names);
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const auto &const_bundle = bundle;
+
+  auto it1 = const_bundle.begin();
+  auto it2 = const_bundle.cbegin();
+  auto end1 = const_bundle.end();
+  auto end2 = const_bundle.cend();
+
+  EXPECT_EQ(it1, it2);
+  EXPECT_EQ(end1, end2);
+
+  std::size_t count = 0;
+  for (const auto &rule : const_bundle) {
+    EXPECT_FALSE(rule.first.empty());
+    EXPECT_NE(rule.second.get(), nullptr);
+    count++;
+  }
+  EXPECT_EQ(count, 2);
 }
