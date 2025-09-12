@@ -190,7 +190,13 @@ private:
 /// Every registered rule is applied to every subschema of the passed schema
 /// until no longer of them applies.
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformer {
+private:
+  using internal =
+      typename std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+
 public:
+  using const_iterator = typename internal::const_iterator;
+
   /// Create a transform bundle
   SchemaTransformer() = default;
 
@@ -216,6 +222,15 @@ public:
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// Get const iterator to beginning of rules
+  auto begin() const -> const_iterator;
+  /// Get const iterator to end of rules
+  auto end() const -> const_iterator;
+  /// Get const iterator to beginning of rules
+  auto cbegin() const -> const_iterator;
+  /// Get const iterator to end of rules
+  auto cend() const -> const_iterator;
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
