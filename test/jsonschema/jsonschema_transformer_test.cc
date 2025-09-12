@@ -1187,3 +1187,71 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (const auto &rule : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_with_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 3);
+  EXPECT_EQ(std::distance(bundle.cbegin(), bundle.cend()), 3);
+
+  std::vector<std::string> rule_names;
+  for (const auto &rule_pair : bundle) {
+    rule_names.push_back(rule_pair.first);
+    EXPECT_NE(rule_pair.second.get(), nullptr);
+  }
+
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+  EXPECT_EQ(rule_names[2], "example_rule_3");
+}
+
+TEST(JSONSchema_transformer, iterator_rule_introspection) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  for (const auto &rule_pair : bundle) {
+    const std::string &name = rule_pair.first;
+    const auto &rule = rule_pair.second;
+
+    EXPECT_EQ(name, rule->name());
+
+    if (name == "example_rule_1") {
+      EXPECT_EQ(rule->message(), "Keyword foo is not permitted");
+    } else if (name == "example_rule_2") {
+      EXPECT_EQ(rule->message(), "Keyword bar is not permitted");
+    }
+  }
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  auto it = const_bundle.begin();
+  auto cit = const_bundle.cbegin();
+
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(cit->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(cit->second->name(), "example_rule_1");
+}
