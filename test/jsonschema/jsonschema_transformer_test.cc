@@ -3,6 +3,7 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1186,4 +1187,82 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (const auto &rule : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_NE(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (const auto &rule_pair : bundle) {
+    EXPECT_EQ(rule_pair.first, "example_rule_1");
+    EXPECT_EQ(rule_pair.second->name(), "example_rule_1");
+    EXPECT_EQ(rule_pair.second->message(), "Keyword foo is not permitted");
+    count++;
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::set<std::string> expected_names{"example_rule_1", "example_rule_2",
+                                       "example_rule_3"};
+  std::set<std::string> actual_names;
+
+  std::size_t count = 0;
+  for (const auto &rule_pair : bundle) {
+    actual_names.insert(rule_pair.first);
+    EXPECT_EQ(rule_pair.first, rule_pair.second->name());
+    count++;
+  }
+
+  EXPECT_EQ(count, 3);
+  EXPECT_EQ(actual_names, expected_names);
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  auto it = const_bundle.begin();
+  auto cit = const_bundle.cbegin();
+
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(cit->first, "example_rule_1");
+}
+
+TEST(JSONSchema_transformer, iterator_after_rule_removal) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_TRUE(bundle.remove("example_rule_1"));
+
+  std::size_t count = 0;
+  for (const auto &rule_pair : bundle) {
+    EXPECT_EQ(rule_pair.first, "example_rule_2");
+    count++;
+  }
+  EXPECT_EQ(count, 1);
 }
