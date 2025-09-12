@@ -242,6 +242,23 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// Iterator support for read-only rule introspection
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get iterator to the beginning of rules
+  auto begin() const -> const_iterator;
+
+  /// Get iterator to the end of rules
+  auto end() const -> const_iterator;
+
+  /// Get const iterator to the beginning of rules
+  auto cbegin() const -> const_iterator;
+
+  /// Get const iterator to the end of rules
+  auto cend() const -> const_iterator;
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.

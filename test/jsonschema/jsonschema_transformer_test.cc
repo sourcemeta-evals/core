@@ -1187,3 +1187,72 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 1);
+
+  auto it = bundle.begin();
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 3);
+
+  std::set<std::string> rule_names;
+  for (const auto &[name, rule] : bundle) {
+    rule_names.insert(name);
+    EXPECT_EQ(name, rule->name());
+  }
+
+  std::set<std::string> expected_names{"example_rule_1", "example_rule_2",
+                                       "example_rule_3"};
+  EXPECT_EQ(rule_names, expected_names);
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  auto const_it = const_bundle.begin();
+  EXPECT_EQ(const_it->first, "example_rule_1");
+
+  auto c_it = const_bundle.cbegin();
+  EXPECT_EQ(c_it, const_bundle.begin());
+  EXPECT_EQ(const_bundle.cend(), const_bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterator_range_based_loop) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> rule_names;
+  for (const auto &[name, rule] : bundle) {
+    rule_names.push_back(name);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+}
