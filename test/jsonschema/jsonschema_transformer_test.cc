@@ -1187,3 +1187,49 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_read_only_access) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::vector<std::string> rule_names;
+  for (const auto &rule_pair : bundle) {
+    rule_names.push_back(rule_pair.first);
+    EXPECT_FALSE(rule_pair.first.empty());
+    EXPECT_NE(rule_pair.second.get(), nullptr);
+    EXPECT_FALSE(rule_pair.second->name().empty());
+    EXPECT_FALSE(rule_pair.second->message().empty());
+  }
+
+  std::sort(rule_names.begin(), rule_names.end());
+  const std::vector<std::string> expected_names = {
+      "example_rule_1", "example_rule_2", "example_rule_3"};
+  EXPECT_EQ(rule_names, expected_names);
+
+  auto it = bundle.begin();
+  auto end_it = bundle.end();
+  EXPECT_NE(it, end_it);
+
+  size_t count = 0;
+  for (auto iter = bundle.cbegin(); iter != bundle.cend(); ++iter) {
+    count++;
+    EXPECT_FALSE(iter->first.empty());
+    EXPECT_NE(iter->second.get(), nullptr);
+  }
+  EXPECT_EQ(count, 3);
+}
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  size_t count = 0;
+  for (const auto &rule_pair : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
