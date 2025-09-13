@@ -258,6 +258,23 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
     return;
   }
 
+  // Add the default identifier to the root schema if it's missing and
+  // default_id is provided
+  if (default_id.has_value()) {
+    const auto current_id = sourcemeta::core::identify(
+        schema, resolver,
+        sourcemeta::core::SchemaIdentificationStrategy::Strict, default_dialect,
+        std::nullopt);
+    if (!current_id.has_value()) {
+      const auto base_dialect_result =
+          sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+      if (base_dialect_result.has_value()) {
+        sourcemeta::core::reidentify(schema, default_id.value(),
+                                     base_dialect_result.value());
+      }
+    }
+  }
+
   const auto vocabularies{
       sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
   if (vocabularies.contains(
