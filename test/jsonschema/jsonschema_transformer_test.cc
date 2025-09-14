@@ -1187,3 +1187,51 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_functionality) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  // Test empty transformer
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  // Add some rules
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  // Test iterator functionality
+  std::vector<std::string> rule_names;
+  for (const auto &rule_pair : bundle) {
+    rule_names.push_back(rule_pair.first);
+    EXPECT_NE(rule_pair.second.get(), nullptr);
+  }
+
+  // Verify we got all expected rules (map is ordered)
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+  EXPECT_EQ(rule_names[2], "example_rule_3");
+
+  // Test const iterator methods explicitly
+  auto it = bundle.cbegin();
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+
+  ++it;
+  EXPECT_EQ(it->first, "example_rule_2");
+  EXPECT_EQ(it->second->name(), "example_rule_2");
+  EXPECT_EQ(it->second->message(), "Keyword bar is not permitted");
+
+  // Test rule removal affects iteration
+  bundle.remove("example_rule_2");
+  rule_names.clear();
+  for (const auto &rule_pair : bundle) {
+    rule_names.push_back(rule_pair.first);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_3");
+}
