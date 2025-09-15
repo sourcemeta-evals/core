@@ -1187,3 +1187,48 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterator_support) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    rule_names.push_back(entry.first);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") != rule_names.end());
+}
+
+TEST(JSONSchema_transformer, iterator_const_access) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  auto it_begin = bundle.begin();
+  auto it_end = bundle.end();
+  auto cit_begin = bundle.cbegin();
+  auto cit_end = bundle.cend();
+
+  EXPECT_EQ(std::distance(it_begin, it_end), 1);
+  EXPECT_EQ(std::distance(cit_begin, cit_end), 1);
+
+  EXPECT_EQ(it_begin->first, "example_rule_1");
+  EXPECT_EQ(it_begin->second->message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, iterator_empty_bundle) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  int count = 0;
+  for (const auto &entry : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
