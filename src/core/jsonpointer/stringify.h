@@ -59,6 +59,8 @@ auto stringify_token(const TokenT &token,
         case internal::token_pointer_reverse_solidus<CharT>:
           internal::write_character(
               stream, internal::token_pointer_reverse_solidus<CharT>);
+          internal::write_character(
+              stream, internal::token_pointer_reverse_solidus<CharT>);
           break;
 
         // See https://www.asciitable.com

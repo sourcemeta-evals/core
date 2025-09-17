@@ -644,6 +644,8 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 
   try {
+    // The issue is that value.to_string() doesn't handle JSON string escaping
+    // We need to get the actual string content, not the JSON representation
     return to_pointer(value.to_string());
   } catch (const PointerParseError &) {
     return std::nullopt;

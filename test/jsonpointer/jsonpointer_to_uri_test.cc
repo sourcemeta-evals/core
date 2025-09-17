@@ -54,7 +54,7 @@ TEST(JSONPointer_to_uri, escape_uri_quote) {
 TEST(JSONPointer_to_uri, escape_uri_backslash) {
   const sourcemeta::core::Pointer pointer{"foo", "bar\\baz"};
   const sourcemeta::core::URI fragment{sourcemeta::core::to_uri(pointer)};
-  EXPECT_EQ(fragment.recompose(), "#/foo/bar%5Cbaz");
+  EXPECT_EQ(fragment.recompose(), "#/foo/bar%5C%5Cbaz");
 }
 
 TEST(JSONPointer_to_uri, escape_uri_dollar_sign) {
