@@ -43,6 +43,11 @@ using WeakPointer = GenericPointer<std::reference_wrapper<const std::string>,
                                    PropertyHashJSON<JSON::String>>;
 
 /// @ingroup jsonpointer
+/// Forward declaration for parse_pointer function
+auto parse_pointer(std::basic_istream<JSON::Char, JSON::CharTraits> &stream)
+    -> Pointer;
+
+/// @ingroup jsonpointer
 /// A global constant instance of the empty JSON Pointer.
 const Pointer empty_pointer;
 
@@ -644,7 +649,8 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 
   try {
-    return to_pointer(value.to_string());
+    auto stream{value.to_stringstream()};
+    return parse_pointer(stream);
   } catch (const PointerParseError &) {
     return std::nullopt;
   }

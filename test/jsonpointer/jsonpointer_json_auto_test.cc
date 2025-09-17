@@ -41,3 +41,60 @@ TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   EXPECT_EQ(result.size(), 12);
   EXPECT_EQ(result, expected);
 }
+
+TEST(JSONPointer_json_auto, from_json_regex_pattern_brackets) {
+  const sourcemeta::core::JSON input{"/patternProperties/[\\-]/type"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result->size(), 3);
+  EXPECT_TRUE(result->at(0).is_property());
+  EXPECT_EQ(result->at(0).to_property(), "patternProperties");
+  EXPECT_TRUE(result->at(1).is_property());
+  EXPECT_EQ(result->at(1).to_property(), "[\\-]");
+  EXPECT_TRUE(result->at(2).is_property());
+  EXPECT_EQ(result->at(2).to_property(), "type");
+}
+
+TEST(JSONPointer_json_auto, from_json_regex_pattern_caret) {
+  const sourcemeta::core::JSON input{"/patternProperties/^v/foo"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result->size(), 3);
+  EXPECT_TRUE(result->at(0).is_property());
+  EXPECT_EQ(result->at(0).to_property(), "patternProperties");
+  EXPECT_TRUE(result->at(1).is_property());
+  EXPECT_EQ(result->at(1).to_property(), "^v");
+  EXPECT_TRUE(result->at(2).is_property());
+  EXPECT_EQ(result->at(2).to_property(), "foo");
+}
+
+TEST(JSONPointer_json_auto, from_json_regex_pattern_backslash) {
+  const sourcemeta::core::JSON input{"/patternProperties/\\\\d+/items"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result->size(), 3);
+  EXPECT_TRUE(result->at(0).is_property());
+  EXPECT_EQ(result->at(0).to_property(), "patternProperties");
+  EXPECT_TRUE(result->at(1).is_property());
+  EXPECT_EQ(result->at(1).to_property(), "\\\\d+");
+  EXPECT_TRUE(result->at(2).is_property());
+  EXPECT_EQ(result->at(2).to_property(), "items");
+}
+
+TEST(JSONPointer_json_auto, from_json_regex_pattern_complex) {
+  const sourcemeta::core::JSON input{
+      "/patternProperties/[a-zA-Z0-9_\\-]+/properties"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result->size(), 3);
+  EXPECT_TRUE(result->at(0).is_property());
+  EXPECT_EQ(result->at(0).to_property(), "patternProperties");
+  EXPECT_TRUE(result->at(1).is_property());
+  EXPECT_EQ(result->at(1).to_property(), "[a-zA-Z0-9_\\-]+");
+  EXPECT_TRUE(result->at(2).is_property());
+  EXPECT_EQ(result->at(2).to_property(), "properties");
+}
