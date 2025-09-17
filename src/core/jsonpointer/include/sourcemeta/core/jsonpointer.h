@@ -644,9 +644,15 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 
   try {
-    return to_pointer(value.to_string());
+    // Try parsing as a JSON document first (handles escaped strings)
+    return to_pointer(value);
   } catch (const PointerParseError &) {
-    return std::nullopt;
+    // Fallback to plain string parsing for backward compatibility
+    try {
+      return to_pointer(value.to_string());
+    } catch (const PointerParseError &) {
+      return std::nullopt;
+    }
   }
 }
 
