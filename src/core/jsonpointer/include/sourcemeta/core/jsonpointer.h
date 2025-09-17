@@ -19,7 +19,9 @@
 
 #include <cassert>     // assert
 #include <functional>  // std::reference_wrapper
+#include <iostream>    // std::cerr
 #include <memory>      // std::allocator
+#include <mutex>       // std::mutex
 #include <ostream>     // std::basic_ostream
 #include <string>      // std::basic_string
 #include <type_traits> // std::is_same_v
@@ -644,7 +646,7 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 
   try {
-    return to_pointer(value.to_string());
+    return to_pointer(value);
   } catch (const PointerParseError &) {
     return std::nullopt;
   }
