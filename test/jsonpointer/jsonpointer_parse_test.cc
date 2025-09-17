@@ -545,3 +545,13 @@ TEST(JSONPointer_parse, regex_caret) {
   EXPECT_TRUE(pointer.at(2).is_property());
   EXPECT_EQ(pointer.at(2).to_property(), "foo");
 }
+
+TEST(JSONPointer_parse, pattern_properties_backslash_dash) {
+  const sourcemeta::core::Pointer pointer =
+      sourcemeta::core::to_pointer("/patternProperties/[\\\\-]");
+  EXPECT_EQ(pointer.size(), 2);
+  EXPECT_TRUE(pointer.at(0).is_property());
+  EXPECT_EQ(pointer.at(0).to_property(), "patternProperties");
+  EXPECT_TRUE(pointer.at(1).is_property());
+  EXPECT_EQ(pointer.at(1).to_property(), "[\\-]");
+}
