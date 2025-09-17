@@ -1187,3 +1187,73 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+  EXPECT_TRUE(bundle.begin() == bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_NE(bundle.cbegin(), bundle.cend());
+
+  auto it = bundle.begin();
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+
+  ++it;
+  EXPECT_EQ(it, bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    rule_names.push_back(entry.first);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") != rule_names.end());
+}
+
+TEST(JSONSchema_transformer, iterator_range_based_for_loop) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::size_t count = 0;
+  for (const auto &entry : bundle) {
+    EXPECT_FALSE(entry.first.empty());
+    EXPECT_NE(entry.second, nullptr);
+    EXPECT_EQ(entry.first, entry.second->name());
+    count++;
+  }
+
+  EXPECT_EQ(count, 2);
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+  auto it = const_bundle.begin();
+  EXPECT_EQ(it->first, "example_rule_1");
+
+  auto cit = const_bundle.cbegin();
+  EXPECT_EQ(cit->first, "example_rule_1");
+  EXPECT_EQ(cit, const_bundle.begin());
+}
