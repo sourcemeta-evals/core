@@ -32,6 +32,10 @@ public:
         return false;
       }
 
+      if (schema.defines("enum")) {
+        return false;
+      }
+
       // Don't apply if we don't have the necessary vocabularies
     } else {
       return false;
@@ -95,6 +99,16 @@ public:
 
     if (vocabularies.contains("http://json-schema.org/draft-03/schema#") &&
         schema.defines_any({"$ref", "enum", "disallow", "extends"})) {
+      return false;
+    }
+
+    if (vocabularies.contains("http://json-schema.org/draft-02/schema#") &&
+        schema.defines_any({"enum", "disallow", "extends"})) {
+      return false;
+    }
+
+    if (vocabularies.contains("http://json-schema.org/draft-01/schema#") &&
+        schema.defines_any({"enum", "disallow", "extends"})) {
       return false;
     }
 
