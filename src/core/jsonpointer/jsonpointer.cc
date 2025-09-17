@@ -385,4 +385,26 @@ auto to_uri(const Pointer &pointer, const URI &base) -> URI {
   return to_uri(pointer).try_resolve_from(base).canonicalize();
 }
 
+template <typename T>
+  requires std::is_same_v<T, Pointer>
+auto from_json(const JSON &value) -> std::optional<T> {
+  if (!value.is_string()) {
+    return std::nullopt;
+  }
+
+  try {
+    std::basic_stringstream<JSON::Char, JSON::CharTraits,
+                            std::allocator<JSON::Char>>
+        stream;
+    stream << internal::token_pointer_quote<JSON::Char>;
+    stream << value.to_string();
+    stream << internal::token_pointer_quote<JSON::Char>;
+    return to_pointer(parse_json(stream));
+  } catch (const PointerParseError &) {
+    return std::nullopt;
+  }
+}
+
+template auto from_json<Pointer>(const JSON &value) -> std::optional<Pointer>;
+
 } // namespace sourcemeta::core

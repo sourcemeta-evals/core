@@ -28,6 +28,20 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_regex_pattern) {
+  const sourcemeta::core::JSON input{"/patternProperties/[\\\\-]"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+
+  const sourcemeta::core::Pointer expected{"patternProperties", "[\\-]"};
+  EXPECT_EQ(result.value(), expected);
+
+  const auto back_to_json{sourcemeta::core::to_json(result.value())};
+  const sourcemeta::core::JSON expected_json{"/patternProperties/[\\-]"};
+  EXPECT_EQ(back_to_json, expected_json);
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
