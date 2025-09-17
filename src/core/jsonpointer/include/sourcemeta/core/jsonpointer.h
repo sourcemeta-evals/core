@@ -19,6 +19,7 @@
 
 #include <cassert>     // assert
 #include <functional>  // std::reference_wrapper
+#include <istream>     // std::basic_istream
 #include <memory>      // std::allocator
 #include <ostream>     // std::basic_ostream
 #include <string>      // std::basic_string
@@ -644,7 +645,7 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 
   try {
-    return to_pointer(value.to_string());
+    return to_pointer(value);
   } catch (const PointerParseError &) {
     return std::nullopt;
   }
