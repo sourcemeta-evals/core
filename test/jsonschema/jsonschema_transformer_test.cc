@@ -1187,3 +1187,78 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+  EXPECT_TRUE(bundle.begin() == bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  auto it = bundle.begin();
+  EXPECT_NE(it, bundle.end());
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+
+  ++it;
+  EXPECT_EQ(it, bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::set<std::string> rule_names;
+  for (const auto &rule : bundle) {
+    rule_names.insert(rule.first);
+    EXPECT_EQ(rule.first, rule.second->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+}
+
+TEST(JSONSchema_transformer, iterator_const_methods) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const auto &const_bundle = bundle;
+
+  auto it1 = const_bundle.begin();
+  auto it2 = const_bundle.cbegin();
+  auto end1 = const_bundle.end();
+  auto end2 = const_bundle.cend();
+
+  EXPECT_EQ(it1, it2);
+  EXPECT_EQ(end1, end2);
+
+  std::size_t count = 0;
+  for (auto it = const_bundle.cbegin(); it != const_bundle.cend(); ++it) {
+    ++count;
+    EXPECT_FALSE(it->first.empty());
+    EXPECT_NE(it->second.get(), nullptr);
+  }
+  EXPECT_EQ(count, 2);
+}
+
+TEST(JSONSchema_transformer, iterator_rule_removal) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 2);
+
+  bundle.remove("example_rule_1");
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 1);
+
+  auto it = bundle.begin();
+  EXPECT_EQ(it->first, "example_rule_2");
+}
