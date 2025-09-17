@@ -28,6 +28,44 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_pattern_properties_escaped) {
+  const sourcemeta::core::JSON input{"/patternProperties/[\\-]"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+
+  if (result.has_value()) {
+    const auto &pointer = result.value();
+    EXPECT_EQ(pointer.size(), 2);
+    EXPECT_TRUE(pointer.at(0).is_property());
+    EXPECT_EQ(pointer.at(0).to_property(), "patternProperties");
+    EXPECT_TRUE(pointer.at(1).is_property());
+    EXPECT_EQ(pointer.at(1).to_property(), "[\\-]");
+
+    const auto back_to_json = sourcemeta::core::to_json(pointer);
+    EXPECT_EQ(back_to_json, input);
+  }
+}
+
+TEST(JSONPointer_json_auto, from_json_special_characters_roundtrip) {
+  std::vector<std::string> test_cases = {
+      "/patternProperties/[\\-]", "/patternProperties/^[a-z]+$",
+      "/patternProperties/\\d+", "/properties/foo~0bar",
+      "/properties/foo~1bar"};
+
+  for (const auto &test_case : test_cases) {
+    const sourcemeta::core::JSON input{test_case};
+    const auto result{
+        sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+    EXPECT_TRUE(result.has_value()) << "Failed for: " << test_case;
+
+    if (result.has_value()) {
+      const auto back_to_json = sourcemeta::core::to_json(result.value());
+      EXPECT_EQ(back_to_json, input) << "Round-trip failed for: " << test_case;
+    }
+  }
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
