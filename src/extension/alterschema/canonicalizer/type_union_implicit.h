@@ -37,6 +37,21 @@ public:
       return false;
     }
 
+    if (vocabularies.contains("http://json-schema.org/draft-02/schema#") &&
+        schema.defines_any({"enum", "disallow", "extends"})) {
+      return false;
+    }
+
+    if (vocabularies.contains("http://json-schema.org/draft-01/schema#") &&
+        schema.defines_any({"enum", "disallow", "extends"})) {
+      return false;
+    }
+
+    if (vocabularies.contains("http://json-schema.org/draft-00/schema#") &&
+        schema.defines_any({"enum", "disallow", "extends"})) {
+      return false;
+    }
+
     if (vocabularies.contains(
             "https://json-schema.org/draft/2020-12/vocab/core") &&
         schema.defines_any({"$ref", "$dynamicRef"})) {
