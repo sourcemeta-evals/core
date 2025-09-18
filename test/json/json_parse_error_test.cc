@@ -1,6 +1,16 @@
+#include <type_traits>
+
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <sourcemeta/core/json.h>
+#include <utility>
+
+static_assert(
+    std::is_same_v<
+        decltype(std::declval<const sourcemeta::core::JSONFileParseError>()
+                     .path()),
+        const std::filesystem::path &>);
 
 #include <exception>
 #include <sstream>
