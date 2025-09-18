@@ -4,6 +4,16 @@
 
 #include <exception>
 #include <sstream>
+#include <type_traits> // std::is_same_v
+#include <utility>     // std::declval
+
+// Ensure JSONFileParseError::path() returns a const reference to avoid copying
+static_assert(
+    std::is_same_v<
+        decltype(std::declval<const sourcemeta::core::JSONFileParseError &>()
+                     .path()),
+        const std::filesystem::path &>,
+    "JSONFileParseError::path() must return a const reference");
 
 #define __EXPECT_PARSE_ERROR(input, expected_line, expected_column,            \
                              expected_error, expected_message)                 \
