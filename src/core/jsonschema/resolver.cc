@@ -29,7 +29,6 @@ auto SchemaMapResolver::add(
     }
 
     auto subschema{get(schema, entry.pointer)};
-    const auto subschema_vocabularies{frame.vocabularies(entry, *this)};
 
     // Given we might be resolving embedded resources, we fully
     // resolve their dialect and identifiers, otherwise the
