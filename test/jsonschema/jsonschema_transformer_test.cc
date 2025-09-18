@@ -1187,3 +1187,53 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_support) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  // Test that we can iterate over rules
+  std::set<std::string> rule_names;
+  for (const auto &[name, rule] : bundle) {
+    rule_names.insert(name);
+    EXPECT_NE(rule.get(), nullptr);
+  }
+
+  // Verify we found all expected rules
+  const std::set<std::string> expected_names{"example_rule_1", "example_rule_2",
+                                             "example_rule_3"};
+  EXPECT_EQ(rule_names, expected_names);
+
+  // Test const iterators explicitly
+  auto it = bundle.cbegin();
+  auto end_it = bundle.cend();
+  std::size_t count = 0;
+  while (it != end_it) {
+    EXPECT_NE(it->second.get(), nullptr);
+    ++it;
+    ++count;
+  }
+  EXPECT_EQ(count, 3);
+
+  // Test begin/end methods
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 3);
+  EXPECT_EQ(std::distance(bundle.cbegin(), bundle.cend()), 3);
+}
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  // Test iteration over empty transformer
+  std::size_t count = 0;
+  for (const auto &[name, rule] : bundle) {
+    ++count;
+  }
+  EXPECT_EQ(count, 0);
+
+  // Test iterators on empty transformer
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 0);
+}
