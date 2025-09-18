@@ -248,6 +248,19 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const std::optional<std::string> &default_id,
             const std::optional<Pointer> &default_container,
             const SchemaFrame::Paths &paths) -> void {
+  if (default_id.has_value() && schema.is_object()) {
+    const auto &maybe_id =
+        identify(schema, resolver, SchemaIdentificationStrategy::Strict,
+                 default_dialect, std::nullopt);
+    if (!maybe_id.has_value()) {
+      const auto &maybe_base_dialect =
+          base_dialect(schema, resolver, default_dialect);
+      if (maybe_base_dialect.has_value()) {
+        reidentify(schema, default_id.value(), maybe_base_dialect.value());
+      }
+    }
+  }
+
   SchemaFrame frame{SchemaFrame::Mode::References};
 
   if (default_container.has_value()) {
