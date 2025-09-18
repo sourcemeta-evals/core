@@ -1187,3 +1187,72 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer transformer;
+
+  EXPECT_EQ(transformer.begin(), transformer.end());
+  EXPECT_EQ(transformer.cbegin(), transformer.cend());
+
+  int count = 0;
+  for (const auto &rule : transformer) {
+    (void)rule;
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+
+  EXPECT_NE(transformer.begin(), transformer.end());
+  EXPECT_NE(transformer.cbegin(), transformer.cend());
+
+  int count = 0;
+  for (const auto &rule : transformer) {
+    EXPECT_EQ(rule.first, "example_rule_1");
+    EXPECT_NE(rule.second.get(), nullptr);
+    EXPECT_EQ(rule.second->name(), "example_rule_1");
+    count++;
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+  transformer.add<ExampleRuleDefinitionsToDefsWithRereference>();
+
+  std::set<std::string> rule_names;
+  for (const auto &rule : transformer) {
+    rule_names.insert(rule.first);
+    EXPECT_NE(rule.second.get(), nullptr);
+    EXPECT_EQ(rule.second->name(), rule.first);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(
+      rule_names.contains("example_rule_definitions_to_defs_with_rereference"));
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+
+  const auto &const_transformer = transformer;
+
+  auto it = const_transformer.begin();
+  auto cit = const_transformer.cbegin();
+
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(cit->first, "example_rule_1");
+
+  static_assert(
+      std::is_same_v<decltype(it),
+                     sourcemeta::core::SchemaTransformer::const_iterator>);
+  static_assert(
+      std::is_same_v<decltype(cit),
+                     sourcemeta::core::SchemaTransformer::const_iterator>);
+}
