@@ -32,6 +32,17 @@ public:
         return false;
       }
 
+      // Don't apply if enum is already present (for Draft 01 and Draft 02)
+      if (vocabularies.contains("http://json-schema.org/draft-02/schema#") &&
+          schema.defines("enum")) {
+        return false;
+      }
+
+      if (vocabularies.contains("http://json-schema.org/draft-01/schema#") &&
+          schema.defines("enum")) {
+        return false;
+      }
+
       // Don't apply if we don't have the necessary vocabularies
     } else {
       return false;
