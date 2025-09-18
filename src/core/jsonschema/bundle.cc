@@ -258,6 +258,14 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
     return;
   }
 
+  // If a default identifier is provided and the root schema lacks an
+  // identifier, assign it using the correct keyword for the base dialect.
+  if (default_id.has_value() && schema.is_object() && !schema.defines("$id") &&
+      !schema.defines("id")) {
+    sourcemeta::core::reidentify(schema, default_id.value(), resolver,
+                                 default_dialect);
+  }
+
   const auto vocabularies{
       sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
   if (vocabularies.contains(
