@@ -3,6 +3,7 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1186,4 +1187,73 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (const auto &entry : bundle) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_NE(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (const auto &entry : bundle) {
+    count++;
+    EXPECT_EQ(entry.first, "example_rule_1");
+    EXPECT_EQ(entry.second->name(), "example_rule_1");
+    EXPECT_EQ(entry.second->message(), "Keyword foo is not permitted");
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::set<std::string> expected_names{"example_rule_1", "example_rule_2",
+                                       "example_rule_3"};
+  std::set<std::string> found_names;
+
+  std::size_t count = 0;
+  for (const auto &entry : bundle) {
+    count++;
+    found_names.insert(entry.first);
+    EXPECT_EQ(entry.first, entry.second->name());
+  }
+
+  EXPECT_EQ(count, 3);
+  EXPECT_EQ(found_names, expected_names);
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  auto it = const_bundle.begin();
+  auto cit = const_bundle.cbegin();
+
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(cit->first, "example_rule_1");
+
+  for (const auto &entry : const_bundle) {
+    EXPECT_EQ(entry.first, "example_rule_1");
+    EXPECT_EQ(entry.second->name(), "example_rule_1");
+  }
 }
