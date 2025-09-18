@@ -214,6 +214,24 @@ public:
     this->rules.emplace(rule->name(), std::move(rule));
   }
 
+  /// Read-only iteration over registered rules
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  [[nodiscard]] auto begin() const noexcept -> const_iterator {
+    return this->rules.begin();
+  }
+  [[nodiscard]] auto end() const noexcept -> const_iterator {
+    return this->rules.end();
+  }
+  [[nodiscard]] auto cbegin() const noexcept -> const_iterator {
+    return this->rules.cbegin();
+  }
+  [[nodiscard]] auto cend() const noexcept -> const_iterator {
+    return this->rules.cend();
+  }
+
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
