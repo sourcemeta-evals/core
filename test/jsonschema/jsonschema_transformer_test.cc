@@ -1187,3 +1187,27 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterate_rules_readonly) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const sourcemeta::core::SchemaTransformer &cbundle = bundle;
+
+  std::vector<std::string> keys;
+  std::size_t count = 0;
+  for (const auto &entry : cbundle) {
+    const auto &name = entry.first;
+    const auto &rule_ptr = entry.second;
+    keys.push_back(std::string{name});
+    ASSERT_NE(rule_ptr, nullptr);
+    EXPECT_EQ(name, rule_ptr->name());
+    EXPECT_FALSE(rule_ptr->message().empty());
+    ++count;
+  }
+
+  EXPECT_EQ(count, 2);
+  EXPECT_EQ(cbundle.size(), 2);
+  EXPECT_FALSE(cbundle.empty());
+}
