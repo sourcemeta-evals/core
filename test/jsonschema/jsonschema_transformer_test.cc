@@ -1187,3 +1187,46 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterator_empty_transformer) {
+  sourcemeta::core::SchemaTransformer transformer;
+  EXPECT_EQ(transformer.begin(), transformer.end());
+  EXPECT_EQ(transformer.cbegin(), transformer.cend());
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+
+  auto it = transformer.begin();
+  EXPECT_NE(it, transformer.end());
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_NE(it->second.get(), nullptr);
+
+  ++it;
+  EXPECT_EQ(it, transformer.end());
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+  transformer.add<ExampleRule2>();
+
+  std::set<std::string> rule_names;
+  for (const auto &rule : transformer) {
+    rule_names.insert(rule.first);
+    EXPECT_NE(rule.second.get(), nullptr);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+}
+
+TEST(JSONSchema_transformer, const_iterator_methods) {
+  const sourcemeta::core::SchemaTransformer transformer;
+  EXPECT_EQ(transformer.begin(), transformer.end());
+  EXPECT_EQ(transformer.cbegin(), transformer.cend());
+  EXPECT_EQ(transformer.begin(), transformer.cbegin());
+  EXPECT_EQ(transformer.end(), transformer.cend());
+}
