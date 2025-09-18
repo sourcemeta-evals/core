@@ -3,6 +3,7 @@ sourcemeta_googletest(NAMESPACE sourcemeta PROJECT core NAME json
     json_array_test.cc
     json_boolean_test.cc
     json_error_test.cc
+    json_file_parse_error_path_test.cc
     json_hash_test.cc
     json_integer_test.cc
     json_null_test.cc

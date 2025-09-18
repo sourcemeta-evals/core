@@ -82,8 +82,13 @@ public:
         path_{path} {}
 
   /// Get the file path of the error
-  [[nodiscard]] auto path() const noexcept -> const std::filesystem::path {
+  [[nodiscard]] auto path() const & noexcept -> const std::filesystem::path & {
     return path_;
+  }
+
+  /// Rvalue-qualified overload to allow efficient moves when needed
+  [[nodiscard]] auto path() && noexcept -> std::filesystem::path {
+    return std::move(path_);
   }
 
 private:
