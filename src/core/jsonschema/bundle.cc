@@ -250,6 +250,19 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  // Inject implicit identifier if a default_id was provided and the root has
+  // none
+  if (default_id.has_value() && is_schema(schema) && schema.is_object()) {
+    const auto has_id =
+        identify(schema, resolver, SchemaIdentificationStrategy::Strict,
+                 default_dialect, std::nullopt)
+            .has_value();
+    if (!has_id) {
+      // Choose correct keyword ($id or id) based on base dialect
+      reidentify(schema, default_id.value(), resolver, default_dialect);
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
