@@ -12,8 +12,6 @@ static_assert(
                      .path()),
         const std::filesystem::path &>);
 
-#include <sourcemeta/core/json.h>
-
 #include <exception>
 #include <sstream>
 
