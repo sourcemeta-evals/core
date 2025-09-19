@@ -271,7 +271,10 @@ public:
       // by definition change the score
       -> std::pair<bool, std::uint8_t>;
 
+  /// Get const iterator to the beginning of the rules map for read-only
+  /// introspection
   [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
+  /// Get const iterator to the end of the rules map for read-only introspection
   [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
 
 private:

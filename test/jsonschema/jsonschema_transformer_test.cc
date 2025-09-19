@@ -1304,3 +1304,18 @@ TEST(JSONSchema_transformer, iterators) {
   EXPECT_TRUE(rules.contains("example_rule_2"));
   EXPECT_TRUE(rules.contains("example_rule_3"));
 }
+
+TEST(JSONSchema_transformer, iterators_access_rule_properties) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::map<std::string, std::string> rule_messages;
+  for (const auto &entry : bundle) {
+    rule_messages[entry.first] = entry.second->message();
+  }
+
+  EXPECT_EQ(rule_messages.size(), 2);
+  EXPECT_EQ(rule_messages["example_rule_1"], "Keyword foo is not permitted");
+  EXPECT_EQ(rule_messages["example_rule_2"], "Keyword bar is not permitted");
+}
