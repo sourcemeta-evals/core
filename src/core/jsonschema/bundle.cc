@@ -250,6 +250,18 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  // Insert root identifier if requested and absent
+  if (default_id.has_value() && schema.is_object()) {
+    const auto maybe_base =
+        sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+    if (maybe_base.has_value() &&
+        !sourcemeta::core::identify(schema, maybe_base.value(), std::nullopt)
+             .has_value()) {
+      sourcemeta::core::reidentify(schema, default_id.value(),
+                                   maybe_base.value());
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
