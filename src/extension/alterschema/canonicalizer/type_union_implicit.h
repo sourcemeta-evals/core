@@ -32,6 +32,12 @@ public:
         return false;
       }
 
+      // Avoid adding a type union when an enum/const fully constrains the
+      // instance
+      if (schema.defines_any({"enum", "const"})) {
+        return false;
+      }
+
       // Don't apply if we don't have the necessary vocabularies
     } else {
       return false;
