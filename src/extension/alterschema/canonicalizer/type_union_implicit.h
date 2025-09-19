@@ -3,7 +3,7 @@ public:
   TypeUnionImplicit()
       : SchemaTransformRule{
             "type_union_implicit",
-            "Not setting `type` is equivalent to accepting any type"} {};
+            "Not setting `type` is equivalent to accepting any type"} {}
 
   [[nodiscard]] auto
   condition(const sourcemeta::core::JSON &schema,
@@ -64,7 +64,7 @@ public:
             {"$ref", "enum", "anyOf", "oneOf", "allOf", "not"}));
     ONLY_CONTINUE_IF(
         !vocabularies.contains("http://json-schema.org/draft-03/schema#") ||
-        !schema.defines_any({"$ref", "enum", "disallow", "extends"}))
+        !schema.defines_any({"$ref", "enum", "disallow", "extends"}));
     ONLY_CONTINUE_IF(
         !vocabularies.contains("http://json-schema.org/draft-02/schema#") ||
         !schema.defines_any({"enum", "disallow", "extends"}));
