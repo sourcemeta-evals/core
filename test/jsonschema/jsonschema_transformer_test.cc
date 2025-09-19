@@ -512,6 +512,34 @@ TEST(JSONSchema_transformer, check_no_match) {
   EXPECT_TRUE(entries.empty());
 }
 
+TEST(JSONSchema_transformer, iterate_rules_read_only) {
+  const auto make_bundle = []() {
+    sourcemeta::core::SchemaTransformer tmp;
+    tmp.add<ExampleRule2>();
+    tmp.add<ExampleRule1>();
+    return tmp;
+  };
+
+  const sourcemeta::core::SchemaTransformer bundle = make_bundle();
+
+  std::vector<std::string> names;
+  std::vector<std::string> messages;
+
+  for (const auto &entry : bundle) {
+    names.push_back(entry.first);
+    ASSERT_NE(entry.second, nullptr);
+    messages.push_back(entry.second->message());
+  }
+
+  ASSERT_EQ(names.size(), 2u);
+  EXPECT_EQ(names[0], "example_rule_1");
+  EXPECT_EQ(names[1], "example_rule_2");
+
+  ASSERT_EQ(messages.size(), 2u);
+  EXPECT_EQ(messages[0], "Keyword foo is not permitted");
+  EXPECT_EQ(messages[1], "Keyword bar is not permitted");
+}
+
 TEST(JSONSchema_transformer, check_empty) {
   sourcemeta::core::SchemaTransformer bundle;
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
