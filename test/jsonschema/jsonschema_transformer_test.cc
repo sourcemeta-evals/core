@@ -1304,3 +1304,58 @@ TEST(JSONSchema_transformer, iterators) {
   EXPECT_TRUE(rules.contains("example_rule_2"));
   EXPECT_TRUE(rules.contains("example_rule_3"));
 }
+
+TEST(JSONSchema_transformer, size_and_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_TRUE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 0);
+
+  bundle.add<ExampleRule1>();
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 1);
+
+  bundle.add<ExampleRule2>();
+  EXPECT_EQ(bundle.size(), 2);
+
+  bundle.add<ExampleRule3>();
+  EXPECT_EQ(bundle.size(), 3);
+}
+
+TEST(JSONSchema_transformer, contains) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_TRUE(bundle.contains("example_rule_1"));
+  EXPECT_TRUE(bundle.contains("example_rule_2"));
+  EXPECT_FALSE(bundle.contains("nonexistent_rule"));
+  EXPECT_FALSE(bundle.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, find) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  auto it1 = bundle.find("example_rule_1");
+  EXPECT_NE(it1, bundle.end());
+  EXPECT_EQ(it1->first, "example_rule_1");
+
+  auto it2 = bundle.find("nonexistent_rule");
+  EXPECT_EQ(it2, bundle.end());
+}
+
+TEST(JSONSchema_transformer, at) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const auto &rule1 = bundle.at("example_rule_1");
+  EXPECT_EQ(rule1.name(), "example_rule_1");
+
+  const auto &rule2 = bundle.at("example_rule_2");
+  EXPECT_EQ(rule2.name(), "example_rule_2");
+
+  EXPECT_THROW(bundle.at("nonexistent_rule"), std::out_of_range);
+}

@@ -273,6 +273,18 @@ public:
 
   [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
   [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
+  [[nodiscard]] auto contains(const std::string &name) const -> bool {
+    return this->rules.contains(name);
+  }
+  [[nodiscard]] auto find(const std::string &name) const -> auto {
+    return this->rules.find(name);
+  }
+  [[nodiscard]] auto at(const std::string &name) const
+      -> const SchemaTransformRule & {
+    return *this->rules.at(name);
+  }
 
 private:
 // Exporting symbols that depends on the standard C++ library is considered
