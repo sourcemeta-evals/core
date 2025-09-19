@@ -274,6 +274,21 @@ public:
   [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
   [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
 
+  /// Iterator type for read-only iteration over registered rules
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get const iterator to the beginning of the rules collection
+  [[nodiscard]] auto begin() const noexcept -> const_iterator {
+    return this->rules.cbegin();
+  }
+
+  /// Get const iterator to the end of the rules collection
+  [[nodiscard]] auto end() const noexcept -> const_iterator {
+    return this->rules.cend();
+  }
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
