@@ -250,6 +250,20 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  // Inject a root identifier when a default identifier is provided and
+  // the root schema lacks an explicit identifier
+  if (default_id.has_value() && schema.is_object()) {
+    const auto root_base =
+        sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+    if (root_base.has_value()) {
+      if (!sourcemeta::core::identify(schema, root_base.value(), std::nullopt)
+               .has_value()) {
+        sourcemeta::core::reidentify(schema, default_id.value(),
+                                     root_base.value());
+      }
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
