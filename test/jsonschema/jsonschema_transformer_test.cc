@@ -656,6 +656,51 @@ TEST(JSONSchema_transformer, check_empty) {
   EXPECT_TRUE(entries.empty());
 }
 
+TEST(JSONSchema_transformer, iterate_rules_readonly_order_and_metadata) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule1>();
+
+  std::vector<std::string> names;
+  std::vector<std::string> messages;
+
+  for (const auto &entry : bundle) {
+    names.push_back(entry.first);
+    messages.push_back(entry.second->message());
+  }
+
+  EXPECT_EQ(names,
+            (std::vector<std::string>{"example_rule_1", "example_rule_2"}));
+  EXPECT_EQ(messages,
+            (std::vector<std::string>{"Keyword foo is not permitted",
+                                      "Keyword bar is not permitted"}));
+}
+
+TEST(JSONSchema_transformer, iterate_rules_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  std::size_t count = 0;
+  for (const auto &entry : bundle) {
+    static_cast<void>(entry);
+    ++count;
+  }
+  EXPECT_EQ(count, 0U);
+}
+
+TEST(JSONSchema_transformer, iterate_rules_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const bool removed = bundle.remove("example_rule_1");
+  EXPECT_TRUE(removed);
+
+  std::vector<std::string> names;
+  for (const auto &entry : bundle) {
+    names.push_back(entry.first);
+  }
+  EXPECT_EQ(names, (std::vector<std::string>{"example_rule_2"}));
+}
+
 TEST(JSONSchema_transformer, check_throw_if_no_dialect_invalid_default) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();
