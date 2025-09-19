@@ -1,10 +1,20 @@
 #include <gtest/gtest.h>
 
 #include <sourcemeta/core/json.h>
+#include <sourcemeta/core/json_error.h>
 
 #include <exception>   // std::exception
+#include <filesystem>  // std::filesystem::path
 #include <string>      // std::string
 #include <type_traits> // std::is_base_of_v
+#include <utility>     // std::declval
+// Ensure JSONFileParseError::path() returns by const reference (no copies)
+static_assert(
+    std::is_same_v<
+        decltype(std::declval<const sourcemeta::core::JSONFileParseError>()
+                     .path()),
+        const std::filesystem::path &>,
+    "JSONFileParseError::path() must return const std::filesystem::path&");
 
 TEST(JSON_error, parse_error) {
   static_assert(
