@@ -1625,26 +1625,16 @@ TEST(AlterSchema_lint_2020_12, boolean_true_1) {
       { "enum": [ null ] },
       { "enum": [ false, true ] },
       {
-        "minProperties": 0,
-        "type": "object",
         "properties": {
-          "foo": {
-            "anyOf": [
-              { "enum": [ null ] },
-              { "enum": [ false, true ] },
-              { "properties": {}, "minProperties": 0, "type": "object" },
-              { "minItems": 0, "type": "array" },
-              { "minLength": 0, "type": "string" },
-              { "multipleOf": 1, "type": "number" },
-              { "multipleOf": 1, "type": "integer" }
-            ]
-          }
-        }
+          "foo": {}
+        },
+        "type": "object",
+        "minProperties": 0
       },
-      { "minItems": 0, "type": "array" },
-      { "minLength": 0, "type": "string" },
-      { "multipleOf": 1, "type": "number" },
-      { "multipleOf": 1, "type": "integer" }
+      { "type": "array", "minItems": 0 },
+      { "type": "string", "minLength": 0 },
+      { "type": "number", "multipleOf": 1 },
+      { "type": "integer", "multipleOf": 1 }
     ]
   })JSON");
 
