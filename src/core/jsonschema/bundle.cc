@@ -250,6 +250,21 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  // Insert a root identifier if a default is provided and the schema lacks one
+  if (default_id.has_value()) {
+    const auto maybe_base =
+        sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+    if (!maybe_base.has_value()) {
+      throw SchemaUnknownBaseDialectError();
+    }
+    const auto explicit_id =
+        sourcemeta::core::identify(schema, maybe_base.value(), std::nullopt);
+    if (!explicit_id.has_value() && schema.is_object()) {
+      sourcemeta::core::reidentify(schema, default_id.value(),
+                                   maybe_base.value());
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
