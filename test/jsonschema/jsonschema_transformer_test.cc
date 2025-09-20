@@ -3,6 +3,7 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <algorithm>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1186,4 +1187,78 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+TEST(JSONSchema_transformer, iterator_empty_bundle) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  // Test that empty bundle has no rules to iterate over
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  // Test that range-based for loop works with empty bundle
+  std::size_t count = 0;
+  for (const auto &entry : bundle) {
+    (void)entry; // Suppress unused variable warning
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_with_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  // Test that we can iterate over all rules
+  std::vector<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    rule_names.push_back(entry.first);
+    EXPECT_NE(entry.second.get(), nullptr);
+  }
+
+  // Verify we got all expected rules (order may vary due to map)
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_3") != rule_names.end());
+}
+
+TEST(JSONSchema_transformer, iterator_rule_access) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  // Test that we can access rule properties through iterator
+  auto it = bundle.begin();
+  EXPECT_NE(it, bundle.end());
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const auto &const_bundle = bundle;
+
+  // Test that const iterators work
+  std::size_t count = 0;
+  for (auto it = const_bundle.cbegin(); it != const_bundle.cend(); ++it) {
+    EXPECT_NE(it->second.get(), nullptr);
+    count++;
+  }
+  EXPECT_EQ(count, 2);
+
+  // Test range-based for loop with const reference
+  count = 0;
+  for (const auto &entry : const_bundle) {
+    EXPECT_NE(entry.second.get(), nullptr);
+    count++;
+  }
+  EXPECT_EQ(count, 2);
 }
