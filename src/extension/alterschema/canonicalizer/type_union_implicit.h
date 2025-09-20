@@ -74,6 +74,10 @@ public:
     ONLY_CONTINUE_IF(!vocabularies.contains(
                          "http://json-schema.org/draft-00/hyper-schema#") ||
                      !schema.defines_any({"enum", "disallow", "extends"}));
+
+    // Don't apply to empty schemas (result of boolean_true transformation)
+    ONLY_CONTINUE_IF(schema.size() > 0);
+
     return true;
   }
 

@@ -801,12 +801,10 @@ TEST(AlterSchema_lint_draft3, boolean_true_1) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-03/schema#",
-    "type": [ "null", "boolean", "object", "array", "string", "number", "integer" ],
     "properties": {
-      "foo": {
-        "type": [ "null", "boolean", "object", "array", "string", "number", "integer" ]
-      }
-    }
+      "foo": {}
+    },
+    "type": [ "null", "boolean", "object", "array", "string", "number", "integer" ]
   })JSON");
 
   EXPECT_EQ(document, expected);
