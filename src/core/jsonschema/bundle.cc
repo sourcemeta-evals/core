@@ -250,6 +250,37 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  if (default_id.has_value() && schema.is_object()) {
+    const auto maybe_base{
+        sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+    if (maybe_base.has_value()) {
+      const std::string &bd = maybe_base.value();
+      bool has_id_kw = false;
+      if (bd == "https://json-schema.org/draft/2020-12/schema" ||
+          bd == "https://json-schema.org/draft/2020-12/hyper-schema" ||
+          bd == "https://json-schema.org/draft/2019-09/schema" ||
+          bd == "https://json-schema.org/draft/2019-09/hyper-schema" ||
+          bd == "http://json-schema.org/draft-07/schema#" ||
+          bd == "http://json-schema.org/draft-07/hyper-schema#" ||
+          bd == "http://json-schema.org/draft-06/schema#" ||
+          bd == "http://json-schema.org/draft-06/hyper-schema#") {
+        has_id_kw = schema.defines("$id");
+      } else if (bd == "http://json-schema.org/draft-04/schema#" ||
+                 bd == "http://json-schema.org/draft-04/hyper-schema#" ||
+                 bd == "http://json-schema.org/draft-03/schema#" ||
+                 bd == "http://json-schema.org/draft-03/hyper-schema#" ||
+                 bd == "http://json-schema.org/draft-02/hyper-schema#" ||
+                 bd == "http://json-schema.org/draft-01/hyper-schema#" ||
+                 bd == "http://json-schema.org/draft-00/hyper-schema#") {
+        has_id_kw = schema.defines("id");
+      }
+      if (!has_id_kw) {
+        sourcemeta::core::reidentify(schema, default_id.value(), resolver,
+                                     default_dialect);
+      }
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
