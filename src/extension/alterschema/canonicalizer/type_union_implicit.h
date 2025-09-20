@@ -116,6 +116,21 @@ public:
       return false;
     }
 
+    if (vocabularies.contains("http://json-schema.org/draft-02/schema#") &&
+        schema.defines_any({"enum"})) {
+      return false;
+    }
+
+    if (vocabularies.contains("http://json-schema.org/draft-01/schema#") &&
+        schema.defines_any({"enum"})) {
+      return false;
+    }
+
+    if (vocabularies.contains("http://json-schema.org/draft-00/schema#") &&
+        schema.defines_any({"enum"})) {
+      return false;
+    }
+
     return true;
   }
 
