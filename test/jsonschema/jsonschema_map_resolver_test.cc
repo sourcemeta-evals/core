@@ -116,6 +116,44 @@ TEST(JSONSchema_SchemaMapResolver, duplicate_ids) {
   EXPECT_THROW(resolver.add(document_2), sourcemeta::core::SchemaError);
 }
 
+TEST(JSONSchema_SchemaMapResolver, add_sets_identifier_via_reidentify_draft4) {
+  sourcemeta::core::SchemaMapResolver resolver;
+  const auto doc =
+      sourcemeta::core::parse_json(R"JSON({ "type": "string" })JSON");
+  const std::string id = "https://www.sourcemeta.com/test";
+
+  EXPECT_TRUE(resolver.add(doc, "http://json-schema.org/draft-04/schema#", id,
+                           nullptr));
+  const auto got = resolver(id);
+  ASSERT_TRUE(got.has_value());
+
+  const auto expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://www.sourcemeta.com/test",
+    "type": "string"
+  })JSON");
+  EXPECT_EQ(got.value(), expected);
+}
+
+TEST(JSONSchema_SchemaMapResolver, add_sets_identifier_via_reidentify_2020_12) {
+  sourcemeta::core::SchemaMapResolver resolver;
+  const auto doc =
+      sourcemeta::core::parse_json(R"JSON({ "type": "string" })JSON");
+  const std::string id = "https://www.sourcemeta.com/test";
+
+  EXPECT_TRUE(resolver.add(doc, "https://json-schema.org/draft/2020-12/schema",
+                           id, nullptr));
+  const auto got = resolver(id);
+  ASSERT_TRUE(got.has_value());
+
+  const auto expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/test",
+    "type": "string"
+  })JSON");
+  EXPECT_EQ(got.value(), expected);
+}
+
 TEST(JSONSchema_SchemaMapResolver, embedded_resource) {
   sourcemeta::core::SchemaMapResolver resolver;
 
