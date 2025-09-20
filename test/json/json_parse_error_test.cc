@@ -3,7 +3,17 @@
 #include <sourcemeta/core/json.h>
 
 #include <exception>
+#include <filesystem>
 #include <sstream>
+#include <type_traits>
+#include <utility>
+
+static_assert(
+    std::is_same_v<
+        decltype(std::declval<const sourcemeta::core::JSONFileParseError>()
+                     .path()),
+        const std::filesystem::path &>,
+    "JSONFileParseError::path() must return const std::filesystem::path&");
 
 #define __EXPECT_PARSE_ERROR(input, expected_line, expected_column,            \
                              expected_error, expected_message)                 \
