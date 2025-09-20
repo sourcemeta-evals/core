@@ -25,3 +25,27 @@ TEST(JSONSchema, resolution_error_throw) {
   EXPECT_EQ(std::string{exception.what()}, "My error");
   EXPECT_EQ(exception.id(), "https://sourcemeta.com/test");
 }
+
+TEST(JSONSchema, reference_error_throw) {
+  static_assert(
+      std::is_base_of_v<std::exception, sourcemeta::core::SchemaReferenceError>,
+      "Must subclass std::exception");
+  auto exception{sourcemeta::core::SchemaReferenceError(
+      "#/foo", sourcemeta::core::Pointer{"$ref"}, "My error")};
+  EXPECT_THROW(throw exception, sourcemeta::core::SchemaReferenceError);
+  EXPECT_EQ(std::string{exception.what()}, "My error");
+  EXPECT_EQ(exception.id(), "#/foo");
+  EXPECT_EQ(sourcemeta::core::to_string(exception.location()), "/$ref");
+}
+
+TEST(JSONSchema, broken_reference_error_throw) {
+  static_assert(std::is_base_of_v<sourcemeta::core::SchemaReferenceError,
+                                  sourcemeta::core::SchemaBrokenReferenceError>,
+                "Must subclass SchemaReferenceError");
+  auto exception{sourcemeta::core::SchemaBrokenReferenceError(
+      "#/foo", sourcemeta::core::Pointer{"$ref"}, "My error")};
+  EXPECT_THROW(throw exception, sourcemeta::core::SchemaBrokenReferenceError);
+  EXPECT_EQ(std::string{exception.what()}, "My error");
+  EXPECT_EQ(exception.id(), "#/foo");
+  EXPECT_EQ(sourcemeta::core::to_string(exception.location()), "/$ref");
+}

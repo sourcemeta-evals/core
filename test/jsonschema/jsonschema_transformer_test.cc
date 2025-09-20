@@ -1293,3 +1293,29 @@ TEST(JSONSchema_transformer, iterators) {
   EXPECT_TRUE(rules.contains("example_rule_2"));
   EXPECT_TRUE(rules.contains("example_rule_3"));
 }
+
+TEST(JSONSchema_transformer,
+     throws_broken_reference_error_on_missing_rereference) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRuleDefinitionsToDefsNoRereference>();
+
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "definitions": {
+      "foo": { "type": "string" }
+    },
+    "$ref": "#/definitions/foo"
+  })JSON");
+
+  try {
+    TestTransformTraces entries;
+    (void)bundle.apply(document, sourcemeta::core::schema_official_walker,
+                       sourcemeta::core::schema_official_resolver,
+                       transformer_callback_trace(entries));
+    FAIL() << "The transformation was expected to throw";
+  } catch (const sourcemeta::core::SchemaBrokenReferenceError &error) {
+    EXPECT_EQ(error.id(), "#/definitions/foo");
+    EXPECT_EQ(sourcemeta::core::to_string(error.location()), "/$ref");
+    SUCCEED();
+  }
+}
