@@ -4,6 +4,7 @@
 
 #include <exception>
 #include <sstream>
+#include <type_traits>
 
 #define __EXPECT_PARSE_ERROR(input, expected_line, expected_column,            \
                              expected_error, expected_message)                 \
@@ -728,4 +729,13 @@ TEST(JSON_parse_error, read_json_non_existent) {
   } catch (...) {
     FAIL() << "The parse function was expected to throw a filesystem error";
   }
+}
+
+TEST(JSON_parse_error, path_returns_const_reference) {
+  static_assert(
+      std::is_same_v<
+          decltype(std::declval<const sourcemeta::core::JSONFileParseError &>()
+                       .path()),
+          const std::filesystem::path &>,
+      "JSONFileParseError::path() should return const std::filesystem::path&");
 }
