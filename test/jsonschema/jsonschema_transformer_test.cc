@@ -1187,3 +1187,33 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterate_rules_read_only_names_and_messages) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule1>();
+
+  const sourcemeta::core::SchemaTransformer &cbundle = bundle;
+
+  std::vector<std::string> names;
+  std::vector<std::string> messages;
+  for (const auto &entry : cbundle) {
+    const auto &name = entry.first;
+    const auto &rule_ptr = entry.second;
+    names.emplace_back(name);
+    messages.emplace_back(rule_ptr->message());
+  }
+
+  std::vector<std::string> expected_names{"example_rule_1", "example_rule_2"};
+  std::vector<std::string> expected_messages{"Keyword foo is not permitted",
+                                             "Keyword bar is not permitted"};
+
+  EXPECT_EQ(names, expected_names);
+  EXPECT_EQ(messages, expected_messages);
+}
+
+TEST(JSONSchema_transformer, iterate_rules_empty_bundle) {
+  const sourcemeta::core::SchemaTransformer bundle;
+  const auto count = std::distance(bundle.begin(), bundle.end());
+  EXPECT_EQ(count, 0);
+}
