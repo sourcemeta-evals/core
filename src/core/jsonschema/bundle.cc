@@ -250,6 +250,22 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  // Inject a root identifier when absent and a default_id is provided
+  if (default_id.has_value() && schema.is_object() && !schema.defines("$id") &&
+      !schema.defines("id")) {
+    const auto base =
+        sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+    if (base.has_value()) {
+      // Use reidentify to handle dialect-specific keyword and top-level $ref
+      // rules
+      sourcemeta::core::reidentify(schema, default_id.value(), base.value());
+    } else {
+      // If dialect cannot be determined, fall back to strict assignment of $id
+      // (this path is unlikely in bundle context but keeps behavior safe)
+      schema.assign("$id", sourcemeta::core::JSON{default_id.value()});
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
