@@ -242,6 +242,29 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// Read-only iteration API over registered rules
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+  [[nodiscard]] auto begin() const noexcept -> const_iterator {
+    return this->rules.begin();
+  }
+  [[nodiscard]] auto end() const noexcept -> const_iterator {
+    return this->rules.end();
+  }
+  [[nodiscard]] auto cbegin() const noexcept -> const_iterator {
+    return this->rules.cbegin();
+  }
+  [[nodiscard]] auto cend() const noexcept -> const_iterator {
+    return this->rules.cend();
+  }
+  [[nodiscard]] auto size() const noexcept -> std::size_t {
+    return this->rules.size();
+  }
+  [[nodiscard]] auto empty() const noexcept -> bool {
+    return this->rules.empty();
+  }
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
