@@ -1187,3 +1187,68 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterator_empty_bundle) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  auto it = bundle.begin();
+  EXPECT_NE(it, bundle.end());
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+
+  ++it;
+  EXPECT_EQ(it, bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::set<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    rule_names.insert(entry.first);
+    EXPECT_EQ(entry.first, entry.second->name());
+  }
+
+  std::set<std::string> expected{"example_rule_1", "example_rule_2",
+                                 "example_rule_3"};
+  EXPECT_EQ(rule_names, expected);
+}
+
+TEST(JSONSchema_transformer, iterator_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const auto &const_bundle = bundle;
+  std::set<std::string> rule_names;
+  for (auto it = const_bundle.cbegin(); it != const_bundle.cend(); ++it) {
+    rule_names.insert(it->first);
+  }
+
+  std::set<std::string> expected{"example_rule_1", "example_rule_2"};
+  EXPECT_EQ(rule_names, expected);
+}
+
+TEST(JSONSchema_transformer, iterator_rule_introspection) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1WithDescription>();
+  bundle.add<ExampleRule2>();
+
+  for (const auto &[name, rule] : bundle) {
+    if (name == "example_rule_1") {
+      EXPECT_EQ(rule->message(), "Keyword foo is not permitted");
+    } else if (name == "example_rule_2") {
+      EXPECT_EQ(rule->message(), "Keyword bar is not permitted");
+    }
+  }
+}
