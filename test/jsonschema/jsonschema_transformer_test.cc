@@ -1187,3 +1187,74 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterator_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  // Should be able to iterate over empty bundle
+  std::size_t count = 0;
+  for (const auto &entry : bundle) {
+    (void)entry;
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterator_with_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  // Test that iterators are not equal when rules exist
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_NE(bundle.cbegin(), bundle.cend());
+
+  // Collect rule names through iteration
+  std::set<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    rule_names.insert(entry.first);
+    // Verify we can access rule properties
+    EXPECT_FALSE(entry.second->name().empty());
+    EXPECT_FALSE(entry.second->message().empty());
+  }
+
+  // Verify we got all expected rules
+  const std::set<std::string> expected_names{"example_rule_1", "example_rule_2",
+                                             "example_rule_3"};
+  EXPECT_EQ(rule_names, expected_names);
+}
+
+TEST(JSONSchema_transformer, iterator_const_access) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  // Test const iterator access
+  const auto &const_bundle = bundle;
+  std::size_t count = 0;
+  for (auto it = const_bundle.cbegin(); it != const_bundle.cend(); ++it) {
+    EXPECT_EQ(it->first, "example_rule_1");
+    EXPECT_EQ(it->second->name(), "example_rule_1");
+    EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+    count++;
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterator_rule_introspection) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  // Test that we can introspect rule details
+  std::map<std::string, std::string> rule_messages;
+  for (const auto &[name, rule] : bundle) {
+    rule_messages[name] = rule->message();
+  }
+
+  EXPECT_EQ(rule_messages.size(), 2);
+  EXPECT_EQ(rule_messages["example_rule_1"], "Keyword foo is not permitted");
+  EXPECT_EQ(rule_messages["example_rule_2"], "Keyword bar is not permitted");
+}
