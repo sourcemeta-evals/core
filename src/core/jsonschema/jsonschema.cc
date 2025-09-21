@@ -732,24 +732,51 @@ auto sourcemeta::core::wrap(const sourcemeta::core::JSON &schema,
   // outside of the root of a schema resource is not valid according to
   // JSON Schema
   constexpr auto WRAPPER_IDENTIFIER{"tag:core.sourcemeta.com,2025:wrap"};
-  const auto id{identify(copy, resolver, SchemaIdentificationStrategy::Strict,
-                         default_dialect)
-                    .value_or(WRAPPER_IDENTIFIER)};
+  const auto existing_id{identify(
+      copy, resolver, SchemaIdentificationStrategy::Strict, default_dialect)};
+
+  // Check if the target subschema contains relative references
+  const auto target_schema = try_get(copy, pointer);
+  bool has_relative_refs = false;
+  if (target_schema && target_schema->is_object()) {
+    for (const auto &entry : target_schema->as_object()) {
+      if (entry.first == "$ref" && entry.second.is_string()) {
+        const std::string ref_value = entry.second.to_string();
+        // Check if it's a relative reference (not absolute URI)
+        if (!ref_value.empty() && ref_value.find("://") == std::string::npos &&
+            ref_value[0] != '#') {
+          has_relative_refs = true;
+          break;
+        }
+      }
+    }
+  }
+
+  const auto id{existing_id.value_or(WRAPPER_IDENTIFIER)};
   reidentify(copy, id, resolver, default_dialect);
   result.assign("$defs", JSON::make_object());
   result.at("$defs").assign("schema", std::move(copy));
 
-  // Add a reference to the schema
-  const URI uri{id};
-  if (!uri.fragment().has_value() || uri.fragment().value().empty()) {
-    std::ostringstream effective_uri;
-    effective_uri << uri.recompose_without_fragment().value_or("")
-                  << to_uri(pointer).recompose();
-    result.assign("$ref", JSON{effective_uri.str()});
-  } else {
+  // For anonymous schemas with relative references, use fragment-based
+  // references to preserve relative reference resolution within the wrapped
+  // schema
+  if (!existing_id.has_value() && has_relative_refs) {
     result.assign(
         "$ref",
         JSON{to_uri(Pointer{"$defs", "schema"}.concat(pointer)).recompose()});
+  } else {
+    // Add a reference to the schema using the original logic
+    const URI uri{id};
+    if (!uri.fragment().has_value() || uri.fragment().value().empty()) {
+      std::ostringstream effective_uri;
+      effective_uri << uri.recompose_without_fragment().value_or("")
+                    << to_uri(pointer).recompose();
+      result.assign("$ref", JSON{effective_uri.str()});
+    } else {
+      result.assign(
+          "$ref",
+          JSON{to_uri(Pointer{"$defs", "schema"}.concat(pointer)).recompose()});
+    }
   }
 
   return result;

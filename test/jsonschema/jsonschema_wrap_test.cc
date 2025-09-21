@@ -341,3 +341,40 @@ TEST(JSONSchema_wrap, schema_with_identifier_with_fragment) {
 
   EXPECT_EQ(result, expected);
 }
+
+TEST(JSONSchema_wrap, anonymous_schema_with_relative_reference) {
+  const auto schema{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "items": {
+      "$ref": "relative"
+    }
+  })JSON")};
+
+  const auto result{sourcemeta::core::wrap(
+      schema, {"items"}, sourcemeta::core::schema_official_resolver)};
+
+  // After the fix: anonymous schemas with relative references should use
+  // fragment-based references to preserve relative reference resolution.
+  // The relative reference "relative" should now be resolved correctly
+  // within the original schema context.
+
+  // Verify the corrected behavior: fragment-based reference preserves
+  // relative reference resolution
+  EXPECT_TRUE(result.is_object());
+  EXPECT_TRUE(result.defines("$ref"));
+  EXPECT_TRUE(result.defines("$defs"));
+
+  // The key fix: use fragment-based reference instead of absolute reference
+  EXPECT_EQ(result.at("$ref").to_string(), "#/$defs/schema/items");
+
+  // The wrapped schema should still have the artificial identifier
+  const auto &schema_def = result.at("$defs").at("schema");
+  EXPECT_TRUE(schema_def.defines("$id"));
+  EXPECT_EQ(schema_def.at("$id").to_string(),
+            "tag:core.sourcemeta.com,2025:wrap");
+
+  // The relative reference should be preserved in the wrapped schema
+  EXPECT_TRUE(schema_def.defines("items"));
+  EXPECT_TRUE(schema_def.at("items").defines("$ref"));
+  EXPECT_EQ(schema_def.at("items").at("$ref").to_string(), "relative");
+}
