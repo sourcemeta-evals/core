@@ -152,6 +152,26 @@ auto bundle_schema(sourcemeta::core::JSON &root,
         subschema, walker, resolver, default_dialect, default_id,
         // We only want to frame in "wrapper" mode for the top level object
         paths);
+
+    // Add default_id to root schema if it lacks an identifier and default_id is
+    // provided
+    if (default_id.has_value()) {
+      // Check if the schema already has an identifier
+      const auto base_dialect =
+          sourcemeta::core::base_dialect(subschema, resolver, default_dialect);
+      if (base_dialect.has_value()) {
+        const auto existing_id =
+            sourcemeta::core::identify(subschema, base_dialect.value());
+        if (!existing_id.has_value()) {
+          // Schema lacks an identifier, add the default_id
+          // We need to modify the root schema, which is passed by reference
+          if (&subschema == &root) {
+            sourcemeta::core::reidentify(root, default_id.value(),
+                                         base_dialect.value());
+          }
+        }
+      }
+    }
   } else {
     frame.analyse(subschema, walker, resolver, default_dialect, default_id);
   }
