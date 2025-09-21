@@ -350,7 +350,11 @@ auto URI::append_path(const std::string &path) -> URI & {
       this->path_.value() += '/';
     }
 
-    this->path_.value() += path;
+    if (this->path_.value().ends_with('/') && path.starts_with('/')) {
+      this->path_.value() += path.substr(1);
+    } else {
+      this->path_.value() += path;
+    }
     return *this;
   } else {
     return this->path(path);
