@@ -242,6 +242,26 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// Iterator support for read-only rule introspection
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get const iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> const_iterator;
+
+  /// Get const iterator to the end of the rules
+  [[nodiscard]] auto end() const -> const_iterator;
+
+  /// Get const iterator to a specific rule by name
+  [[nodiscard]] auto find(const std::string &name) const -> const_iterator;
+
+  /// Check if the transformer contains any rules
+  [[nodiscard]] auto empty() const -> bool;
+
+  /// Get the number of rules in the transformer
+  [[nodiscard]] auto size() const -> std::size_t;
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
