@@ -73,16 +73,17 @@ public:
   JSONFileParseError(const std::filesystem::path &path,
                      const std::uint64_t line, const std::uint64_t column,
                      std::string message)
-      : JSONParseError{line, column, std::move(message)}, path_{path} {}
+      : JSONParseError{line, column, std::move(message)},
+        path_{std::move(path)} {}
 
   /// Create a file parsing error from a parse error
   JSONFileParseError(const std::filesystem::path &path,
                      const JSONParseError &parent)
       : JSONParseError{parent.line(), parent.column(), parent.what()},
-        path_{path} {}
+        path_{std::move(path)} {}
 
   /// Get the file path of the error
-  [[nodiscard]] auto path() const noexcept -> const std::filesystem::path {
+  [[nodiscard]] auto path() const noexcept -> const std::filesystem::path & {
     return path_;
   }
 
