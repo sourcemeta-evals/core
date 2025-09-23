@@ -260,6 +260,18 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
 
   const auto vocabularies{
       sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
+
+  if (default_id.has_value() && schema.is_object()) {
+    const auto base_dialect{
+        sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+    if (base_dialect.has_value()) {
+      const auto current_id{identify(schema, base_dialect.value())};
+      if (!current_id.has_value()) {
+        reidentify(schema, default_id.value(), base_dialect.value());
+      }
+    }
+  }
+
   if (vocabularies.contains(
           "https://json-schema.org/draft/2020-12/vocab/core") ||
       vocabularies.contains(
