@@ -741,3 +741,29 @@ TEST(AlterSchema_lint_draft4, equal_numeric_bounds_to_enum_2) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(AlterSchema_lint_draft4, DISABLED_foo) {
+  for (int index = 0; index < 100; index++) {
+    sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "string",
+    "enum": [ "foo", "bar" ]
+  })JSON");
+
+    LINT_AND_FIX_FOR_READABILITY(document);
+
+    const sourcemeta::core::JSON expected =
+        sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "enum": [ "foo", "bar" ]
+  })JSON");
+
+    EXPECT_EQ(document, expected);
+  }
+}
+
+TEST(AlterSchema_lint_draft4, unnecessary_allof_ref_wrapper_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  sourcemeta::core::add(bundle, sourcemeta::core::AlterSchemaMode::Readability);
+  EXPECT_TRUE(bundle.remove("unnecessary_allof_ref_wrapper"));
+}

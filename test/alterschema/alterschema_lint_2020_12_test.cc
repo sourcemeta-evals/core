@@ -2,6 +2,8 @@
 
 #include <sourcemeta/core/json.h>
 
+#include <iostream>
+
 #include "alterschema_test_utils.h"
 
 TEST(AlterSchema_lint_2020_12, enum_to_const_1) {
