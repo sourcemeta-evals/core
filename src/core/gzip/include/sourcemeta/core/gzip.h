@@ -5,6 +5,8 @@
 #include <sourcemeta/core/gzip_export.h>
 #endif
 
+#include <istream>     // std::istream
+#include <mutex>       // std::mutex
 #include <optional>    // std::optional
 #include <string>      // std::string
 #include <string_view> // std::string_view
@@ -35,6 +37,8 @@ namespace sourcemeta::core {
 /// ```
 SOURCEMETA_CORE_GZIP_EXPORT auto gzip(std::string_view input)
     -> std::optional<std::string>;
+
+auto gunzip(std::istream &stream) -> std::optional<std::string>;
 
 } // namespace sourcemeta::core
 
