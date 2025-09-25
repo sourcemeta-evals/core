@@ -1,0 +1,53 @@
+class UnnecessaryAllOfRefWrapper final : public SchemaTransformRule {
+public:
+  UnnecessaryAllOfRefWrapper()
+      : SchemaTransformRule{"unnecessary_allof_ref_wrapper",
+                            "Wrapping `$ref` in `allOf` is unnecessary in JSON "
+                            "Schema 2019-09 and later versions as `$ref` does "
+                            "not override sibling keywords anymore"} {};
+
+  [[nodiscard]] auto
+  condition(const sourcemeta::core::JSON &schema,
+            const sourcemeta::core::JSON &,
+            const sourcemeta::core::Vocabularies &vocabularies,
+            const sourcemeta::core::SchemaFrame &,
+            const sourcemeta::core::SchemaFrame::Location &,
+            const sourcemeta::core::SchemaWalker &,
+            const sourcemeta::core::SchemaResolver &) const
+      -> sourcemeta::core::SchemaTransformRule::Result override {
+    if (!((vocabularies.contains(
+               "https://json-schema.org/draft/2020-12/vocab/core") &&
+           vocabularies.contains(
+               "https://json-schema.org/draft/2020-12/vocab/applicator")) ||
+          (vocabularies.contains(
+               "https://json-schema.org/draft/2019-09/vocab/core") &&
+           vocabularies.contains(
+               "https://json-schema.org/draft/2019-09/vocab/applicator")))) {
+      return false;
+    }
+
+    if (!schema.is_object() || schema.defines("$ref") ||
+        !schema.defines("allOf") || !schema.at("allOf").is_array() ||
+        schema.at("allOf").empty()) {
+      return false;
+    }
+
+    bool match{false};
+    for (const auto &entry : schema.at("allOf").as_array()) {
+      if (entry.is_object() && entry.defines("$ref")) {
+        if (match) {
+          return false;
+        } else {
+          match = true;
+        }
+      }
+    }
+
+    return match;
+  }
+
+  auto transform(JSON &schema) const -> void override {
+    schema.assign("$ref", schema.at("allOf").at(0).at("$ref"));
+    schema.erase("allOf");
+  }
+};
