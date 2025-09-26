@@ -41,3 +41,13 @@ TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   EXPECT_EQ(result.size(), 12);
   EXPECT_EQ(result, expected);
 }
+
+TEST(JSONPointer_json_auto, from_json_pattern_properties_case) {
+  const sourcemeta::core::JSON input{"/[\\-]"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value().size(), 1);
+  EXPECT_TRUE(result.value().at(0).is_property());
+  EXPECT_EQ(result.value().at(0).to_property(), "[\\-]");
+}
