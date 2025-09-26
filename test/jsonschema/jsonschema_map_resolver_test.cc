@@ -181,3 +181,47 @@ TEST(JSONSchema_SchemaMapResolver, embedded_resource_with_callback) {
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/test"));
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/string"));
 }
+
+TEST(JSONSchema_SchemaMapResolver, reidentify_draft04_uses_id) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "string"
+  })JSON");
+
+  const auto result{
+      resolver.add(document, std::nullopt, "https://example.com/test")};
+  EXPECT_TRUE(result);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://example.com/test",
+    "type": "string"
+  })JSON");
+
+  EXPECT_TRUE(resolver("https://example.com/test").has_value());
+  EXPECT_EQ(resolver("https://example.com/test").value(), expected);
+}
+
+TEST(JSONSchema_SchemaMapResolver, reidentify_draft2020_uses_dollar_id) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "string"
+  })JSON");
+
+  const auto result{
+      resolver.add(document, std::nullopt, "https://example.com/test")};
+  EXPECT_TRUE(result);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/test",
+    "type": "string"
+  })JSON");
+
+  EXPECT_TRUE(resolver("https://example.com/test").has_value());
+  EXPECT_EQ(resolver("https://example.com/test").value(), expected);
+}
