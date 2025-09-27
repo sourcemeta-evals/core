@@ -12,6 +12,7 @@
 
 #include <cassert>     // assert
 #include <concepts>    // std::derived_from
+#include <cstddef>     // std::size_t
 #include <functional>  // std::function
 #include <map>         // std::map
 #include <memory>      // std::make_unique, std::unique_ptr
@@ -24,6 +25,14 @@
 #include <vector>      // std::vector
 
 namespace sourcemeta::core {
+
+/// @ingroup jsonschema
+/// An entry representing a registered transformation rule for read-only
+/// introspection
+struct SchemaTransformRuleEntry {
+  std::string name;
+  std::string message;
+};
 
 /// @ingroup jsonschema
 ///
@@ -212,10 +221,30 @@ public:
     // Rules must only be defined once
     assert(!this->rules.contains(rule->name()));
     this->rules.emplace(rule->name(), std::move(rule));
+    this->rule_entries_.reset();
   }
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+private:
+  using internal = typename std::vector<SchemaTransformRuleEntry>;
+
+public:
+  using const_iterator = typename internal::const_iterator;
+
+  /// Get an iterator to the beginning of registered rules
+  auto begin() const -> const_iterator;
+  /// Get an iterator to the end of registered rules
+  auto end() const -> const_iterator;
+  /// Get a const iterator to the beginning of registered rules
+  auto cbegin() const -> const_iterator;
+  /// Get a const iterator to the end of registered rules
+  auto cend() const -> const_iterator;
+  /// Get the number of registered rules
+  auto size() const -> std::size_t;
+  /// Check if no rules are registered
+  auto empty() const -> bool;
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
@@ -250,9 +279,14 @@ private:
 #pragma warning(disable : 4251)
 #endif
   std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  // Mutable to allow lazy initialization in const methods
+  mutable std::optional<internal> rule_entries_;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif
+
+  /// Build the rule entries vector for iteration
+  auto build_rule_entries() const -> void;
 };
 
 } // namespace sourcemeta::core

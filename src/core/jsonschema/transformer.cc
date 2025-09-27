@@ -236,7 +236,48 @@ auto SchemaTransformer::apply(
 }
 
 auto SchemaTransformer::remove(const std::string &name) -> bool {
-  return this->rules.erase(name) > 0;
+  const bool removed = this->rules.erase(name) > 0;
+  if (removed) {
+    this->rule_entries_.reset();
+  }
+  return removed;
 }
+
+auto SchemaTransformer::build_rule_entries() const -> void {
+  if (!this->rule_entries_.has_value()) {
+    internal entries;
+    entries.reserve(this->rules.size());
+    for (const auto &[name, rule] : this->rules) {
+      entries.emplace_back(SchemaTransformRuleEntry{name, rule->message()});
+    }
+    this->rule_entries_ = std::move(entries);
+  }
+}
+
+auto SchemaTransformer::begin() const -> const_iterator {
+  this->build_rule_entries();
+  return this->rule_entries_->begin();
+}
+
+auto SchemaTransformer::end() const -> const_iterator {
+  this->build_rule_entries();
+  return this->rule_entries_->end();
+}
+
+auto SchemaTransformer::cbegin() const -> const_iterator {
+  this->build_rule_entries();
+  return this->rule_entries_->cbegin();
+}
+
+auto SchemaTransformer::cend() const -> const_iterator {
+  this->build_rule_entries();
+  return this->rule_entries_->cend();
+}
+
+auto SchemaTransformer::size() const -> std::size_t {
+  return this->rules.size();
+}
+
+auto SchemaTransformer::empty() const -> bool { return this->rules.empty(); }
 
 } // namespace sourcemeta::core

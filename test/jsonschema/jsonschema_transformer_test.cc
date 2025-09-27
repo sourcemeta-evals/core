@@ -1187,3 +1187,93 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterate_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_TRUE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  // Test range-based for loop
+  for (const auto &entry : bundle) {
+    // Should not execute
+    FAIL() << "Empty transformer should not have any entries";
+  }
+}
+
+TEST(JSONSchema_transformer, iterate_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 1);
+  EXPECT_NE(bundle.begin(), bundle.end());
+
+  auto it = bundle.begin();
+  EXPECT_EQ(it->name, "example_rule_1");
+  EXPECT_EQ(it->message, "Keyword foo is not permitted");
+
+  ++it;
+  EXPECT_EQ(it, bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterate_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 3);
+
+  std::set<std::string> expected_names{"example_rule_1", "example_rule_2",
+                                       "example_rule_3"};
+  std::set<std::string> found_names;
+
+  for (const auto &entry : bundle) {
+    found_names.insert(entry.name);
+    EXPECT_FALSE(entry.name.empty());
+    EXPECT_FALSE(entry.message.empty());
+  }
+
+  EXPECT_EQ(found_names, expected_names);
+}
+
+TEST(JSONSchema_transformer, iterate_after_rule_removal) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_EQ(bundle.size(), 2);
+
+  // Remove a rule
+  EXPECT_TRUE(bundle.remove("example_rule_1"));
+
+  EXPECT_EQ(bundle.size(), 1);
+
+  // Verify iteration reflects the removal
+  auto it = bundle.begin();
+  EXPECT_EQ(it->name, "example_rule_2");
+  EXPECT_EQ(it->message, "Keyword bar is not permitted");
+
+  ++it;
+  EXPECT_EQ(it, bundle.end());
+}
+
+TEST(JSONSchema_transformer, const_iteration) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  EXPECT_EQ(const_bundle.size(), 1);
+  EXPECT_FALSE(const_bundle.empty());
+
+  auto it = const_bundle.cbegin();
+  EXPECT_EQ(it->name, "example_rule_1");
+  EXPECT_EQ(it->message, "Keyword foo is not permitted");
+
+  ++it;
+  EXPECT_EQ(it, const_bundle.cend());
+}
