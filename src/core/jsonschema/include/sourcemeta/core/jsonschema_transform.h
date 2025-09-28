@@ -217,6 +217,29 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto size() const -> std::size_t;
+
+  /// Check if the bundle is empty
+  [[nodiscard]] auto empty() const -> bool;
+
+  /// Iterator support for read-only access to rules
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get iterator to the beginning of rules
+  [[nodiscard]] auto begin() const -> const_iterator;
+
+  /// Get iterator to the end of rules
+  [[nodiscard]] auto end() const -> const_iterator;
+
+  /// Get const iterator to the beginning of rules
+  [[nodiscard]] auto cbegin() const -> const_iterator;
+
+  /// Get const iterator to the end of rules
+  [[nodiscard]] auto cend() const -> const_iterator;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
