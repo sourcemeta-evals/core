@@ -1732,3 +1732,90 @@ TEST(AlterSchema_lint_2020_12, equal_numeric_bounds_to_enum_2) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_basic) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12,
+     unnecessary_allof_ref_wrapper_with_other_properties) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { 
+        "$ref": "https://example.com",
+        "title": "Example"
+      }
+    ]
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com",
+    "title": "Example"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12,
+     unnecessary_allof_ref_wrapper_no_change_multiple_branches) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com" },
+      { "type": "object" }
+    ]
+  })JSON");
+
+  const sourcemeta::core::JSON original = document;
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  EXPECT_EQ(document, original);
+}
+
+TEST(AlterSchema_lint_2020_12,
+     unnecessary_allof_ref_wrapper_no_change_ref_sibling) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://other.com",
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  const sourcemeta::core::JSON original = document;
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  EXPECT_EQ(document, original);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_no_change_no_ref) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "type": "string" }
+    ]
+  })JSON");
+
+  const sourcemeta::core::JSON original = document;
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  EXPECT_EQ(document, original);
+}
