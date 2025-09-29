@@ -242,6 +242,40 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// Iterator support for read-only introspection of registered rules
+  class const_iterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type =
+        std::pair<const std::string &, const SchemaTransformRule &>;
+    using pointer = const value_type *;
+    using reference = const value_type &;
+
+    const_iterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator it);
+
+    auto operator*() const -> value_type;
+    auto operator++() -> const_iterator &;
+    auto operator++(int) -> const_iterator;
+    auto operator==(const const_iterator &other) const -> bool;
+    auto operator!=(const const_iterator &other) const -> bool;
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        iter;
+  };
+
+  /// Get iterator to the beginning of the rules
+  auto begin() const -> const_iterator;
+  /// Get iterator to the end of the rules
+  auto end() const -> const_iterator;
+  /// Get const iterator to the beginning of the rules
+  auto cbegin() const -> const_iterator;
+  /// Get const iterator to the end of the rules
+  auto cend() const -> const_iterator;
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
