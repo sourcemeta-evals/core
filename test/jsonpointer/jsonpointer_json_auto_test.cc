@@ -41,3 +41,23 @@ TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   EXPECT_EQ(result.size(), 12);
   EXPECT_EQ(result, expected);
 }
+
+TEST(JSONPointer_json_auto, pointer_with_backslash) {
+  const sourcemeta::core::Pointer pointer{"patternProperties", "[\\-]"};
+  const auto result{sourcemeta::core::to_json(pointer)};
+  const sourcemeta::core::JSON expected{"/patternProperties/[\\-]"};
+  EXPECT_EQ(result, expected);
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+}
+
+TEST(JSONPointer_json_auto, pointer_with_multiple_backslashes) {
+  const sourcemeta::core::Pointer pointer{"foo", "bar\\baz"};
+  const auto result{sourcemeta::core::to_json(pointer)};
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+}
