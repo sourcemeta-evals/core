@@ -345,6 +345,14 @@ public:
   /// ```
   auto canonicalize() -> URI &;
 
+  [[nodiscard]] auto to_path() -> std::string {
+    if (this->path_.has_value()) {
+      return this->path_.value();
+    } else {
+      return "";
+    }
+  }
+
   /// Resolve a relative URI against a base URI as established by RFC 3986. For
   /// example:
   ///
