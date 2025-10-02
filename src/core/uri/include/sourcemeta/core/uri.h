@@ -11,6 +11,7 @@
 
 #include <cstdint>     // std::uint32_t
 #include <filesystem>  // std::filesystem
+#include <iostream>    // std::cout
 #include <istream>     // std::istream
 #include <memory>      // std::unique_ptr
 #include <optional>    // std::optional
@@ -344,6 +345,8 @@ public:
   /// assert(uri.recompose() == "http://example.com/TEST");
   /// ```
   auto canonicalize() -> URI &;
+
+  [[nodiscard]] auto to_path() const -> std::filesystem::path;
 
   /// Resolve a relative URI against a base URI as established by RFC 3986. For
   /// example:

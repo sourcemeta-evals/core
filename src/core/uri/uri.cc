@@ -8,6 +8,7 @@
 #include <cassert>    // assert
 #include <cstdint>    // std::uint32_t
 #include <filesystem> // std::filesystem
+#include <iostream>   // std::cout
 #include <optional>   // std::optional
 #include <sstream>    // std::ostringstream, std::istringstream
 #include <stdexcept>  // std::length_error, std::runtime_error
@@ -744,6 +745,50 @@ auto URI::operator<(const URI &other) const noexcept -> bool {
 
 auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto scheme{this->scheme()};
+  auto path{this->path().value_or("")};
+  if (!scheme.has_value() || scheme.value() != "file") {
+    return path;
+  }
+
+  const auto is_windows_absolute{path.size() >= 3 && path[0] == '/' &&
+                                 path[2] == ':'};
+  if (is_windows_absolute) {
+    path.erase(0, 1);
+    std::ranges::replace(path, '/', '\\');
+  }
+
+  std::istringstream input{path};
+  std::ostringstream output;
+
+  std::istream_iterator<char> iterator(input);
+  std::istream_iterator<char> end;
+  auto plus_1 = std::ranges::next(iterator, 1, end);
+  auto plus_2 = std::ranges::next(plus_1, 1, end);
+  const int hex_base = 16;
+
+  while (iterator != end) {
+    if (*iterator == '%' && plus_1 != end && plus_2 != end &&
+        std::isxdigit(*(plus_1)) && std::isxdigit(*(plus_2))) {
+      std::string hex{*plus_1, *plus_2};
+      char decoded_char = static_cast<char>(std::stoi(hex, nullptr, hex_base));
+      output << decoded_char;
+
+      iterator = std::ranges::next(plus_2, 1, end);
+      plus_1 = std::ranges::next(iterator, 1, end);
+      plus_2 = std::ranges::next(plus_1, 1, end);
+    } else {
+      output << *iterator;
+      iterator = plus_1;
+      plus_1 = plus_2;
+      plus_2 = std::ranges::next(plus_1, 1, end);
+    }
+  }
+
+  return output.str();
 }
 
 auto URI::from_path(const std::filesystem::path &path) -> URI {

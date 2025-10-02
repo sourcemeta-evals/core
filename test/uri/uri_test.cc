@@ -4,6 +4,16 @@
 
 #include <map>
 
+#ifdef _WIN32
+TEST(URI, DISABLED_foo) {
+  for (const auto &input : {"https://example.com"}) {
+    const sourcemeta::core::URI uri_1{input};
+    const sourcemeta::core::URI uri_2{uri_1};
+    EXPECT_EQ(uri_1.recompose(), uri_2.recompose());
+  }
+}
+#endif
+
 TEST(URI, copy_constructor) {
   const sourcemeta::core::URI uri_1{"https://example.com"};
   const sourcemeta::core::URI uri_2{uri_1};
