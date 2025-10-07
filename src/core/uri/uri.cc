@@ -786,4 +786,55 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto scheme_value = this->scheme();
+
+  if (!scheme_value.has_value() || scheme_value.value() != "file") {
+    const auto path_value = this->path();
+    if (path_value.has_value()) {
+      return std::filesystem::path{path_value.value()};
+    }
+    return std::filesystem::path{};
+  }
+
+  const auto host_value = this->host();
+  const auto path_value = this->path();
+
+  if (!path_value.has_value()) {
+    return std::filesystem::path{};
+  }
+
+  std::istringstream input{path_value.value()};
+  std::ostringstream output;
+  uri_unescape(input, output);
+  std::string unescaped_path = output.str();
+
+  if (host_value.has_value() && !host_value.value().empty()) {
+    std::istringstream host_input{std::string(host_value.value())};
+    std::ostringstream host_output;
+    uri_unescape(host_input, host_output);
+    std::string unescaped_host = host_output.str();
+
+#ifdef _WIN32
+    std::string unc_path = "\\\\" + unescaped_host + unescaped_path;
+    std::ranges::replace(unc_path, '/', '\\');
+    return std::filesystem::path{unc_path};
+#else
+    std::string combined = "//" + unescaped_host + unescaped_path;
+    return std::filesystem::path{combined};
+#endif
+  }
+
+  if (unescaped_path.size() >= 3 && unescaped_path[0] == '/' &&
+      std::isalpha(unescaped_path[1]) && unescaped_path[2] == ':') {
+    std::string windows_path = unescaped_path.substr(1);
+#ifdef _WIN32
+    std::ranges::replace(windows_path, '/', '\\');
+#endif
+    return std::filesystem::path{windows_path};
+  }
+
+  return std::filesystem::path{unescaped_path};
+}
+
 } // namespace sourcemeta::core
