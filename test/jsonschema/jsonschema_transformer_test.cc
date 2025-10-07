@@ -1187,3 +1187,56 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterate_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iterate_with_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::set<std::string> rule_names;
+  for (const auto &[name, rule] : bundle) {
+    rule_names.insert(name);
+    EXPECT_NE(rule, nullptr);
+  }
+
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, iterate_access_rule_properties) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  for (const auto &[name, rule] : bundle) {
+    EXPECT_FALSE(rule->name().empty());
+    EXPECT_FALSE(rule->message().empty());
+    EXPECT_EQ(rule->name(), name);
+  }
+}
+
+TEST(JSONSchema_transformer, iterate_const_correctness) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  std::size_t count = 0;
+  for (const auto &[name, rule] : const_bundle) {
+    EXPECT_EQ(name, "example_rule_1");
+    EXPECT_EQ(rule->name(), "example_rule_1");
+    EXPECT_EQ(rule->message(), "Keyword foo is not permitted");
+    count++;
+  }
+
+  EXPECT_EQ(count, 1);
+}

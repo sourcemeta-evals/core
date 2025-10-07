@@ -205,6 +205,20 @@ public:
   auto operator=(SchemaTransformer &&) -> SchemaTransformer & = default;
 #endif
 
+  /// Iterator support for read-only access to registered rules
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get const iterator to the beginning of the rules
+  auto begin() const -> const_iterator;
+  /// Get const iterator to the end of the rules
+  auto end() const -> const_iterator;
+  /// Get const iterator to the beginning of the rules
+  auto cbegin() const -> const_iterator;
+  /// Get const iterator to the end of the rules
+  auto cend() const -> const_iterator;
+
   /// Add a rule to the bundle
   template <std::derived_from<SchemaTransformRule> T, typename... Args>
   auto add(Args &&...args) -> void {
