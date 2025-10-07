@@ -201,6 +201,19 @@ public:
   /// ```
   [[nodiscard]] auto path() const -> std::optional<std::string>;
 
+  /// Convert the URI to a filesystem path. For URIs with the `file://` scheme,
+  /// this correctly handles both Windows and UNIX paths. For non `file://`
+  /// URIs, this returns the URI path component. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/uri.h>
+  ///
+  /// const sourcemeta::core::URI uri{"file:///foo/bar/baz"};
+  /// const auto path = uri.to_path();
+  /// assert(path == std::filesystem::path{"/foo/bar/baz"});
+  /// ```
+  [[nodiscard]] auto to_path() const -> std::filesystem::path;
+
   /// Set the path part of the URI. For example:
   ///
   /// ```cpp

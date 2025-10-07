@@ -786,4 +786,55 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto scheme_value = this->scheme();
+  const auto path_value = this->path();
+
+  if (!scheme_value.has_value() || scheme_value.value() != "file") {
+    if (!path_value.has_value()) {
+      return std::filesystem::path{};
+    }
+    std::istringstream input{path_value.value()};
+    std::ostringstream output;
+    uri_unescape(input, output);
+    return std::filesystem::path{output.str()};
+  }
+
+  const auto host_value = this->host();
+
+  if (host_value.has_value() && !host_value.value().empty()) {
+    std::string unc_path = "\\\\";
+    unc_path += host_value.value();
+
+    if (path_value.has_value()) {
+      std::istringstream input{path_value.value()};
+      std::ostringstream output;
+      uri_unescape(input, output);
+      std::string decoded_path = output.str();
+      std::ranges::replace(decoded_path, '/', '\\');
+      unc_path += decoded_path;
+    }
+
+    return std::filesystem::path{unc_path};
+  }
+
+  if (!path_value.has_value()) {
+    return std::filesystem::path{};
+  }
+
+  std::istringstream input{path_value.value()};
+  std::ostringstream output;
+  uri_unescape(input, output);
+  std::string decoded_path = output.str();
+
+  if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+      std::isalpha(decoded_path[1]) && decoded_path[2] == ':') {
+    decoded_path = decoded_path.substr(1);
+    std::ranges::replace(decoded_path, '/', '\\');
+    return std::filesystem::path{decoded_path};
+  }
+
+  return std::filesystem::path{decoded_path};
+}
+
 } // namespace sourcemeta::core
