@@ -141,6 +141,7 @@ sourcemeta_library(NAMESPACE sourcemeta PROJECT core NAME alterschema
     linter/duplicate_allof_branches.h
     linter/duplicate_anyof_branches.h
     linter/else_without_if.h
+    linter/unnecessary_allof_ref_wrapper.h
     linter/if_without_then_else.h
     linter/max_contains_without_contains.h
     linter/min_contains_without_contains.h
