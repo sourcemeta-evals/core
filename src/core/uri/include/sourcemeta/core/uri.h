@@ -453,6 +453,26 @@ public:
   /// ```
   static auto from_path(const std::filesystem::path &path) -> URI;
 
+  /// Convert a URI to a file system path. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/uri.h>
+  /// #include <cassert>
+  /// #include <filesystem>
+  ///
+  /// const sourcemeta::core::URI uri{"file:///foo/bar"};
+  /// const auto path{uri.to_path()};
+  /// assert(path.string() == "/foo/bar");
+  /// ```
+  ///
+  /// For file:// URIs:
+  /// - UNIX paths: file:///foo/bar → /foo/bar
+  /// - Windows drives: file:///C:/path → C:/path
+  /// - UNC paths: file://server/share → \\server\share
+  ///
+  /// For non-file:// URIs, returns the decoded URI path component.
+  auto to_path() const -> std::filesystem::path;
+
   /// A convenient method to canonicalize and recompose a URI from a string. For
   /// example:
   ///
