@@ -333,6 +333,21 @@ public:
   [[nodiscard]] auto recompose_without_fragment() const
       -> std::optional<std::string>;
 
+  /// Convert a URI to a file system path. For file:// URIs, this correctly
+  /// handles Windows, UNIX, and UNC path formats. For non-file URIs, this
+  /// returns the path component of the URI. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/uri.h>
+  /// #include <cassert>
+  /// #include <filesystem>
+  ///
+  /// const sourcemeta::core::URI uri{"file:///foo/bar"};
+  /// const auto path{uri.to_path()};
+  /// assert(path == "/foo/bar");
+  /// ```
+  auto to_path() const -> std::filesystem::path;
+
   /// Canonicalize a URI. For example:
   ///
   /// ```cpp
