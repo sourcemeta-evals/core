@@ -1187,3 +1187,96 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterate_empty_transformer) {
+  sourcemeta::core::SchemaTransformer transformer;
+
+  EXPECT_TRUE(transformer.empty());
+  EXPECT_EQ(transformer.size(), 0);
+  EXPECT_EQ(transformer.begin(), transformer.end());
+  EXPECT_EQ(transformer.cbegin(), transformer.cend());
+
+  std::size_t count = 0;
+  for (const auto &[name, rule] : transformer) {
+    (void)name;
+    (void)rule;
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterate_single_rule) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+
+  EXPECT_FALSE(transformer.empty());
+  EXPECT_EQ(transformer.size(), 1);
+
+  std::size_t count = 0;
+  for (const auto &[name, rule] : transformer) {
+    EXPECT_EQ(name, "example_rule_1");
+    EXPECT_EQ(rule->name(), "example_rule_1");
+    EXPECT_EQ(rule->message(), "Keyword foo is not permitted");
+    count++;
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterate_multiple_rules) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+  transformer.add<ExampleRule2>();
+  transformer.add<ExampleRule3>();
+
+  EXPECT_FALSE(transformer.empty());
+  EXPECT_EQ(transformer.size(), 3);
+
+  std::set<std::string> rule_names;
+  for (const auto &[name, rule] : transformer) {
+    rule_names.insert(name);
+    EXPECT_EQ(name, rule->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, iterate_after_remove) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+  transformer.add<ExampleRule2>();
+
+  EXPECT_EQ(transformer.size(), 2);
+
+  transformer.remove("example_rule_1");
+
+  EXPECT_EQ(transformer.size(), 1);
+
+  std::size_t count = 0;
+  for (const auto &[name, rule] : transformer) {
+    EXPECT_EQ(name, "example_rule_2");
+    EXPECT_EQ(rule->name(), "example_rule_2");
+    count++;
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, const_iterator_methods) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+  transformer.add<ExampleRule2>();
+
+  auto it1 = transformer.begin();
+  auto it2 = transformer.cbegin();
+  auto end1 = transformer.end();
+  auto end2 = transformer.cend();
+
+  EXPECT_EQ(std::distance(it1, end1), 2);
+  EXPECT_EQ(std::distance(it2, end2), 2);
+
+  for (auto it = transformer.begin(); it != transformer.end(); ++it) {
+    EXPECT_FALSE(it->second->name().empty());
+    EXPECT_FALSE(it->second->message().empty());
+  }
+}
