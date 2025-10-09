@@ -3,6 +3,8 @@
 #include <sourcemeta/core/jsonpointer.h>
 
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 
 TEST(JSONPointer_pointer, general_traits) {
   EXPECT_TRUE(std::is_default_constructible<sourcemeta::core::Pointer>::value);

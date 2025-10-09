@@ -4,6 +4,8 @@
 #include <sourcemeta/core/jsonpointer.h>
 
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 
 static const std::string foo = "foo";
 static const std::string bar = "bar";

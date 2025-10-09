@@ -652,4 +652,19 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+template <typename PropertyT>
+struct hash<sourcemeta::core::GenericPointer<
+    PropertyT,
+    sourcemeta::core::PropertyHashJSON<sourcemeta::core::JSON::String>>> {
+  auto operator()(
+      const sourcemeta::core::GenericPointer<
+          PropertyT,
+          sourcemeta::core::PropertyHashJSON<sourcemeta::core::JSON::String>> &)
+      -> std::size_t {
+    return 0;
+  }
+};
+} // namespace std
+
 #endif
