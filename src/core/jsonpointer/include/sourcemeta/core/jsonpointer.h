@@ -652,4 +652,54 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    const auto size = pointer.size();
+    std::size_t result = 0;
+
+    result = hash_token(pointer.at(0));
+
+    if (size > 1) {
+      result = combine_hash(result, hash_token(pointer.at(size - 1)));
+    }
+
+    if (size > 2) {
+      result = combine_hash(result, hash_token(pointer.at(size / 2)));
+    }
+
+    result = combine_hash(result, static_cast<std::size_t>(size));
+
+    return result;
+  }
+
+private:
+  static auto hash_token(
+      const typename sourcemeta::core::GenericPointer<PropertyT, Hash>::Token
+          &token) noexcept -> std::size_t {
+    if (token.is_property()) {
+      const auto prop_hash = token.property_hash();
+      return static_cast<std::size_t>(prop_hash.a);
+    } else {
+      return static_cast<std::size_t>(token.to_index());
+    }
+  }
+
+  static auto combine_hash(std::size_t seed, std::size_t value) noexcept
+      -> std::size_t {
+    seed ^= value;
+    seed *= 0x100000001b3;
+    return seed;
+  }
+};
+
+} // namespace std
+
 #endif
