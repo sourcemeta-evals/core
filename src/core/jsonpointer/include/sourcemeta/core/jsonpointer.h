@@ -652,4 +652,96 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t hash_value = 0;
+
+    const auto &first = pointer.at(0);
+    if (first.is_property()) {
+      hash_value ^= static_cast<std::size_t>(first.property_hash().a);
+    } else {
+      hash_value ^= static_cast<std::size_t>(first.to_index());
+    }
+
+    if (size == 1) {
+      return hash_value;
+    }
+
+    const auto &last = pointer.at(size - 1);
+    if (last.is_property()) {
+      hash_value ^= (static_cast<std::size_t>(last.property_hash().a) << 1) | 1;
+    } else {
+      hash_value ^= (static_cast<std::size_t>(last.to_index()) << 1) | 1;
+    }
+
+    if (size == 2) {
+      return hash_value;
+    }
+
+    const auto &middle = pointer.at(size / 2);
+    if (middle.is_property()) {
+      hash_value ^=
+          (static_cast<std::size_t>(middle.property_hash().a) << 2) | 2;
+    } else {
+      hash_value ^= (static_cast<std::size_t>(middle.to_index()) << 2) | 2;
+    }
+
+    return hash_value;
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t hash_value = 0;
+
+    const auto &first = pointer.at(0);
+    if (first.is_property()) {
+      hash_value ^= static_cast<std::size_t>(first.property_hash().a);
+    } else {
+      hash_value ^= static_cast<std::size_t>(first.to_index());
+    }
+
+    if (size == 1) {
+      return hash_value;
+    }
+
+    const auto &last = pointer.at(size - 1);
+    if (last.is_property()) {
+      hash_value ^= (static_cast<std::size_t>(last.property_hash().a) << 1) | 1;
+    } else {
+      hash_value ^= (static_cast<std::size_t>(last.to_index()) << 1) | 1;
+    }
+
+    if (size == 2) {
+      return hash_value;
+    }
+
+    const auto &middle = pointer.at(size / 2);
+    if (middle.is_property()) {
+      hash_value ^=
+          (static_cast<std::size_t>(middle.property_hash().a) << 2) | 2;
+    } else {
+      hash_value ^= (static_cast<std::size_t>(middle.to_index()) << 2) | 2;
+    }
+
+    return hash_value;
+  }
+};
+
+} // namespace std
+
 #endif
