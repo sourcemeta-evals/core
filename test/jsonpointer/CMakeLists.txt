@@ -10,6 +10,7 @@ sourcemeta_googletest(NAMESPACE sourcemeta PROJECT core NAME jsonpointer
     jsonpointer_position_test.cc
     jsonpointer_template_test.cc
     jsonpointer_weakpointer_test.cc
+    jsonpointer_hash_test.cc
     jsonpointer_resolve_from_test.cc
     jsonpointer_set_test.cc
     jsonpointer_stringify_test.cc
