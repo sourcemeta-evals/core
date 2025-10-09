@@ -1,5 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <iostream>
+#include <map>
+#include <set>
+#include <sstream>
+
 #include <chrono>
 #include <ctime>
 #include <stdexcept>
@@ -76,3 +82,5 @@ TEST(Time, gmt_comparison_greater_than) {
   EXPECT_TRUE(sourcemeta::core::from_gmt("Wed, 21 Oct 2100 11:28:00 GMT") >
               sourcemeta::core::from_gmt("Wed, 21 Oct 2015 11:28:00 GMT"));
 }
+
+TEST(JSONWeakPointer_pointer, DISABLED_unrelated_test) { EXPECT_TRUE(true); }
