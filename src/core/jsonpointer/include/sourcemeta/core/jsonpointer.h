@@ -652,4 +652,80 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    if (size == 0) {
+      return 0;
+    }
+
+    auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    if (size == 1) {
+      return hash_token(pointer.at(0));
+    }
+
+    const std::size_t first_hash = hash_token(pointer.at(0));
+    const std::size_t last_hash = hash_token(pointer.at(size - 1));
+
+    if (size == 2) {
+      return first_hash ^ (last_hash << 1);
+    }
+
+    const std::size_t middle_hash = hash_token(pointer.at(size / 2));
+
+    return first_hash ^ (middle_hash << 1) ^ (last_hash << 2);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    if (size == 0) {
+      return 0;
+    }
+
+    auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    if (size == 1) {
+      return hash_token(pointer.at(0));
+    }
+
+    const std::size_t first_hash = hash_token(pointer.at(0));
+    const std::size_t last_hash = hash_token(pointer.at(size - 1));
+
+    if (size == 2) {
+      return first_hash ^ (last_hash << 1);
+    }
+
+    const std::size_t middle_hash = hash_token(pointer.at(size / 2));
+
+    return first_hash ^ (middle_hash << 1) ^ (last_hash << 2);
+  }
+};
+
+} // namespace std
+
 #endif
