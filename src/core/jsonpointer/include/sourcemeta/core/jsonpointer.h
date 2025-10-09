@@ -652,4 +652,88 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    if (size == 0) {
+      return 0;
+    }
+
+    auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    auto hash_combine = [](std::size_t seed, std::size_t value) -> std::size_t {
+      seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      return seed;
+    };
+
+    if (size == 1) {
+      return hash_token(pointer.at(0));
+    }
+
+    if (size == 2) {
+      std::size_t result = hash_token(pointer.at(0));
+      result = hash_combine(result, hash_token(pointer.at(1)));
+      return result;
+    }
+
+    std::size_t result = hash_token(pointer.at(0));
+    result = hash_combine(result, hash_token(pointer.at(size / 2)));
+    result = hash_combine(result, hash_token(pointer.at(size - 1)));
+    return result;
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    if (size == 0) {
+      return 0;
+    }
+
+    auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    auto hash_combine = [](std::size_t seed, std::size_t value) -> std::size_t {
+      seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      return seed;
+    };
+
+    if (size == 1) {
+      return hash_token(pointer.at(0));
+    }
+
+    if (size == 2) {
+      std::size_t result = hash_token(pointer.at(0));
+      result = hash_combine(result, hash_token(pointer.at(1)));
+      return result;
+    }
+
+    std::size_t result = hash_token(pointer.at(0));
+    result = hash_combine(result, hash_token(pointer.at(size / 2)));
+    result = hash_combine(result, hash_token(pointer.at(size - 1)));
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
