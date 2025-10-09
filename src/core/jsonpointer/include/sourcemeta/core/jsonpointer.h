@@ -652,4 +652,43 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    const auto size = pointer.size();
+
+    if (size == 0) {
+      return 0;
+    }
+
+    auto hash_token = [](const typename sourcemeta::core::GenericPointer<
+                          PropertyT, Hash>::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    if (size == 1) {
+      return hash_token(pointer.at(0));
+    }
+
+    if (size == 2) {
+      return hash_token(pointer.at(0)) ^ (hash_token(pointer.at(1)) << 1);
+    }
+
+    const auto first_hash = hash_token(pointer.at(0));
+    const auto middle_hash = hash_token(pointer.at(size / 2));
+    const auto last_hash = hash_token(pointer.at(size - 1));
+
+    return first_hash ^ (middle_hash << 1) ^ (last_hash << 2);
+  }
+};
+
+} // namespace std
+
 #endif
