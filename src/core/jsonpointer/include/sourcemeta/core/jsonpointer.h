@@ -652,4 +652,21 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+// This hash specialisation is intentionally constant with a decent tolerance
+// to collisions
+namespace std {
+template <typename PropertyT>
+struct hash<sourcemeta::core::GenericPointer<
+    PropertyT,
+    sourcemeta::core::PropertyHashJSON<sourcemeta::core::JSON::String>>> {
+  auto
+  operator()(const sourcemeta::core::GenericPointer<
+             PropertyT,
+             sourcemeta::core::PropertyHashJSON<sourcemeta::core::JSON::String>>
+                 &pointer) const noexcept -> std::size_t {
+    return pointer.size();
+  }
+};
+} // namespace std
+
 #endif

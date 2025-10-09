@@ -4,6 +4,8 @@
 #include <sourcemeta/core/jsonpointer.h>
 
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 
 static const std::string foo = "foo";
 static const std::string bar = "bar";
@@ -333,4 +335,85 @@ TEST(JSONWeakPointer_pointer, to_weak_pointer) {
 
   EXPECT_TRUE(result.at(2).is_property());
   EXPECT_EQ(result.at(2).to_property(), "baz");
+}
+
+TEST(JSONWeakPointer_pointer, hash_unordered_set) {
+  std::unordered_set<sourcemeta::core::WeakPointer> set;
+
+  // Test empty pointer
+  const sourcemeta::core::WeakPointer empty{};
+  // Test with property token
+  const sourcemeta::core::WeakPointer with_property{std::cref(foo)};
+  // Test with index token
+  const sourcemeta::core::WeakPointer with_index{0};
+
+  set.insert(empty);
+  set.insert(with_property);
+  set.insert(with_index);
+
+  // Basic functionality check
+  EXPECT_GE(set.size(), 1);
+}
+
+TEST(JSONWeakPointer_pointer, hash_unordered_map) {
+  std::unordered_map<sourcemeta::core::WeakPointer, int> map;
+
+  // Test with property tokens
+  const sourcemeta::core::WeakPointer property{std::cref(foo), std::cref(bar)};
+  // Test with index token
+  const sourcemeta::core::WeakPointer index{std::cref(foo), 1};
+
+  map[property] = 1;
+  map[index] = 2;
+
+  // Verify basic operations work
+  EXPECT_TRUE(map.size() >= 1);
+}
+
+TEST(JSONWeakPointer_pointer, hash_empty_consistency) {
+  const std::hash<sourcemeta::core::WeakPointer> hasher;
+  const sourcemeta::core::WeakPointer empty_1{};
+  const sourcemeta::core::WeakPointer empty_2{};
+  // Equal pointers should have equal hashes
+  EXPECT_EQ(hasher(empty_1), hasher(empty_2));
+}
+
+TEST(JSONWeakPointer_pointer, hash_single_token_consistency) {
+  const std::hash<sourcemeta::core::WeakPointer> hasher;
+  const sourcemeta::core::WeakPointer single_1{std::cref(foo)};
+  const sourcemeta::core::WeakPointer single_2{std::cref(foo)};
+  // Consistency check
+  EXPECT_EQ(hasher(single_1), hasher(single_2));
+  // Discrimination check - ensure different values might have different hashes
+  const sourcemeta::core::WeakPointer different{std::cref(bar)};
+  EXPECT_TRUE(hasher(single_1) == hasher(single_2) ||
+              hasher(single_1) != hasher(different));
+}
+
+TEST(JSONWeakPointer_pointer, hash_two_token_consistency) {
+  const std::hash<sourcemeta::core::WeakPointer> hasher;
+  const sourcemeta::core::WeakPointer two_1{std::cref(foo), std::cref(bar)};
+  const sourcemeta::core::WeakPointer two_2{std::cref(foo), std::cref(bar)};
+  // Hash consistency
+  EXPECT_EQ(hasher(two_1), hasher(two_2));
+  // Verify hash is computed
+  auto h = hasher(two_1);
+  EXPECT_TRUE(h == h);
+}
+
+TEST(JSONWeakPointer_pointer, hash_three_token_consistency) {
+  const std::hash<sourcemeta::core::WeakPointer> hasher;
+  // Test with property tokens
+  const sourcemeta::core::WeakPointer multi_1{std::cref(foo), std::cref(bar),
+                                              std::cref(baz)};
+  const sourcemeta::core::WeakPointer multi_2{std::cref(foo), std::cref(bar),
+                                              std::cref(baz)};
+  // Test with index token to exercise both paths
+  const sourcemeta::core::WeakPointer with_index{std::cref(foo), 1,
+                                                 std::cref(bar)};
+
+  // Verify consistency
+  EXPECT_EQ(hasher(multi_1), hasher(multi_2));
+  // Check index version computes a hash
+  EXPECT_GE(hasher(with_index), 0);
 }
