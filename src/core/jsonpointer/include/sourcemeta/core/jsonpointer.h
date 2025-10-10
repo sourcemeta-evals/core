@@ -652,4 +652,92 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t seed = 0;
+
+    auto hash_combine = [](std::size_t &s, std::size_t h) {
+      s ^= h + 0x9e3779b9 + (s << 6) + (s >> 2);
+    };
+
+    auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    hash_combine(seed, hash_token(pointer.at(0)));
+
+    if (size == 1) {
+      return seed;
+    }
+
+    hash_combine(seed, hash_token(pointer.at(size - 1)));
+
+    if (size == 2) {
+      return seed;
+    }
+
+    hash_combine(seed, hash_token(pointer.at(size / 2)));
+
+    return seed;
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t seed = 0;
+
+    auto hash_combine = [](std::size_t &s, std::size_t h) {
+      s ^= h + 0x9e3779b9 + (s << 6) + (s >> 2);
+    };
+
+    auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    hash_combine(seed, hash_token(pointer.at(0)));
+
+    if (size == 1) {
+      return seed;
+    }
+
+    hash_combine(seed, hash_token(pointer.at(size - 1)));
+
+    if (size == 2) {
+      return seed;
+    }
+
+    hash_combine(seed, hash_token(pointer.at(size / 2)));
+
+    return seed;
+  }
+};
+
+} // namespace std
+
 #endif
