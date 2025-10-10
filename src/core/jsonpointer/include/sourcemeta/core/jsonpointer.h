@@ -650,6 +650,59 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 }
 
+namespace internal {
+
+template <typename PointerT>
+inline auto hash_pointer(const PointerT &pointer) noexcept -> std::size_t {
+  const auto size{pointer.size()};
+  if (size == 0) {
+    return 0;
+  }
+
+  auto hash_token = [](const auto &token) -> std::size_t {
+    if (token.is_property()) {
+      return static_cast<std::size_t>(token.property_hash().a);
+    } else {
+      return static_cast<std::size_t>(token.to_index());
+    }
+  };
+
+  std::size_t result{0};
+  if (size == 1) {
+    result = hash_token(pointer.at(0));
+  } else if (size == 2) {
+    result = hash_token(pointer.at(0)) ^ (hash_token(pointer.at(1)) << 1);
+  } else {
+    const auto middle_idx{size / 2};
+    result = hash_token(pointer.at(0)) ^
+             (hash_token(pointer.at(middle_idx)) << 1) ^
+             (hash_token(pointer.at(size - 1)) << 2);
+  }
+
+  result ^= size;
+  return result;
+}
+
+} // namespace internal
+
 } // namespace sourcemeta::core
+
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::internal::hash_pointer(pointer);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::internal::hash_pointer(pointer);
+  }
+};
+
+} // namespace std
 
 #endif
