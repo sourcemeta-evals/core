@@ -1187,3 +1187,58 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterate_over_rules) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+  transformer.add<ExampleRule2>();
+
+  std::set<std::string> rule_names;
+  for (const auto &[name, rule] : transformer) {
+    rule_names.insert(name);
+    EXPECT_FALSE(rule->name().empty());
+    EXPECT_FALSE(rule->message().empty());
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+}
+
+TEST(JSONSchema_transformer, iterate_over_empty_transformer) {
+  sourcemeta::core::SchemaTransformer transformer;
+
+  int count = 0;
+  for (const auto &[name, rule] : transformer) {
+    (void)name;
+    (void)rule;
+    count++;
+  }
+
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterate_using_explicit_iterators) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+
+  auto it = transformer.begin();
+  EXPECT_NE(it, transformer.end());
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, iterate_const_iterators) {
+  sourcemeta::core::SchemaTransformer transformer;
+  transformer.add<ExampleRule1>();
+  transformer.add<ExampleRule2>();
+
+  auto cit = transformer.cbegin();
+  EXPECT_NE(cit, transformer.cend());
+
+  int count = 0;
+  for (auto it = transformer.cbegin(); it != transformer.cend(); ++it) {
+    count++;
+  }
+  EXPECT_EQ(count, 2);
+}

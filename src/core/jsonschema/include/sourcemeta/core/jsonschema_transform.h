@@ -214,6 +214,20 @@ public:
     this->rules.emplace(rule->name(), std::move(rule));
   }
 
+  /// Type alias for const iterator over registered rules
+  using const_iterator =
+      typename std::map<std::string,
+                        std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get a constant begin iterator for registered rules
+  auto begin() const -> const_iterator;
+  /// Get a constant end iterator for registered rules
+  auto end() const -> const_iterator;
+  /// Get a constant begin iterator for registered rules
+  auto cbegin() const -> const_iterator;
+  /// Get a constant end iterator for registered rules
+  auto cend() const -> const_iterator;
+
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
