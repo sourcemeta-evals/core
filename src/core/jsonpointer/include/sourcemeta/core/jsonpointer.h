@@ -652,4 +652,72 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <typename PropertyT, typename Hash>
+inline auto hash_generic_pointer(
+    const sourcemeta::core::GenericPointer<PropertyT, Hash> &pointer) noexcept
+    -> std::size_t {
+  const auto size = pointer.size();
+
+  if (size == 0) {
+    return 0;
+  }
+
+  std::size_t result = 0;
+
+  const auto &first_token = pointer.at(0);
+  if (first_token.is_property()) {
+    result = static_cast<std::size_t>(first_token.property_hash().a);
+  } else {
+    result = static_cast<std::size_t>(first_token.to_index());
+  }
+
+  if (size == 1) {
+    return result;
+  }
+
+  const auto &last_token = pointer.at(size - 1);
+  std::size_t last_hash;
+  if (last_token.is_property()) {
+    last_hash = static_cast<std::size_t>(last_token.property_hash().a);
+  } else {
+    last_hash = static_cast<std::size_t>(last_token.to_index());
+  }
+
+  result ^= (last_hash << 1) | (last_hash >> (sizeof(std::size_t) * 8 - 1));
+
+  if (size == 2) {
+    return result;
+  }
+
+  const auto &middle_token = pointer.at(size / 2);
+  std::size_t middle_hash;
+  if (middle_token.is_property()) {
+    middle_hash = static_cast<std::size_t>(middle_token.property_hash().a);
+  } else {
+    middle_hash = static_cast<std::size_t>(middle_token.to_index());
+  }
+
+  result ^= (middle_hash << 2) | (middle_hash >> (sizeof(std::size_t) * 8 - 2));
+
+  return result;
+}
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    return hash_generic_pointer(pointer);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    return hash_generic_pointer(pointer);
+  }
+};
+
+} // namespace std
+
 #endif
