@@ -28,6 +28,24 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_with_backslash) {
+  const sourcemeta::core::Pointer pointer{"foo\\bar"};
+  const auto result{sourcemeta::core::to_json(pointer)};
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+}
+
+TEST(JSONPointer_json_auto, from_json_with_quote) {
+  const sourcemeta::core::Pointer pointer{"foo\"bar"};
+  const auto result{sourcemeta::core::to_json(pointer)};
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
