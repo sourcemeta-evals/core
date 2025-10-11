@@ -249,6 +249,22 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const std::optional<Pointer> &default_container,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
+  // Add the default identifier to the schema if it doesn't have one
+  // (important-comment)
+  if (default_id.has_value() && schema.is_object()) {
+    const auto current_id = sourcemeta::core::identify(
+        schema, resolver, SchemaIdentificationStrategy::Strict, default_dialect,
+        std::nullopt);
+
+    if (!current_id.has_value()) {
+      const auto base_dialect_value =
+          sourcemeta::core::base_dialect(schema, resolver, default_dialect);
+      if (base_dialect_value.has_value()) {
+        sourcemeta::core::reidentify(schema, default_id.value(),
+                                     base_dialect_value.value());
+      }
+    }
+  }
 
   if (default_container.has_value()) {
     // This is undefined behavior
