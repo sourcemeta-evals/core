@@ -1187,3 +1187,57 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterate_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  const auto &rules = bundle.rules();
+
+  EXPECT_EQ(rules.size(), 3);
+
+  EXPECT_TRUE(rules.contains("example_rule_1"));
+  EXPECT_TRUE(rules.contains("example_rule_2"));
+  EXPECT_TRUE(rules.contains("example_rule_3"));
+
+  EXPECT_EQ(rules.at("example_rule_1")->name(), "example_rule_1");
+  EXPECT_EQ(rules.at("example_rule_1")->message(),
+            "Keyword foo is not permitted");
+  EXPECT_EQ(rules.at("example_rule_2")->name(), "example_rule_2");
+  EXPECT_EQ(rules.at("example_rule_2")->message(),
+            "Keyword bar is not permitted");
+
+  std::vector<std::string> rule_names;
+  for (const auto &[name, rule] : rules) {
+    rule_names.push_back(name);
+  }
+  EXPECT_EQ(rule_names.size(), 3);
+  std::sort(rule_names.begin(), rule_names.end());
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+  EXPECT_EQ(rule_names[2], "example_rule_3");
+}
+
+TEST(JSONSchema_transformer, empty_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  const auto &rules = bundle.rules();
+  EXPECT_TRUE(rules.empty());
+  EXPECT_EQ(rules.size(), 0);
+}
+
+TEST(JSONSchema_transformer, rules_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_EQ(bundle.rules().size(), 2);
+
+  bundle.remove("example_rule_1");
+
+  const auto &rules = bundle.rules();
+  EXPECT_EQ(rules.size(), 1);
+  EXPECT_FALSE(rules.contains("example_rule_1"));
+  EXPECT_TRUE(rules.contains("example_rule_2"));
+}
