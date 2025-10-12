@@ -786,4 +786,45 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto scheme_val = this->scheme();
+  const auto path_val = this->path();
+
+  if (!scheme_val.has_value() || scheme_val.value() != "file") {
+    if (path_val.has_value()) {
+      return std::filesystem::path{path_val.value()};
+    }
+    return std::filesystem::path{};
+  }
+
+  if (!path_val.has_value()) {
+    throw URIError{"file:// URI must have a path component"};
+  }
+
+  std::string decoded_path;
+  {
+    std::istringstream input{path_val.value()};
+    std::ostringstream output;
+    uri_unescape(input, output);
+    decoded_path = output.str();
+  }
+
+  const auto host_val = this->host();
+
+  if (host_val.has_value() && !host_val.value().empty()) {
+    std::string unc_path =
+        "\\\\" + std::string{host_val.value()} + decoded_path;
+    std::ranges::replace(unc_path, '/', '\\');
+    return std::filesystem::path{unc_path};
+  }
+
+  if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+      std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+      decoded_path[2] == ':') {
+    return std::filesystem::path{decoded_path.substr(1)};
+  }
+
+  return std::filesystem::path{decoded_path};
+}
+
 } // namespace sourcemeta::core
