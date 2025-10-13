@@ -651,6 +651,61 @@ TEST(JSONSchema_transformer, unfixable_apply_without_description) {
   EXPECT_EQ(document, expected);
 }
 
+TEST(JSONSchema_transformer, iterate_rules_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_TRUE(bundle.rules().empty());
+  EXPECT_EQ(bundle.rules().size(), 0);
+}
+
+TEST(JSONSchema_transformer, iterate_rules_with_entries) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  const auto &rules = bundle.rules();
+  EXPECT_EQ(rules.size(), 3);
+  EXPECT_TRUE(rules.contains("example_rule_1"));
+  EXPECT_TRUE(rules.contains("example_rule_2"));
+  EXPECT_TRUE(rules.contains("example_rule_3"));
+
+  EXPECT_EQ(rules.at("example_rule_1")->name(), "example_rule_1");
+  EXPECT_EQ(rules.at("example_rule_1")->message(),
+            "Keyword foo is not permitted");
+  EXPECT_EQ(rules.at("example_rule_2")->name(), "example_rule_2");
+  EXPECT_EQ(rules.at("example_rule_2")->message(),
+            "Keyword bar is not permitted");
+}
+
+TEST(JSONSchema_transformer, iterate_rules_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_EQ(bundle.rules().size(), 2);
+
+  bundle.remove("example_rule_1");
+
+  const auto &rules = bundle.rules();
+  EXPECT_EQ(rules.size(), 1);
+  EXPECT_FALSE(rules.contains("example_rule_1"));
+  EXPECT_TRUE(rules.contains("example_rule_2"));
+}
+
+TEST(JSONSchema_transformer, iterate_rules_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &rules = bundle.rules();
+
+  for (const auto &[name, rule] : rules) {
+    EXPECT_FALSE(name.empty());
+    EXPECT_NE(rule.get(), nullptr);
+  }
+
+  EXPECT_EQ(rules.size(), 1);
+}
+
 TEST(JSONSchema_transformer, unfixable_apply_with_description) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRuleUnfixableWithDescription1>();
