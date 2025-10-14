@@ -786,4 +786,55 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme = this->scheme();
+
+  // Handle file:// URIs
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host = this->host();
+    const auto uri_path = this->path();
+
+    if (!uri_path.has_value()) {
+      throw URIError("File URI must have a path component");
+    }
+
+    std::string decoded_path;
+    std::istringstream input{uri_path.value()};
+    std::ostringstream output;
+    uri_unescape(input, output);
+    decoded_path = output.str();
+
+    // Handle UNC paths (file://server/share/...)
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      // UNC path on Windows: \\server\share\...
+      std::string unc_path = "\\\\";
+      unc_path += uri_host.value();
+      unc_path += decoded_path;
+      std::ranges::replace(unc_path, '/', '\\');
+      return std::filesystem::path{unc_path};
+    }
+
+    // Check if this is a Windows absolute path (e.g., /C:/...)
+    if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+        decoded_path[2] == ':' && std::isalpha(decoded_path[1])) {
+      // Windows absolute path: remove leading slash and convert to backslashes
+      std::string windows_path = decoded_path.substr(1);
+      std::ranges::replace(windows_path, '/', '\\');
+      return std::filesystem::path{windows_path};
+    }
+
+    // Unix absolute path
+    return std::filesystem::path{decoded_path};
+  }
+
+  // For non-file URIs, return the path component (if available)
+  const auto uri_path = this->path();
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  // No path component available
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
