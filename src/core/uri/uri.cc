@@ -786,4 +786,45 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+    const auto uri_path{this->path()};
+
+    std::ostringstream path_stream;
+
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      path_stream << "\\\\" << uri_host.value();
+    }
+
+    if (uri_path.has_value()) {
+      std::istringstream input{uri_path.value()};
+      uri_unescape(input, path_stream);
+    }
+
+    std::string path_string{path_stream.str()};
+
+    if (!path_string.empty() && path_string[0] == '/') {
+      const bool is_windows_path = path_string.size() >= 3 &&
+                                   std::isalpha(path_string[1]) &&
+                                   path_string[2] == ':';
+
+      if (is_windows_path) {
+        path_string = path_string.substr(1);
+      }
+    }
+
+    return std::filesystem::path{path_string};
+  }
+
+  const auto uri_path{this->path()};
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
