@@ -12,7 +12,9 @@
 
 #include <cassert>     // assert
 #include <concepts>    // std::derived_from
+#include <cstddef>     // std::ptrdiff_t, std::size_t
 #include <functional>  // std::function
+#include <iterator>    // std::forward_iterator_tag
 #include <map>         // std::map
 #include <memory>      // std::make_unique, std::unique_ptr
 #include <optional>    // std::optional, std::nullopt
@@ -216,6 +218,59 @@ public:
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// A const iterator for iterating over the registered rules
+  class ConstIterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = const SchemaTransformRule;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const SchemaTransformRule *;
+    using reference = const SchemaTransformRule &;
+
+    ConstIterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator iter)
+        : iter_(iter) {}
+
+    auto operator*() const -> reference { return *iter_->second; }
+    auto operator->() const -> pointer { return iter_->second.get(); }
+    auto operator++() -> ConstIterator & {
+      ++iter_;
+      return *this;
+    }
+    auto operator++(int) -> ConstIterator {
+      ConstIterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+    auto operator==(const ConstIterator &other) const -> bool {
+      return iter_ == other.iter_;
+    }
+    auto operator!=(const ConstIterator &other) const -> bool {
+      return iter_ != other.iter_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        iter_;
+  };
+
+  /// Get an iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> ConstIterator {
+    return ConstIterator(this->rules.begin());
+  }
+
+  /// Get an iterator to the end of the rules
+  [[nodiscard]] auto end() const -> ConstIterator {
+    return ConstIterator(this->rules.end());
+  }
+
+  /// Get the number of registered rules
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
+
+  /// Check if the transformer has no rules
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
