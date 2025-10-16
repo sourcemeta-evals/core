@@ -39,9 +39,9 @@ public:
     return branch.size() == 1;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     auto ref_value = schema.at("allOf").front().at("$ref");
+    schema.try_assign_before("$ref", std::move(ref_value), "allOf");
     schema.erase("allOf");
-    schema.assign("$ref", std::move(ref_value));
   }
 };
