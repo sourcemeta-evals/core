@@ -217,6 +217,54 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Iterator support for read-only introspection of registered rules
+  class Iterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type =
+        std::pair<const std::string, const SchemaTransformRule *>;
+    using pointer = const value_type *;
+    using reference = const value_type &;
+
+    Iterator(std::map<std::string,
+                      std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : iter_(it) {}
+
+    auto operator*() const -> value_type {
+      return {iter_->first, iter_->second.get()};
+    }
+
+    auto operator++() -> Iterator & {
+      ++iter_;
+      return *this;
+    }
+
+    auto operator++(int) -> Iterator {
+      Iterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    auto operator==(const Iterator &other) const -> bool {
+      return iter_ == other.iter_;
+    }
+
+    auto operator!=(const Iterator &other) const -> bool {
+      return iter_ != other.iter_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        iter_;
+  };
+
+  /// Returns an iterator to the beginning of the registered rules
+  auto begin() const -> Iterator;
+
+  /// Returns an iterator to the end of the registered rules
+  auto end() const -> Iterator;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
