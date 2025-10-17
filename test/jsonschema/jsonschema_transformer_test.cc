@@ -1187,3 +1187,80 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterate_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterate_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::size_t count = 0;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    count++;
+    EXPECT_EQ(it->first, "example_rule_1");
+    EXPECT_EQ(it->second->name(), "example_rule_1");
+    EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterate_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::size_t count = 0;
+  std::set<std::string> rule_names;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    count++;
+    rule_names.insert(it->first);
+    EXPECT_EQ(it->first, it->second->name());
+  }
+  EXPECT_EQ(count, 3);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, iterate_with_cbegin_cend) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::size_t count = 0;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    count++;
+    EXPECT_EQ(it->first, it->second->name());
+  }
+  EXPECT_EQ(count, 2);
+}
+
+TEST(JSONSchema_transformer, iterate_range_for) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule4>();
+
+  std::size_t count = 0;
+  std::set<std::string> rule_names;
+  for (const auto &[name, rule] : bundle) {
+    count++;
+    rule_names.insert(name);
+    EXPECT_EQ(name, rule->name());
+  }
+  EXPECT_EQ(count, 3);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_4"));
+}

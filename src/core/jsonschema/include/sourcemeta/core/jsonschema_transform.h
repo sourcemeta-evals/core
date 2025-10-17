@@ -242,6 +242,23 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// A const iterator type for iterating over registered rules
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get an iterator to the beginning of the registered rules
+  [[nodiscard]] auto begin() const -> const_iterator;
+
+  /// Get an iterator to the end of the registered rules
+  [[nodiscard]] auto end() const -> const_iterator;
+
+  /// Get an iterator to the beginning of the registered rules (const version)
+  [[nodiscard]] auto cbegin() const -> const_iterator;
+
+  /// Get an iterator to the end of the registered rules (const version)
+  [[nodiscard]] auto cend() const -> const_iterator;
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
