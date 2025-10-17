@@ -7,7 +7,6 @@ extern "C" {
 #include <array>   // std::array
 #include <cstring> // std::memset
 #include <sstream> // std::ostringstream, std::istringstream
-#include <vector>  // std::vector
 
 namespace sourcemeta::core {
 
