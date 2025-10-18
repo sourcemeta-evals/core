@@ -329,6 +329,87 @@ TEST(JSONSchema_frame, no_id_with_default) {
       "https://json-schema.org/draft/2020-12/schema");
 }
 
+TEST(JSONSchema_frame, id_with_default_id) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$id": "https://example.com",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": {
+      "type": "string"
+    }
+  })JSON");
+
+  sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Instances};
+  frame.analyse(document, sourcemeta::core::schema_official_walker,
+                sourcemeta::core::schema_official_resolver, std::nullopt,
+                "https://other.com");
+
+  EXPECT_EQ(frame.locations().size(), 10);
+
+  EXPECT_FRAME_STATIC_RESOURCE(frame, "https://example.com",
+                               "https://example.com", "",
+                               "https://json-schema.org/draft/2020-12/schema",
+                               "https://json-schema.org/draft/2020-12/schema",
+                               "https://example.com", "", {""}, std::nullopt);
+  EXPECT_FRAME_STATIC_POINTER(frame, "https://example.com#/$id",
+                              "https://example.com", "/$id",
+                              "https://json-schema.org/draft/2020-12/schema",
+                              "https://json-schema.org/draft/2020-12/schema",
+                              "https://example.com", "/$id", {}, "");
+  EXPECT_FRAME_STATIC_POINTER(frame, "https://example.com#/$schema",
+                              "https://example.com", "/$schema",
+                              "https://json-schema.org/draft/2020-12/schema",
+                              "https://json-schema.org/draft/2020-12/schema",
+                              "https://example.com", "/$schema", {}, "");
+  EXPECT_FRAME_STATIC_SUBSCHEMA(
+      frame, "https://example.com#/additionalProperties", "https://example.com",
+      "/additionalProperties", "https://json-schema.org/draft/2020-12/schema",
+      "https://json-schema.org/draft/2020-12/schema", "https://example.com",
+      "/additionalProperties", {"/~?additionalProperties~/~P~"}, "");
+  EXPECT_FRAME_STATIC_POINTER(
+      frame, "https://example.com#/additionalProperties/type",
+      "https://example.com", "/additionalProperties/type",
+      "https://json-schema.org/draft/2020-12/schema",
+      "https://json-schema.org/draft/2020-12/schema", "https://example.com",
+      "/additionalProperties/type", {}, "/additionalProperties");
+
+  EXPECT_FRAME_STATIC_RESOURCE(frame, "https://other.com",
+                               "https://example.com", "",
+                               "https://json-schema.org/draft/2020-12/schema",
+                               "https://json-schema.org/draft/2020-12/schema",
+                               "https://example.com", "", {""}, std::nullopt);
+  EXPECT_FRAME_STATIC_POINTER(frame, "https://other.com#/$id",
+                              "https://example.com", "/$id",
+                              "https://json-schema.org/draft/2020-12/schema",
+                              "https://json-schema.org/draft/2020-12/schema",
+                              "https://example.com", "/$id", {}, "");
+  EXPECT_FRAME_STATIC_POINTER(frame, "https://other.com#/$schema",
+                              "https://example.com", "/$schema",
+                              "https://json-schema.org/draft/2020-12/schema",
+                              "https://json-schema.org/draft/2020-12/schema",
+                              "https://example.com", "/$schema", {}, "");
+  EXPECT_FRAME_STATIC_SUBSCHEMA(
+      frame, "https://other.com#/additionalProperties", "https://example.com",
+      "/additionalProperties", "https://json-schema.org/draft/2020-12/schema",
+      "https://json-schema.org/draft/2020-12/schema", "https://example.com",
+      "/additionalProperties", {"/~?additionalProperties~/~P~"}, "");
+  EXPECT_FRAME_STATIC_POINTER(
+      frame, "https://other.com#/additionalProperties/type",
+      "https://example.com", "/additionalProperties/type",
+      "https://json-schema.org/draft/2020-12/schema",
+      "https://json-schema.org/draft/2020-12/schema", "https://example.com",
+      "/additionalProperties/type", {}, "/additionalProperties");
+
+  // References
+
+  EXPECT_EQ(frame.references().size(), 1);
+
+  EXPECT_STATIC_REFERENCE(
+      frame, "/$schema", "https://json-schema.org/draft/2020-12/schema",
+      "https://json-schema.org/draft/2020-12/schema", std::nullopt,
+      "https://json-schema.org/draft/2020-12/schema");
+}
+
 TEST(JSONSchema_frame, cross_2020_12_to_2019_09_without_id) {
   const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1067,7 +1148,10 @@ TEST(JSONSchema_frame, to_json_empty) {
       sourcemeta::core::SchemaFrame::Mode::Instances};
   const auto result{frame.to_json()};
   const auto expected = sourcemeta::core::parse_json(R"JSON({
-    "locations": [],
+    "locations": {
+      "static": {},
+      "dynamic": {}
+    },
     "references": [],
     "instances": {}
   })JSON");
@@ -1099,176 +1183,151 @@ TEST(JSONSchema_frame, to_json_mode_instances) {
   const auto result{frame.to_json()};
 
   const auto expected = sourcemeta::core::parse_json(R"JSON({
-    "locations": [
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar",
-        "parent": "",
-        "type": "resource",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar",
-        "relativePointer": "",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
+    "locations": {
+      "static": {
+        "https://www.sourcemeta.com/bar": {
+          "parent": "",
+          "type": "resource",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar",
+          "relativePointer": "",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/bar#/$schema": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/$schema",
+          "relativePointer": "/$schema",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/bar#/id": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/id",
+          "relativePointer": "/id",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/bar#/type": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/type",
+          "relativePointer": "/type",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test": {
+          "parent": null,
+          "type": "resource",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "",
+          "relativePointer": "",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/$id": {
+          "parent": "",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/$id",
+          "relativePointer": "/$id",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/$schema": {
+          "parent": "",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/$schema",
+          "relativePointer": "/$schema",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/properties": {
+          "parent": "",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/properties",
+          "relativePointer": "/properties",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar": {
+          "parent": "",
+          "type": "subschema",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar",
+          "relativePointer": "",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar/$schema": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/$schema",
+          "relativePointer": "/$schema",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar/id": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/id",
+          "relativePointer": "/id",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar/type": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/type",
+          "relativePointer": "/type",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/foo": {
+          "parent": "",
+          "type": "subschema",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/properties/foo",
+          "relativePointer": "/properties/foo",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/properties/foo/$ref": {
+          "parent": "/properties/foo",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/properties/foo/$ref",
+          "relativePointer": "/properties/foo/$ref",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        }
       },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar#/$schema",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/$schema",
-        "relativePointer": "/$schema",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar#/id",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/id",
-        "relativePointer": "/id",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar#/type",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/type",
-        "relativePointer": "/type",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test",
-        "parent": null,
-        "type": "resource",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "",
-        "relativePointer": "",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/$id",
-        "parent": "",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/$id",
-        "relativePointer": "/$id",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/$schema",
-        "parent": "",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/$schema",
-        "relativePointer": "/$schema",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties",
-        "parent": "",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/properties",
-        "relativePointer": "/properties",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar",
-        "parent": "",
-        "type": "subschema",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar",
-        "relativePointer": "",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar/$schema",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/$schema",
-        "relativePointer": "/$schema",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar/id",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/id",
-        "relativePointer": "/id",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar/type",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/type",
-        "relativePointer": "/type",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/foo",
-        "parent": "",
-        "type": "subschema",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/properties/foo",
-        "relativePointer": "/properties/foo",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/foo/$ref",
-        "parent": "/properties/foo",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/properties/foo/$ref",
-        "relativePointer": "/properties/foo/$ref",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      }
-    ],
+      "dynamic": {}
+    },
     "references": [
       {
         "type": "static",
@@ -1333,176 +1392,151 @@ TEST(JSONSchema_frame, to_json_mode_references) {
   const auto result{frame.to_json()};
 
   const auto expected = sourcemeta::core::parse_json(R"JSON({
-    "locations": [
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar",
-        "parent": "",
-        "type": "resource",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar",
-        "relativePointer": "",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
+    "locations": {
+      "static": {
+        "https://www.sourcemeta.com/bar": {
+          "parent": "",
+          "type": "resource",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar",
+          "relativePointer": "",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/bar#/$schema": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/$schema",
+          "relativePointer": "/$schema",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/bar#/id": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/id",
+          "relativePointer": "/id",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/bar#/type": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/type",
+          "relativePointer": "/type",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test": {
+          "parent": null,
+          "type": "resource",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "",
+          "relativePointer": "",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/$id": {
+          "parent": "",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/$id",
+          "relativePointer": "/$id",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/$schema": {
+          "parent": "",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/$schema",
+          "relativePointer": "/$schema",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/properties": {
+          "parent": "",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/properties",
+          "relativePointer": "/properties",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar": {
+          "parent": "",
+          "type": "subschema",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar",
+          "relativePointer": "",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar/$schema": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/$schema",
+          "relativePointer": "/$schema",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar/id": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/id",
+          "relativePointer": "/id",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar/type": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/type",
+          "relativePointer": "/type",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/foo": {
+          "parent": "",
+          "type": "subschema",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/properties/foo",
+          "relativePointer": "/properties/foo",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/properties/foo/$ref": {
+          "parent": "/properties/foo",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/properties/foo/$ref",
+          "relativePointer": "/properties/foo/$ref",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        }
       },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar#/$schema",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/$schema",
-        "relativePointer": "/$schema",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar#/id",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/id",
-        "relativePointer": "/id",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar#/type",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/type",
-        "relativePointer": "/type",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test",
-        "parent": null,
-        "type": "resource",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "",
-        "relativePointer": "",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/$id",
-        "parent": "",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/$id",
-        "relativePointer": "/$id",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/$schema",
-        "parent": "",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/$schema",
-        "relativePointer": "/$schema",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties",
-        "parent": "",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/properties",
-        "relativePointer": "/properties",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar",
-        "parent": "",
-        "type": "subschema",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar",
-        "relativePointer": "",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar/$schema",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/$schema",
-        "relativePointer": "/$schema",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar/id",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/id",
-        "relativePointer": "/id",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar/type",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/type",
-        "relativePointer": "/type",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/foo",
-        "parent": "",
-        "type": "subschema",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/properties/foo",
-        "relativePointer": "/properties/foo",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/foo/$ref",
-        "parent": "/properties/foo",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/properties/foo/$ref",
-        "relativePointer": "/properties/foo/$ref",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      }
-    ],
+      "dynamic": {}
+    },
     "references": [
       {
         "type": "static",
@@ -1556,733 +1590,154 @@ TEST(JSONSchema_frame, to_json_mode_locations) {
   const auto result{frame.to_json()};
 
   const auto expected = sourcemeta::core::parse_json(R"JSON({
-    "locations": [
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar",
-        "parent": "",
-        "type": "resource",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar",
-        "relativePointer": "",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
+    "locations": {
+      "static": {
+        "https://www.sourcemeta.com/bar": {
+          "parent": "",
+          "type": "resource",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar",
+          "relativePointer": "",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/bar#/$schema": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/$schema",
+          "relativePointer": "/$schema",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/bar#/id": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/id",
+          "relativePointer": "/id",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/bar#/type": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/type",
+          "relativePointer": "/type",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test": {
+          "parent": null,
+          "type": "resource",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "",
+          "relativePointer": "",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/$id": {
+          "parent": "",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/$id",
+          "relativePointer": "/$id",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/$schema": {
+          "parent": "",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/$schema",
+          "relativePointer": "/$schema",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/properties": {
+          "parent": "",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/properties",
+          "relativePointer": "/properties",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar": {
+          "parent": "",
+          "type": "subschema",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar",
+          "relativePointer": "",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar/$schema": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/$schema",
+          "relativePointer": "/$schema",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar/id": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/id",
+          "relativePointer": "/id",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/bar/type": {
+          "parent": "/properties/bar",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/bar",
+          "pointer": "/properties/bar/type",
+          "relativePointer": "/type",
+          "dialect": "http://json-schema.org/draft-04/schema#",
+          "baseDialect": "http://json-schema.org/draft-04/schema#"
+        },
+        "https://www.sourcemeta.com/test#/properties/foo": {
+          "parent": "",
+          "type": "subschema",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/properties/foo",
+          "relativePointer": "/properties/foo",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://www.sourcemeta.com/test#/properties/foo/$ref": {
+          "parent": "/properties/foo",
+          "type": "pointer",
+          "root": "https://www.sourcemeta.com/test",
+          "base": "https://www.sourcemeta.com/test",
+          "pointer": "/properties/foo/$ref",
+          "relativePointer": "/properties/foo/$ref",
+          "dialect": "https://json-schema.org/draft/2020-12/schema",
+          "baseDialect": "https://json-schema.org/draft/2020-12/schema"
+        }
       },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar#/$schema",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/$schema",
-        "relativePointer": "/$schema",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar#/id",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/id",
-        "relativePointer": "/id",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/bar#/type",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/type",
-        "relativePointer": "/type",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test",
-        "parent": null,
-        "type": "resource",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "",
-        "relativePointer": "",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/$id",
-        "parent": "",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/$id",
-        "relativePointer": "/$id",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/$schema",
-        "parent": "",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/$schema",
-        "relativePointer": "/$schema",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties",
-        "parent": "",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/properties",
-        "relativePointer": "/properties",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar",
-        "parent": "",
-        "type": "subschema",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar",
-        "relativePointer": "",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar/$schema",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/$schema",
-        "relativePointer": "/$schema",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar/id",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/id",
-        "relativePointer": "/id",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/bar/type",
-        "parent": "/properties/bar",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/bar",
-        "pointer": "/properties/bar/type",
-        "relativePointer": "/type",
-        "dialect": "http://json-schema.org/draft-04/schema#",
-        "baseDialect": "http://json-schema.org/draft-04/schema#"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/foo",
-        "parent": "",
-        "type": "subschema",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/properties/foo",
-        "relativePointer": "/properties/foo",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      },
-      {
-        "referenceType": "static",
-        "uri": "https://www.sourcemeta.com/test#/properties/foo/$ref",
-        "parent": "/properties/foo",
-        "type": "pointer",
-        "root": "https://www.sourcemeta.com/test",
-        "base": "https://www.sourcemeta.com/test",
-        "pointer": "/properties/foo/$ref",
-        "relativePointer": "/properties/foo/$ref",
-        "dialect": "https://json-schema.org/draft/2020-12/schema",
-        "baseDialect": "https://json-schema.org/draft/2020-12/schema"
-      }
-    ],
+      "dynamic": {}
+    },
     "references": [],
     "instances": {}
   })JSON");
 
   EXPECT_EQ(result, expected);
-}
-
-TEST(JSONSchema_frame, stringify_empty) {
-  sourcemeta::core::SchemaFrame frame{
-      sourcemeta::core::SchemaFrame::Mode::Instances};
-  std::ostringstream result;
-  result << frame;
-  EXPECT_EQ(result.str(), "");
-}
-
-TEST(JSONSchema_frame, stringify_mode_instances) {
-  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
-    "$id": "https://www.sourcemeta.com/test",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "properties": {
-      "foo": {
-        "$ref": "bar"
-      },
-      "bar": {
-        "id": "bar",
-        "$schema": "http://json-schema.org/draft-04/schema#",
-        "type": "string"
-      }
-    }
-  })JSON");
-
-  sourcemeta::core::SchemaFrame frame{
-      sourcemeta::core::SchemaFrame::Mode::Instances};
-  frame.analyse(document, sourcemeta::core::schema_official_walker,
-                sourcemeta::core::schema_official_resolver);
-
-  std::ostringstream result;
-  result << frame;
-
-  const auto expected = R"OUTPUT((RESOURCE) URI: https://www.sourcemeta.com/bar
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  :
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            :
-    Instance Location : /bar
-    Instance Location : /foo
-
-(POINTER) URI: https://www.sourcemeta.com/bar#/$schema
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/$schema
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /$schema
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/bar#/id
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/id
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /id
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/bar#/type
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/type
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /type
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(RESOURCE) URI: https://www.sourcemeta.com/test
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           :
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  :
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            : <NONE>
-    Instance Location :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/$id
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /$id
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /$id
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/$schema
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /$schema
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /$schema
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /properties
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(SUBSCHEMA) URI: https://www.sourcemeta.com/test#/properties/bar
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  :
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            :
-    Instance Location : /bar
-    Instance Location : /foo
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/bar/$schema
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/$schema
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /$schema
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/bar/id
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/id
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /id
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/bar/type
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/type
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /type
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(SUBSCHEMA) URI: https://www.sourcemeta.com/test#/properties/foo
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/foo
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /properties/foo
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-    Instance Location : /foo
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/foo/$ref
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/foo/$ref
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /properties/foo/$ref
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            : /properties/foo
-
-(REFERENCE) ORIGIN: /$schema
-    Type              : Static
-    Destination       : https://json-schema.org/draft/2020-12/schema
-    - (w/o fragment)  : https://json-schema.org/draft/2020-12/schema
-    - (fragment)      : <NONE>
-
-(REFERENCE) ORIGIN: /properties/bar/$schema
-    Type              : Static
-    Destination       : http://json-schema.org/draft-04/schema
-    - (w/o fragment)  : http://json-schema.org/draft-04/schema
-    - (fragment)      : <NONE>
-
-(REFERENCE) ORIGIN: /properties/foo/$ref
-    Type              : Static
-    Destination       : https://www.sourcemeta.com/bar
-    - (w/o fragment)  : https://www.sourcemeta.com/bar
-    - (fragment)      : <NONE>
-)OUTPUT";
-
-  EXPECT_EQ(result.str(), expected);
-}
-
-TEST(JSONSchema_frame, stringify_mode_references) {
-  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
-    "$id": "https://www.sourcemeta.com/test",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "properties": {
-      "foo": {
-        "$ref": "bar"
-      },
-      "bar": {
-        "id": "bar",
-        "$schema": "http://json-schema.org/draft-04/schema#",
-        "type": "string"
-      }
-    }
-  })JSON");
-
-  sourcemeta::core::SchemaFrame frame{
-      sourcemeta::core::SchemaFrame::Mode::References};
-  frame.analyse(document, sourcemeta::core::schema_official_walker,
-                sourcemeta::core::schema_official_resolver);
-
-  std::ostringstream result;
-  result << frame;
-
-  const auto expected = R"OUTPUT((RESOURCE) URI: https://www.sourcemeta.com/bar
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  :
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/bar#/$schema
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/$schema
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /$schema
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/bar#/id
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/id
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /id
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/bar#/type
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/type
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /type
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(RESOURCE) URI: https://www.sourcemeta.com/test
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           :
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  :
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            : <NONE>
-
-(POINTER) URI: https://www.sourcemeta.com/test#/$id
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /$id
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /$id
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/$schema
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /$schema
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /$schema
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /properties
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(SUBSCHEMA) URI: https://www.sourcemeta.com/test#/properties/bar
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  :
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/bar/$schema
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/$schema
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /$schema
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/bar/id
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/id
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /id
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/bar/type
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/type
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /type
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(SUBSCHEMA) URI: https://www.sourcemeta.com/test#/properties/foo
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/foo
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /properties/foo
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/foo/$ref
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/foo/$ref
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /properties/foo/$ref
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            : /properties/foo
-
-(REFERENCE) ORIGIN: /$schema
-    Type              : Static
-    Destination       : https://json-schema.org/draft/2020-12/schema
-    - (w/o fragment)  : https://json-schema.org/draft/2020-12/schema
-    - (fragment)      : <NONE>
-
-(REFERENCE) ORIGIN: /properties/bar/$schema
-    Type              : Static
-    Destination       : http://json-schema.org/draft-04/schema
-    - (w/o fragment)  : http://json-schema.org/draft-04/schema
-    - (fragment)      : <NONE>
-
-(REFERENCE) ORIGIN: /properties/foo/$ref
-    Type              : Static
-    Destination       : https://www.sourcemeta.com/bar
-    - (w/o fragment)  : https://www.sourcemeta.com/bar
-    - (fragment)      : <NONE>
-)OUTPUT";
-
-  EXPECT_EQ(result.str(), expected);
-}
-
-TEST(JSONSchema_frame, stringify_mode_locations) {
-  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
-    "$id": "https://www.sourcemeta.com/test",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "properties": {
-      "foo": {
-        "$ref": "bar"
-      },
-      "bar": {
-        "id": "bar",
-        "$schema": "http://json-schema.org/draft-04/schema#",
-        "type": "string"
-      }
-    }
-  })JSON");
-
-  sourcemeta::core::SchemaFrame frame{
-      sourcemeta::core::SchemaFrame::Mode::Locations};
-  frame.analyse(document, sourcemeta::core::schema_official_walker,
-                sourcemeta::core::schema_official_resolver);
-
-  std::ostringstream result;
-  result << frame;
-
-  const auto expected = R"OUTPUT((RESOURCE) URI: https://www.sourcemeta.com/bar
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  :
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/bar#/$schema
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/$schema
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /$schema
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/bar#/id
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/id
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /id
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/bar#/type
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/type
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /type
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(RESOURCE) URI: https://www.sourcemeta.com/test
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           :
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  :
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            : <NONE>
-
-(POINTER) URI: https://www.sourcemeta.com/test#/$id
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /$id
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /$id
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/$schema
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /$schema
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /$schema
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /properties
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(SUBSCHEMA) URI: https://www.sourcemeta.com/test#/properties/bar
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  :
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/bar/$schema
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/$schema
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /$schema
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/bar/id
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/id
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /id
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/bar/type
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/bar/type
-    Base              : https://www.sourcemeta.com/bar
-    Relative Pointer  : /type
-    Dialect           : http://json-schema.org/draft-04/schema#
-    Base Dialect      : http://json-schema.org/draft-04/schema#
-    Parent            : /properties/bar
-
-(SUBSCHEMA) URI: https://www.sourcemeta.com/test#/properties/foo
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/foo
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /properties/foo
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            :
-
-(POINTER) URI: https://www.sourcemeta.com/test#/properties/foo/$ref
-    Type              : Static
-    Root              : https://www.sourcemeta.com/test
-    Pointer           : /properties/foo/$ref
-    Base              : https://www.sourcemeta.com/test
-    Relative Pointer  : /properties/foo/$ref
-    Dialect           : https://json-schema.org/draft/2020-12/schema
-    Base Dialect      : https://json-schema.org/draft/2020-12/schema
-    Parent            : /properties/foo
-)OUTPUT";
-
-  EXPECT_EQ(result.str(), expected);
 }
