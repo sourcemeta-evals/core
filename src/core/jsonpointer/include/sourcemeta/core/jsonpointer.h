@@ -652,4 +652,80 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash specialization for Pointer to enable use with std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling the first, middle, and
+/// last tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> size_t {
+    using Token = sourcemeta::core::Pointer::Token;
+
+    auto token_hash = [](const Token &token) -> size_t {
+      if (token.is_property()) {
+        const auto property_hash{token.property_hash()};
+        return static_cast<size_t>(property_hash.a);
+      } else {
+        return static_cast<size_t>(token.to_index());
+      }
+    };
+
+    const auto size{pointer.size()};
+    size_t seed{0xcbf29ce484222325ULL};
+    auto mix = [](size_t s, size_t v) -> size_t {
+      return s ^ (v + 0x9e3779b97f4a7c15ULL + (s << 6) + (s >> 2));
+    };
+
+    if (size == 0) {
+      return seed;
+    }
+
+    seed = mix(seed, token_hash(pointer.at(0)));
+    seed = mix(seed, token_hash(pointer.at(size / 2)));
+    seed = mix(seed, token_hash(pointer.back()));
+    seed = mix(seed, static_cast<size_t>(size));
+    return seed;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash specialization for WeakPointer to enable use with std::unordered_map
+/// and std::unordered_set. The hash is O(1) by sampling the first, middle, and
+/// last tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> size_t {
+    using Token = sourcemeta::core::WeakPointer::Token;
+
+    auto token_hash = [](const Token &token) -> size_t {
+      if (token.is_property()) {
+        const auto property_hash{token.property_hash()};
+        return static_cast<size_t>(property_hash.a);
+      } else {
+        return static_cast<size_t>(token.to_index());
+      }
+    };
+
+    const auto size{pointer.size()};
+    size_t seed{0xcbf29ce484222325ULL};
+    auto mix = [](size_t s, size_t v) -> size_t {
+      return s ^ (v + 0x9e3779b97f4a7c15ULL + (s << 6) + (s >> 2));
+    };
+
+    if (size == 0) {
+      return seed;
+    }
+
+    seed = mix(seed, token_hash(pointer.at(0)));
+    seed = mix(seed, token_hash(pointer.at(size / 2)));
+    seed = mix(seed, token_hash(pointer.back()));
+    seed = mix(seed, static_cast<size_t>(size));
+    return seed;
+  }
+};
+
+} // namespace std
+
 #endif
