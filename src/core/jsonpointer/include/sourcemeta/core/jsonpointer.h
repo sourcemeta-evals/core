@@ -652,4 +652,101 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash support for Pointer to enable use with std::unordered_map and
+/// std::unordered_set
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t seed{size};
+
+    auto hash_combine = [](std::size_t &seed, std::size_t value) noexcept {
+      seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+    };
+
+    auto hash_token = [](const sourcemeta::core::Pointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        const auto property_hash{token.property_hash()};
+#if defined(__SIZEOF_INT128__)
+        return static_cast<std::size_t>(property_hash.a) ^
+               static_cast<std::size_t>(property_hash.a >> 64);
+#else
+        return static_cast<std::size_t>(property_hash.a);
+#endif
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    hash_combine(seed, hash_token(pointer.at(0)));
+
+    if (size > 1) {
+      hash_combine(seed, hash_token(pointer.at(size - 1)));
+    }
+
+    if (size > 2) {
+      hash_combine(seed, hash_token(pointer.at(size / 2)));
+    }
+
+    return seed;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash support for WeakPointer to enable use with std::unordered_map and
+/// std::unordered_set
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t seed{size};
+
+    auto hash_combine = [](std::size_t &seed, std::size_t value) noexcept {
+      seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+    };
+
+    auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        const auto property_hash{token.property_hash()};
+#if defined(__SIZEOF_INT128__)
+        return static_cast<std::size_t>(property_hash.a) ^
+               static_cast<std::size_t>(property_hash.a >> 64);
+#else
+        return static_cast<std::size_t>(property_hash.a);
+#endif
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    hash_combine(seed, hash_token(pointer.at(0)));
+
+    if (size > 1) {
+      hash_combine(seed, hash_token(pointer.at(size - 1)));
+    }
+
+    if (size > 2) {
+      hash_combine(seed, hash_token(pointer.at(size / 2)));
+    }
+
+    return seed;
+  }
+};
+
+} // namespace std
+
 #endif
