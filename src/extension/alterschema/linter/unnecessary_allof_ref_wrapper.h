@@ -28,53 +28,18 @@ public:
     }
 
     const auto &allof = schema.at("allOf");
-    if (!allof.is_array() || allof.empty()) {
+    if (!allof.is_array() || allof.size() != 1) {
       return false;
     }
 
-    std::size_t ref_count = 0;
-    std::optional<std::size_t> ref_only_index;
-
-    for (std::size_t i = 0; i < allof.size(); ++i) {
-      const auto &branch = allof.at(i);
-      if (branch.is_object() && branch.defines("$ref")) {
-        ref_count++;
-        if (branch.size() == 1) {
-          ref_only_index = i;
-        }
-      }
-    }
-
-    return ref_count == 1 && ref_only_index.has_value();
+    const auto &branch = allof.at(0);
+    return branch.is_object() && branch.defines("$ref") && branch.size() == 1;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     const auto &allof = schema.at("allOf");
-    std::optional<std::size_t> ref_only_index;
-
-    for (std::size_t i = 0; i < allof.size(); ++i) {
-      const auto &branch = allof.at(i);
-      if (branch.is_object() && branch.defines("$ref") && branch.size() == 1) {
-        ref_only_index = i;
-        break;
-      }
-    }
-
-    if (!ref_only_index.has_value()) {
-      return;
-    }
-
-    auto ref_value = allof.at(ref_only_index.value()).at("$ref");
-    schema.assign("$ref", ref_value);
-
-    auto collection = schema.at("allOf");
-    collection.erase(collection.as_array().begin() +
-                     static_cast<std::ptrdiff_t>(ref_only_index.value()));
-
-    if (collection.empty()) {
-      schema.erase("allOf");
-    } else {
-      schema.at("allOf").into(std::move(collection));
-    }
+    auto ref_value = allof.at(0).at("$ref");
+    schema.try_assign_before("$ref", ref_value, "allOf");
+    schema.erase("allOf");
   }
 };
