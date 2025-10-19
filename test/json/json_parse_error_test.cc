@@ -729,3 +729,23 @@ TEST(JSON_parse_error, read_json_non_existent) {
     FAIL() << "The parse function was expected to throw a filesystem error";
   }
 }
+
+TEST(JSON_parse_error, file_parse_error_path_returns_reference) {
+  const std::filesystem::path test_path{"test.json"};
+  const sourcemeta::core::JSONFileParseError error{test_path, 1, 1,
+                                                   "test message"};
+
+  // Verify that path() returns a const reference
+  const auto &path_ref = error.path();
+  EXPECT_EQ(&path_ref, &error.path());
+  EXPECT_EQ(path_ref, test_path);
+}
+
+TEST(JSON_parse_error, file_parse_error_path_type_check) {
+  // Compile-time check that path() returns const std::filesystem::path&
+  static_assert(
+      std::is_same_v<
+          decltype(std::declval<const sourcemeta::core::JSONFileParseError &>()
+                       .path()),
+          const std::filesystem::path &>);
+}
