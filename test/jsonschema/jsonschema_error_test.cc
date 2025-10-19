@@ -33,9 +33,12 @@ TEST(JSONSchema, broken_reference_error_throw) {
   static_assert(std::is_base_of_v<std::exception,
                                   sourcemeta::core::SchemaBrokenReferenceError>,
                 "Must subclass std::exception");
-  sourcemeta::core::Pointer location{"foo", "bar"};
+  sourcemeta::core::Pointer location;
+  location.emplace_back("foo");
+  location.emplace_back("bar");
   auto exception{sourcemeta::core::SchemaBrokenReferenceError(
-      "https://sourcemeta.com/test", location)};
+      "https://sourcemeta.com/test", location,
+      "The reference broke after transformation")};
   EXPECT_THROW(throw exception, sourcemeta::core::SchemaBrokenReferenceError);
   EXPECT_THROW(throw exception, sourcemeta::core::SchemaReferenceError);
   EXPECT_EQ(std::string{exception.what()},
