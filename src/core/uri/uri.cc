@@ -786,4 +786,42 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+
+    if (!uri_path.has_value()) {
+      throw URIError{"file:// URI must have a path component"};
+    }
+
+    std::ostringstream unescaped_stream;
+    std::istringstream path_stream{uri_path.value()};
+    uri_unescape(path_stream, unescaped_stream);
+    std::string unescaped_path{unescaped_stream.str()};
+
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      std::ostringstream unc_path;
+      unc_path << "//" << uri_host.value() << unescaped_path;
+      return std::filesystem::path{unc_path.str()};
+    }
+
+    if (unescaped_path.size() >= 3 && unescaped_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(unescaped_path[1])) &&
+        unescaped_path[2] == ':') {
+      return std::filesystem::path{unescaped_path.substr(1)};
+    }
+
+    return std::filesystem::path{unescaped_path};
+  }
+
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
