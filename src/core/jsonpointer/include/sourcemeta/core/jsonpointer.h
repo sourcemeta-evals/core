@@ -644,7 +644,11 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 
   try {
-    return to_pointer(value.to_string());
+    // The JSON value is already a decoded string, so we use to_pointer(JSON)
+    // which parses it directly without going through JSON parsing again
+    // (which would fail on strings like "[\\-]" that contain backslashes
+    // not valid as JSON escapes)
+    return to_pointer(value);
   } catch (const PointerParseError &) {
     return std::nullopt;
   }

@@ -28,6 +28,30 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_with_backslash) {
+  // Test that from_json correctly handles strings with backslashes
+  // that are not valid JSON escape sequences (e.g., from regex patterns)
+  const sourcemeta::core::JSON input{"/properties/[\\-]"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value().size(), 2);
+  EXPECT_TRUE(result.value().at(0).is_property());
+  EXPECT_EQ(result.value().at(0).to_property(), "properties");
+  EXPECT_TRUE(result.value().at(1).is_property());
+  EXPECT_EQ(result.value().at(1).to_property(), "[\\-]");
+}
+
+TEST(JSONPointer_json_auto, roundtrip_with_special_chars) {
+  // Test roundtrip serialization with special characters
+  const sourcemeta::core::Pointer pointer{"properties", "[\\-]"};
+  const auto json{sourcemeta::core::to_json(pointer)};
+  EXPECT_TRUE(json.is_string());
+  const auto back{sourcemeta::core::from_json<sourcemeta::core::Pointer>(json)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
