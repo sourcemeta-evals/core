@@ -786,4 +786,51 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_host{this->host()};
+  const auto uri_path{this->path()};
+
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (uri_path.has_value()) {
+      return std::filesystem::path{uri_path.value()};
+    }
+    return std::filesystem::path{};
+  }
+
+  std::string decoded_path;
+  if (uri_path.has_value()) {
+    std::istringstream input{uri_path.value()};
+    std::ostringstream output;
+    uri_unescape(input, output);
+    decoded_path = output.str();
+  }
+
+  if (!uri_host.has_value() || uri_host.value().empty()) {
+    if (!decoded_path.empty() && decoded_path.size() >= 3 &&
+        decoded_path[0] == '/' &&
+        ((decoded_path[1] >= 'A' && decoded_path[1] <= 'Z') ||
+         (decoded_path[1] >= 'a' && decoded_path[1] <= 'z')) &&
+        decoded_path[2] == ':') {
+      return std::filesystem::path{decoded_path.substr(1)};
+    }
+    return std::filesystem::path{decoded_path};
+  }
+
+  const std::string host_str{uri_host.value()};
+  if (host_str == "localhost") {
+    return std::filesystem::path{decoded_path};
+  }
+
+  std::filesystem::path unc_path = std::filesystem::path("//") / host_str;
+  if (!decoded_path.empty()) {
+    if (decoded_path[0] == '/') {
+      unc_path /= decoded_path.substr(1);
+    } else {
+      unc_path /= decoded_path;
+    }
+  }
+  return unc_path;
+}
+
 } // namespace sourcemeta::core
