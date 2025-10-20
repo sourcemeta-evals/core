@@ -58,7 +58,7 @@ public:
     return ref_count == 1;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     auto collection = schema.at("allOf");
 
     // Find the pure $ref branch
