@@ -7,7 +7,6 @@
 
 // NOLINTBEGIN(misc-include-cleaner)
 #include <sourcemeta/core/uri_error.h>
-#include <sourcemeta/core/uri_escape.h>
 // NOLINTEND(misc-include-cleaner)
 
 #include <cstdint>     // std::uint32_t
@@ -85,7 +84,7 @@ public:
   /// const sourcemeta::core::URI uri{"urn:example:schema"};
   /// assert(uri.is_urn());
   /// ```
-  auto is_urn() const -> bool;
+  [[nodiscard]] auto is_urn() const -> bool;
 
   /// Check if the URI is a tag as described by RFC 4151. For example:
   ///
@@ -96,7 +95,7 @@ public:
   /// const sourcemeta::core::URI uri{"tag:yaml.org,2002:int"};
   /// assert(uri.is_tag());
   /// ```
-  auto is_tag() const -> bool;
+  [[nodiscard]] auto is_tag() const -> bool;
 
   /// Check if the URI has the `mailto` scheme. For example:
   ///
@@ -107,7 +106,18 @@ public:
   /// const sourcemeta::core::URI uri{"mailto:joe@example.com"};
   /// assert(uri.is_mailto());
   /// ```
-  auto is_mailto() const -> bool;
+  [[nodiscard]] auto is_mailto() const -> bool;
+
+  /// Check if the URI is a file URI. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/uri.h>
+  /// #include <cassert>
+  ///
+  /// sourcemeta::core::URI uri{"file:///home/jviotti/foo.txt"};
+  /// assert(uri.is_file());
+  /// ```
+  [[nodiscard]] auto is_file() const -> bool;
 
   /// Check if the URI only consists of a fragment. For example:
   ///
@@ -118,7 +128,7 @@ public:
   /// const sourcemeta::core::URI uri{"#foo"};
   /// assert(uri.is_fragment_only());
   /// ```
-  auto is_fragment_only() const -> bool;
+  [[nodiscard]] auto is_fragment_only() const -> bool;
 
   /// Check if the URI is relative. For example:
   ///
@@ -129,7 +139,7 @@ public:
   /// sourcemeta::core::URI uri{"./foo"};
   /// assert(uri.is_relative());
   /// ```
-  auto is_relative() const -> bool;
+  [[nodiscard]] auto is_relative() const -> bool;
 
   /// Check if the host is an ipv6 address. For example:
   ///
@@ -140,7 +150,7 @@ public:
   /// sourcemeta::core::URI uri{"http://[::1]"};
   /// assert(uri.is_ipv6());
   /// ```
-  auto is_ipv6() const -> bool;
+  [[nodiscard]] auto is_ipv6() const -> bool;
 
   /// Check if the URI corresponds to the empty URI. For example:
   ///
@@ -151,7 +161,7 @@ public:
   /// sourcemeta::core::URI uri{""};
   /// assert(uri.empty());
   /// ```
-  auto empty() const -> bool;
+  [[nodiscard]] auto empty() const -> bool;
 
   /// Get the scheme part of the URI, if any. For example:
   ///
@@ -345,6 +355,18 @@ public:
   /// assert(uri.recompose() == "http://example.com/TEST");
   /// ```
   auto canonicalize() -> URI &;
+
+  /// Convert a URI into a filesystem path. If the URI is not under the `file`
+  /// scheme, get the URI path component as a filesystem path. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/uri.h>
+  /// #include <cassert>
+  ///
+  /// const sourcemeta::core::URI uri{"file:///home/jviotti/foo.txt"};
+  /// assert(uri.to_path() == "/home/jviotti/foo.txt");
+  /// ```
+  [[nodiscard]] auto to_path() const -> std::filesystem::path;
 
   /// Resolve a relative URI against a base URI as established by RFC 3986. For
   /// example:

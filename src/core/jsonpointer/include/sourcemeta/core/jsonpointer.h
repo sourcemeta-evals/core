@@ -304,6 +304,57 @@ SOURCEMETA_CORE_JSONPOINTER_EXPORT
 auto set(JSON &document, const Pointer &pointer, JSON &&value) -> void;
 
 /// @ingroup jsonpointer
+/// Remove a value from a JSON document using a JSON Pointer.
+/// Returns true if a value is removed, false otherwise.
+///
+/// Removing an empty pointer `Pointer{}`, i.e. the root, is a noop.
+///
+/// ```cpp
+/// #include <sourcemeta/core/json.h>
+/// #include <sourcemeta/core/jsonpointer.h>
+/// #include <cassert>
+/// #include <sstream>
+///
+/// std::istringstream stream{"[ { \"foo\": 1, \"baz\": 1 }, { \"bar\": 2 } ]"};
+/// sourcemeta::core::JSON document =
+///   sourcemeta::core::parse_json(stream);
+/// assert(document.at(0).defines("foo"));
+///
+/// const sourcemeta::core::Pointer pointer{0, "foo"};
+/// sourcemeta::core::remove(document, pointer);
+/// assert(!document.at(0).defines("foo"));
+/// assert(document.at(0).defines("baz"));
+/// ```
+SOURCEMETA_CORE_JSONPOINTER_EXPORT
+auto remove(JSON &document, const Pointer &pointer) -> bool;
+
+/// @ingroup jsonpointer
+/// Remove a value from a JSON document using a JSON WeakPointer.
+/// Returns true if a value is removed, false otherwise.
+///
+/// Removing an empty pointer `WeakPointer{}`, i.e. the root, is a noop.
+///
+/// ```cpp
+/// #include <sourcemeta/core/json.h>
+/// #include <sourcemeta/core/jsonpointer.h>
+/// #include <cassert>
+/// #include <sstream>
+///
+/// std::istringstream stream{"[ { \"foo\": 1, \"baz\": 1 }, { \"bar\": 2 } ]"};
+/// sourcemeta::core::JSON document =
+///   sourcemeta::core::parse_json(stream);
+/// assert(document.at(0).defines("foo"));
+///
+/// const std::string foo = "foo";
+/// const sourcemeta::core::WeakPointer pointer{0, std::cref(foo)};
+/// sourcemeta::core::remove(document, pointer);
+/// assert(!document.at(0).defines("foo"));
+/// assert(document.at(0).defines("baz"));
+/// ```
+SOURCEMETA_CORE_JSONPOINTER_EXPORT
+auto remove(JSON &document, const WeakPointer &pointer) -> bool;
+
+/// @ingroup jsonpointer
 /// Create a JSON Pointer from a JSON string value. For example:
 ///
 /// ```cpp
@@ -593,12 +644,47 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 
   try {
-    return to_pointer(value.to_string());
+    return to_pointer(value);
   } catch (const PointerParseError &) {
     return std::nullopt;
   }
 }
 
 } // namespace sourcemeta::core
+
+// This hash specialisation is intentationally constant with a decent tolerance
+// to collisions
+namespace std {
+template <typename PropertyT>
+struct hash<sourcemeta::core::GenericPointer<
+    PropertyT,
+    sourcemeta::core::PropertyHashJSON<sourcemeta::core::JSON::String>>> {
+  auto
+  operator()(const sourcemeta::core::GenericPointer<
+             PropertyT,
+             sourcemeta::core::PropertyHashJSON<sourcemeta::core::JSON::String>>
+                 &pointer) const noexcept -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return size;
+    }
+
+    const auto &first{pointer.at(0)};
+    const auto &middle{pointer.at(size / 2)};
+    const auto &last{pointer.at(size - 1)};
+
+    return size +
+           (first.is_property()
+                ? static_cast<std::size_t>(first.property_hash().a)
+                : first.to_index()) +
+           (middle.is_property()
+                ? static_cast<std::size_t>(middle.property_hash().a)
+                : middle.to_index()) +
+           (last.is_property()
+                ? static_cast<std::size_t>(last.property_hash().a)
+                : last.to_index());
+  }
+};
+} // namespace std
 
 #endif
