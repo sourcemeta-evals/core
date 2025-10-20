@@ -652,4 +652,88 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        const auto property_hash{token.property_hash()};
+#if defined(__SIZEOF_INT128__)
+        const auto high{static_cast<std::size_t>(property_hash.a >> 64)};
+        const auto low{static_cast<std::size_t>(property_hash.a)};
+        return high ^ low;
+#else
+        return static_cast<std::size_t>(property_hash.a);
+#endif
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    std::size_t seed{0x9e3779b97f4a7c15ull};
+    auto mix = [&seed](const std::size_t value) {
+      seed ^= value + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
+    };
+
+    const auto size{pointer.size()};
+    mix(hash_token(pointer.at(0)));
+    if (size > 1) {
+      mix(hash_token(pointer.at(size / 2)));
+      mix(hash_token(pointer.back()));
+    }
+    mix(size);
+
+    return seed;
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        const auto property_hash{token.property_hash()};
+#if defined(__SIZEOF_INT128__)
+        const auto high{static_cast<std::size_t>(property_hash.a >> 64)};
+        const auto low{static_cast<std::size_t>(property_hash.a)};
+        return high ^ low;
+#else
+        return static_cast<std::size_t>(property_hash.a);
+#endif
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    std::size_t seed{0x9e3779b97f4a7c15ull};
+    auto mix = [&seed](const std::size_t value) {
+      seed ^= value + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
+    };
+
+    const auto size{pointer.size()};
+    mix(hash_token(pointer.at(0)));
+    if (size > 1) {
+      mix(hash_token(pointer.at(size / 2)));
+      mix(hash_token(pointer.back()));
+    }
+    mix(size);
+
+    return seed;
+  }
+};
+
+} // namespace std
+
 #endif
