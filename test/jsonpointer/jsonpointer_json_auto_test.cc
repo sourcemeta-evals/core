@@ -28,6 +28,21 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_with_backslash) {
+  // Test case for patternProperties with regex patterns containing backslashes
+  // In C++ string literal, "\\\\" is two backslashes, so "/[\\\\-]" is the
+  // string /[\\-]
+  const sourcemeta::core::JSON input{"/[\\\\-]"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value().size(), 1);
+  EXPECT_TRUE(result.value().at(0).is_property());
+  // The property should be [\\-] (two backslashes)
+  const std::string expected = "[\\\\-]";
+  EXPECT_EQ(result.value().at(0).to_property(), expected);
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
