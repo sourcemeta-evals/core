@@ -217,6 +217,23 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto rule_count() const noexcept -> std::size_t;
+
+  /// Check if a rule with the given name exists in the bundle
+  [[nodiscard]] auto has_rule(std::string_view name) const noexcept -> bool;
+
+  /// Find a rule by name, returning a pointer to it or nullptr if not found
+  [[nodiscard]] auto find_rule(std::string_view name) const noexcept
+      -> const SchemaTransformRule *;
+
+  /// The callback type for iterating over rules
+  using ForEachRuleFn =
+      std::function<void(std::string_view, const SchemaTransformRule &)>;
+
+  /// Iterate over all rules in the bundle in read-only mode
+  auto for_each_rule(const ForEachRuleFn &callback) const -> void;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///

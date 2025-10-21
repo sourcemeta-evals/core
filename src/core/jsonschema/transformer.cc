@@ -239,4 +239,25 @@ auto SchemaTransformer::remove(const std::string &name) -> bool {
   return this->rules.erase(name) > 0;
 }
 
+auto SchemaTransformer::rule_count() const noexcept -> std::size_t {
+  return this->rules.size();
+}
+
+auto SchemaTransformer::has_rule(std::string_view name) const noexcept -> bool {
+  return this->rules.contains(std::string{name});
+}
+
+auto SchemaTransformer::find_rule(std::string_view name) const noexcept
+    -> const SchemaTransformRule * {
+  const auto it{this->rules.find(std::string{name})};
+  return it == this->rules.end() ? nullptr : it->second.get();
+}
+
+auto SchemaTransformer::for_each_rule(const ForEachRuleFn &callback) const
+    -> void {
+  for (const auto &[name, rule] : this->rules) {
+    callback(name, *rule);
+  }
+}
+
 } // namespace sourcemeta::core

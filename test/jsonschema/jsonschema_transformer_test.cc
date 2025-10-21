@@ -1187,3 +1187,156 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, rule_count_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_EQ(bundle.rule_count(), 0);
+}
+
+TEST(JSONSchema_transformer, rule_count_single) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  EXPECT_EQ(bundle.rule_count(), 1);
+}
+
+TEST(JSONSchema_transformer, rule_count_multiple) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+  EXPECT_EQ(bundle.rule_count(), 3);
+}
+
+TEST(JSONSchema_transformer, rule_count_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  EXPECT_EQ(bundle.rule_count(), 2);
+  bundle.remove("example_rule_1");
+  EXPECT_EQ(bundle.rule_count(), 1);
+}
+
+TEST(JSONSchema_transformer, has_rule_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_FALSE(bundle.has_rule("example_rule_1"));
+}
+
+TEST(JSONSchema_transformer, has_rule_exists) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  EXPECT_TRUE(bundle.has_rule("example_rule_1"));
+}
+
+TEST(JSONSchema_transformer, has_rule_not_exists) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  EXPECT_FALSE(bundle.has_rule("example_rule_2"));
+}
+
+TEST(JSONSchema_transformer, has_rule_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  EXPECT_TRUE(bundle.has_rule("example_rule_1"));
+  bundle.remove("example_rule_1");
+  EXPECT_FALSE(bundle.has_rule("example_rule_1"));
+}
+
+TEST(JSONSchema_transformer, find_rule_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  const auto *rule = bundle.find_rule("example_rule_1");
+  EXPECT_EQ(rule, nullptr);
+}
+
+TEST(JSONSchema_transformer, find_rule_exists) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  const auto *rule = bundle.find_rule("example_rule_1");
+  ASSERT_NE(rule, nullptr);
+  EXPECT_EQ(rule->name(), "example_rule_1");
+  EXPECT_EQ(rule->message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, find_rule_not_exists) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  const auto *rule = bundle.find_rule("example_rule_2");
+  EXPECT_EQ(rule, nullptr);
+}
+
+TEST(JSONSchema_transformer, find_rule_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  ASSERT_NE(bundle.find_rule("example_rule_1"), nullptr);
+  bundle.remove("example_rule_1");
+  EXPECT_EQ(bundle.find_rule("example_rule_1"), nullptr);
+}
+
+TEST(JSONSchema_transformer, for_each_rule_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  std::size_t count = 0;
+  bundle.for_each_rule([&count](std::string_view, const auto &) { count++; });
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, for_each_rule_single) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::size_t count = 0;
+  std::string found_name;
+  std::string found_message;
+
+  bundle.for_each_rule([&](std::string_view name, const auto &rule) {
+    count++;
+    found_name = name;
+    found_message = rule.message();
+  });
+
+  EXPECT_EQ(count, 1);
+  EXPECT_EQ(found_name, "example_rule_1");
+  EXPECT_EQ(found_message, "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, for_each_rule_multiple) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::size_t count = 0;
+  std::vector<std::string> names;
+  std::vector<std::string> messages;
+
+  bundle.for_each_rule([&](std::string_view name, const auto &rule) {
+    count++;
+    names.emplace_back(name);
+    messages.emplace_back(rule.message());
+  });
+
+  EXPECT_EQ(count, 3);
+  EXPECT_EQ(names.size(), 3);
+  EXPECT_EQ(messages.size(), 3);
+
+  // Rules are stored in a std::map, so they should be in alphabetical order
+  EXPECT_EQ(names[0], "example_rule_1");
+  EXPECT_EQ(names[1], "example_rule_2");
+  EXPECT_EQ(names[2], "example_rule_3");
+
+  EXPECT_EQ(messages[0], "Keyword foo is not permitted");
+  EXPECT_EQ(messages[1], "Keyword bar is not permitted");
+  EXPECT_EQ(messages[2], "Example rule 3");
+}
+
+TEST(JSONSchema_transformer, for_each_rule_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  // Verify that we can read rule properties
+  bundle.for_each_rule([](std::string_view name, const auto &rule) {
+    EXPECT_FALSE(name.empty());
+    EXPECT_FALSE(rule.name().empty());
+    EXPECT_FALSE(rule.message().empty());
+    EXPECT_EQ(name, rule.name());
+  });
+}
