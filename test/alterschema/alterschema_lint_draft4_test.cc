@@ -435,7 +435,8 @@ TEST(AlterSchema_lint_draft4, duplicate_allof_branches_1) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "allOf": [ { "type": "integer" }, { "type": "string" } ]
+    "type": "integer",
+    "allOf": [ { "type": "string" } ]
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -1104,7 +1105,7 @@ TEST(AlterSchema_lint_draft4, unnecessary_allof_wrapper_2) {
   EXPECT_EQ(traces.size(), 1);
   EXPECT_LINT_TRACE(
       traces, 0, "", "unnecessary_allof_wrapper_draft",
-      "Wrapping keywords other than `$ref` in `allOf` is often unnecessary and "
+      "Wrapping any keyword other than `$ref` in `allOf` is unnecessary and "
       "may even introduce a minor evaluation performance overhead");
 }
 
@@ -1457,8 +1458,7 @@ TEST(AlterSchema_lint_draft4, draft_ref_siblings_2) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "$ref": "#/definitions/foo",
-    "description": "A string field"
+    "$ref": "#/definitions/foo"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -1479,8 +1479,7 @@ TEST(AlterSchema_lint_draft4, draft_ref_siblings_3) {
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-04/schema#",
     "id": "http://example.com/schema",
-    "$ref": "#/definitions/foo",
-    "description": "Documentation"
+    "$ref": "#/definitions/foo"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -1497,8 +1496,7 @@ TEST(AlterSchema_lint_draft4, draft_ref_siblings_4) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "$ref": "#/definitions/foo",
-    "description": "Documentation only"
+    "$ref": "#/definitions/foo"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -1540,8 +1538,7 @@ TEST(AlterSchema_lint_draft4, draft_ref_siblings_6) {
     "type": "object",
     "properties": {
       "nested": {
-        "$ref": "#/definitions/foo",
-        "description": "ignored sibling"
+        "$ref": "#/definitions/foo"
       }
     }
   })JSON");

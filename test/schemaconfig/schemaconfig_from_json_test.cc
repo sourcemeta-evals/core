@@ -129,47 +129,32 @@ TEST(SchemaConfig_from_json, valid_4) {
   EXPECT_EQ(manifest.extra.at("x-foo").to_string(), "bar");
 }
 
-TEST(SchemaConfig_from_json, valid_without_path) {
-  const auto input{sourcemeta::core::parse_json(R"JSON({
-    "title": "Test Project"
-  })JSON")};
-
-  const auto manifest{
-      sourcemeta::core::SchemaConfig::from_json(input, TEST_DIRECTORY)};
-
-  EXPECT_TRUE(manifest.title.has_value());
-  EXPECT_EQ(manifest.title.value(), "Test Project");
-  EXPECT_FALSE(manifest.description.has_value());
-  EXPECT_FALSE(manifest.email.has_value());
-  EXPECT_FALSE(manifest.github.has_value());
-  EXPECT_FALSE(manifest.website.has_value());
-  EXPECT_EQ(manifest.absolute_path, TEST_DIRECTORY);
-  EXPECT_EQ(
-      manifest.base,
-      sourcemeta::core::URI::from_path(manifest.absolute_path).recompose());
-  EXPECT_FALSE(manifest.default_dialect.has_value());
-  EXPECT_EQ(manifest.resolve.size(), 0);
-  EXPECT_EQ(manifest.extra.size(), 0);
+TEST(SchemaConfig_from_json, invalid_1) {
+  const auto input{sourcemeta::core::parse_json("{}")};
+  EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
+      input, TEST_DIRECTORY, "The path property is required", "/path");
 }
 
-TEST(SchemaConfig_from_json, invalid_1) {
+TEST(SchemaConfig_from_json, invalid_2) {
   const auto input{sourcemeta::core::parse_json("[]")};
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
       input, TEST_DIRECTORY, "The configuration must be an object", "");
 }
 
-TEST(SchemaConfig_from_json, invalid_2) {
+TEST(SchemaConfig_from_json, invalid_3) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
-    "title": 1
+    "title": 1,
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
       input, TEST_DIRECTORY, "The title property must be a string", "/title");
 }
 
-TEST(SchemaConfig_from_json, invalid_3) {
+TEST(SchemaConfig_from_json, invalid_4) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
-    "description": 1
+    "description": 1,
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
@@ -177,27 +162,30 @@ TEST(SchemaConfig_from_json, invalid_3) {
       "/description");
 }
 
-TEST(SchemaConfig_from_json, invalid_4) {
+TEST(SchemaConfig_from_json, invalid_5) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
-    "email": 1
+    "email": 1,
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
       input, TEST_DIRECTORY, "The email property must be a string", "/email");
 }
 
-TEST(SchemaConfig_from_json, invalid_5) {
+TEST(SchemaConfig_from_json, invalid_6) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
-    "github": 1
+    "github": 1,
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
       input, TEST_DIRECTORY, "The github property must be a string", "/github");
 }
 
-TEST(SchemaConfig_from_json, invalid_6) {
+TEST(SchemaConfig_from_json, invalid_7) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
-    "website": 1
+    "website": 1,
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
@@ -205,7 +193,7 @@ TEST(SchemaConfig_from_json, invalid_6) {
       "/website");
 }
 
-TEST(SchemaConfig_from_json, invalid_7) {
+TEST(SchemaConfig_from_json, invalid_8) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
     "path": 1
   })JSON")};
@@ -214,9 +202,10 @@ TEST(SchemaConfig_from_json, invalid_7) {
       input, TEST_DIRECTORY, "The path property must be a string", "/path");
 }
 
-TEST(SchemaConfig_from_json, invalid_8) {
+TEST(SchemaConfig_from_json, invalid_9) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
-    "baseUri": 1
+    "baseUri": 1,
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
@@ -224,9 +213,10 @@ TEST(SchemaConfig_from_json, invalid_8) {
       "/baseUri");
 }
 
-TEST(SchemaConfig_from_json, invalid_9) {
+TEST(SchemaConfig_from_json, invalid_10) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
-    "defaultDialect": 1
+    "defaultDialect": 1,
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
@@ -234,9 +224,10 @@ TEST(SchemaConfig_from_json, invalid_9) {
       "/defaultDialect");
 }
 
-TEST(SchemaConfig_from_json, invalid_10) {
+TEST(SchemaConfig_from_json, invalid_11) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
-    "resolve": 1
+    "resolve": 1,
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
@@ -244,11 +235,12 @@ TEST(SchemaConfig_from_json, invalid_10) {
       "/resolve");
 }
 
-TEST(SchemaConfig_from_json, invalid_11) {
+TEST(SchemaConfig_from_json, invalid_12) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
     "resolve": {
       "foo": 1
-    }
+    },
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
@@ -256,9 +248,10 @@ TEST(SchemaConfig_from_json, invalid_11) {
       "/resolve/foo");
 }
 
-TEST(SchemaConfig_from_json, invalid_12) {
+TEST(SchemaConfig_from_json, invalid_13) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
-    "baseUri": "%"
+    "baseUri": "%",
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
@@ -266,50 +259,16 @@ TEST(SchemaConfig_from_json, invalid_12) {
       "/baseUri");
 }
 
-TEST(SchemaConfig_from_json, invalid_13) {
-  const auto input{sourcemeta::core::parse_json(R"JSON({
-    "baseUri": "relative"
-  })JSON")};
-
-  EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
-      input, TEST_DIRECTORY, "The baseUri property must be an absolute URI",
-      "/baseUri");
-}
-
 TEST(SchemaConfig_from_json, invalid_14) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
     "resolve": {
       "foo": "%"
-    }
+    },
+    "path": "./schemas"
   })JSON")};
 
   EXPECT_SCHEMACONFIG_FROM_JSON_PARSE_ERROR(
       input, TEST_DIRECTORY,
       "The values in the resolve object must represent valid URIs",
       "/resolve/foo");
-}
-
-// For backwards compatibility when we add new fields
-TEST(SchemaConfig_from_json, unknown_field_ignored) {
-  const auto input{sourcemeta::core::parse_json(R"JSON({
-    "title": "Test Project",
-    "unknown": 1
-  })JSON")};
-
-  const auto manifest{
-      sourcemeta::core::SchemaConfig::from_json(input, TEST_DIRECTORY)};
-
-  EXPECT_TRUE(manifest.title.has_value());
-  EXPECT_EQ(manifest.title.value(), "Test Project");
-  EXPECT_FALSE(manifest.description.has_value());
-  EXPECT_FALSE(manifest.email.has_value());
-  EXPECT_FALSE(manifest.github.has_value());
-  EXPECT_FALSE(manifest.website.has_value());
-  EXPECT_EQ(manifest.absolute_path, TEST_DIRECTORY);
-  EXPECT_EQ(
-      manifest.base,
-      sourcemeta::core::URI::from_path(manifest.absolute_path).recompose());
-  EXPECT_FALSE(manifest.default_dialect.has_value());
-  EXPECT_EQ(manifest.resolve.size(), 0);
-  EXPECT_EQ(manifest.extra.size(), 0);
 }

@@ -794,10 +794,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_base) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("base", VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -806,10 +804,18 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_links) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("links", VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::ApplicatorElementsInPlace);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
+  EXPECT_TRUE(result.dependencies.empty());
+  EXPECT_TRUE(result.instances.empty());
+}
+
+TEST(JSONSchema_official_walker_2019_09, hyperschema_ref) {
+  using namespace sourcemeta::core;
+  const auto result{
+      schema_official_walker("ref", VOCABULARIES_2019_09_HYPERSCHEMA)};
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -818,10 +824,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_href) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("href", VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -830,10 +834,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_anchor) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("anchor", VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -842,10 +844,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_anchorPointer) {
   using namespace sourcemeta::core;
   const auto result{schema_official_walker("anchorPointer",
                                            VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -854,10 +854,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_rel) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("rel", VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -866,10 +864,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_templatePointers) {
   using namespace sourcemeta::core;
   const auto result{schema_official_walker("templatePointers",
                                            VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -878,10 +874,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_templateRequired) {
   using namespace sourcemeta::core;
   const auto result{schema_official_walker("templateRequired",
                                            VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -890,10 +884,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_targetMediaType) {
   using namespace sourcemeta::core;
   const auto result{schema_official_walker("targetMediaType",
                                            VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -902,10 +894,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_targetHints) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("targetHints", VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }
@@ -914,10 +904,8 @@ TEST(JSONSchema_official_walker_2019_09, hyperschema_submissionMediaType) {
   using namespace sourcemeta::core;
   const auto result{schema_official_walker("submissionMediaType",
                                            VOCABULARIES_2019_09_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_TRUE(result.vocabulary.has_value());
-  EXPECT_EQ(result.vocabulary.value(),
-            "https://json-schema.org/draft/2019-09/vocab/hyper-schema");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   EXPECT_TRUE(result.dependencies.empty());
   EXPECT_TRUE(result.instances.empty());
 }

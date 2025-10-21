@@ -741,10 +741,8 @@ JSON::defines_any(std::initializer_list<JSON::String> keys) const -> bool {
     return true;
   }
 
-  // If we re-use the vector across threads, then we will segfault
-  thread_local std::vector<std::uint64_t> cache;
-  cache.clear();
-  cache.resize(size);
+  static std::vector<std::uint64_t> cache;
+  cache.reserve(size);
 
   for (std::size_t index = 0; index < size; index++) {
     cache[index] = items[index].fast_hash();

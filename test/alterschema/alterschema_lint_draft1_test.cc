@@ -834,8 +834,7 @@ TEST(AlterSchema_lint_draft1, draft_ref_siblings_2) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-01/schema#",
-    "$ref": "#/definitions/foo",
-    "description": "A string field"
+    "$ref": "#/definitions/foo"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -857,9 +856,7 @@ TEST(AlterSchema_lint_draft1, draft_ref_siblings_3) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-01/schema#",
-    "$ref": "#/definitions/foo",
-    "title": "Test Schema",
-    "default": null
+    "$ref": "#/definitions/foo"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -879,8 +876,7 @@ TEST(AlterSchema_lint_draft1, draft_ref_siblings_4) {
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-01/schema#",
     "id": "http://example.com/schema",
-    "$ref": "#/definitions/foo",
-    "description": "Documentation"
+    "$ref": "#/definitions/foo"
   })JSON");
 
   EXPECT_EQ(document, expected);

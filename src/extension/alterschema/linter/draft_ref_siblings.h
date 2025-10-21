@@ -28,8 +28,7 @@ public:
     for (const auto &entry : schema.as_object()) {
       const auto metadata{walker(entry.first, vocabularies)};
       if (metadata.type == sourcemeta::core::SchemaKeywordType::Other ||
-          metadata.type == sourcemeta::core::SchemaKeywordType::Reference ||
-          metadata.type == sourcemeta::core::SchemaKeywordType::Comment) {
+          metadata.type == sourcemeta::core::SchemaKeywordType::Reference) {
         continue;
       } else {
         locations.push_back(Pointer{entry.first});

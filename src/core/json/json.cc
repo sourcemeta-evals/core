@@ -66,9 +66,9 @@ auto stringify(const JSON &document,
 }
 
 auto prettify(const JSON &document,
-              std::basic_ostream<JSON::Char, JSON::CharTraits> &stream,
-              const std::size_t spaces) -> void {
-  prettify<std::allocator>(document, stream, nullptr, 0, spaces);
+              std::basic_ostream<JSON::Char, JSON::CharTraits> &stream)
+    -> void {
+  prettify<std::allocator>(document, stream, nullptr);
 }
 
 auto stringify(const JSON &document,
@@ -79,9 +79,8 @@ auto stringify(const JSON &document,
 
 auto prettify(const JSON &document,
               std::basic_ostream<JSON::Char, JSON::CharTraits> &stream,
-              const JSON::KeyComparison &compare, const std::size_t spaces)
-    -> void {
-  prettify<std::allocator>(document, stream, compare, 0, spaces);
+              const JSON::KeyComparison &compare) -> void {
+  prettify<std::allocator>(document, stream, compare);
 }
 
 auto operator<<(std::basic_ostream<JSON::Char, JSON::CharTraits> &stream,

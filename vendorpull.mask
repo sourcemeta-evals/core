@@ -30,3 +30,4 @@ vendor/jsontestsuite.mask
 vendor/referencing-suite.mask
 vendor/uriparser.mask
 vendor/yaml.mask
+vendor/zlib.mask

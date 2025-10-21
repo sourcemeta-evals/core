@@ -516,9 +516,8 @@ TEST(JSONSchema_official_walker_draft6, hyperschema_links) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("links", VOCABULARIES_DRAFT6_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::ApplicatorElementsInPlace);
-  EXPECT_EQ(result.vocabulary.value(),
-            "http://json-schema.org/draft-06/hyper-schema#");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   const std::set<std::string> expected{"$ref"};
   EXPECT_EQ(result.dependencies, expected);
   EXPECT_TRUE(result.instances.empty());
@@ -528,11 +527,10 @@ TEST(JSONSchema_official_walker_draft6, hyperschema_href) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("href", VOCABULARIES_DRAFT6_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_EQ(result.vocabulary.value(),
-            "http://json-schema.org/draft-06/hyper-schema#");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   const std::set<std::string> expected{"$ref"};
-  EXPECT_TRUE(result.dependencies.empty());
+  EXPECT_EQ(result.dependencies, expected);
   EXPECT_TRUE(result.instances.empty());
 }
 
@@ -540,10 +538,10 @@ TEST(JSONSchema_official_walker_draft6, hyperschema_rel) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("rel", VOCABULARIES_DRAFT6_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_EQ(result.vocabulary.value(),
-            "http://json-schema.org/draft-06/hyper-schema#");
-  EXPECT_TRUE(result.dependencies.empty());
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
+  const std::set<std::string> expected{"$ref"};
+  EXPECT_EQ(result.dependencies, expected);
   EXPECT_TRUE(result.instances.empty());
 }
 
@@ -551,10 +549,10 @@ TEST(JSONSchema_official_walker_draft6, hyperschema_mediaType) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("mediaType", VOCABULARIES_DRAFT6_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_EQ(result.vocabulary.value(),
-            "http://json-schema.org/draft-06/hyper-schema#");
-  EXPECT_TRUE(result.dependencies.empty());
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
+  const std::set<std::string> expected{"$ref"};
+  EXPECT_EQ(result.dependencies, expected);
   EXPECT_TRUE(result.instances.empty());
 }
 
@@ -562,10 +560,10 @@ TEST(JSONSchema_official_walker_draft6, hyperschema_submissionEncType) {
   using namespace sourcemeta::core;
   const auto result{schema_official_walker("submissionEncType",
                                            VOCABULARIES_DRAFT6_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_EQ(result.vocabulary.value(),
-            "http://json-schema.org/draft-06/hyper-schema#");
-  EXPECT_TRUE(result.dependencies.empty());
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
+  const std::set<std::string> expected{"$ref"};
+  EXPECT_EQ(result.dependencies, expected);
   EXPECT_TRUE(result.instances.empty());
 }
 
@@ -573,9 +571,8 @@ TEST(JSONSchema_official_walker_draft6, hyperschema_base) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("base", VOCABULARIES_DRAFT6_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_EQ(result.vocabulary.value(),
-            "http://json-schema.org/draft-06/hyper-schema#");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   const std::set<std::string> expected{"$ref"};
   EXPECT_EQ(result.dependencies, expected);
   EXPECT_TRUE(result.instances.empty());
@@ -585,9 +582,8 @@ TEST(JSONSchema_official_walker_draft6, hyperschema_media) {
   using namespace sourcemeta::core;
   const auto result{
       schema_official_walker("media", VOCABULARIES_DRAFT6_HYPERSCHEMA)};
-  EXPECT_EQ(result.type, SchemaKeywordType::Other);
-  EXPECT_EQ(result.vocabulary.value(),
-            "http://json-schema.org/draft-06/hyper-schema#");
+  EXPECT_EQ(result.type, SchemaKeywordType::Unknown);
+  EXPECT_FALSE(result.vocabulary.has_value());
   const std::set<std::string> expected{"$ref"};
   EXPECT_EQ(result.dependencies, expected);
   EXPECT_TRUE(result.instances.empty());

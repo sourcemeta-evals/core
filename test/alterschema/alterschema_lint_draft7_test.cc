@@ -721,7 +721,8 @@ TEST(AlterSchema_lint_draft7, duplicate_allof_branches_1) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "allOf": [ { "type": "integer" }, { "type": "string" } ]
+    "type": "integer",
+    "allOf": [ { "type": "string" } ]
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -1606,7 +1607,7 @@ TEST(AlterSchema_lint_draft7, unnecessary_allof_wrapper_2) {
   EXPECT_EQ(traces.size(), 1);
   EXPECT_LINT_TRACE(
       traces, 0, "", "unnecessary_allof_wrapper_draft",
-      "Wrapping keywords other than `$ref` in `allOf` is often unnecessary and "
+      "Wrapping any keyword other than `$ref` in `allOf` is unnecessary and "
       "may even introduce a minor evaluation performance overhead");
 }
 
@@ -2089,8 +2090,7 @@ TEST(AlterSchema_lint_draft7, draft_ref_siblings_2) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$ref": "#/definitions/foo",
-    "description": "A string field"
+    "$ref": "#/definitions/foo"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -2113,9 +2113,7 @@ TEST(AlterSchema_lint_draft7, draft_ref_siblings_3) {
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-07/schema#",
     "$id": "http://example.com/schema",
-    "$ref": "#/definitions/foo",
-    "$comment": "This is a comment",
-    "examples": [42]
+    "$ref": "#/definitions/foo"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -2132,8 +2130,7 @@ TEST(AlterSchema_lint_draft7, draft_ref_siblings_4) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$ref": "#/definitions/foo",
-    "description": "Documentation only"
+    "$ref": "#/definitions/foo"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -2175,8 +2172,7 @@ TEST(AlterSchema_lint_draft7, draft_ref_siblings_6) {
     "type": "object",
     "properties": {
       "nested": {
-        "$ref": "#/definitions/foo",
-        "description": "ignored sibling"
+        "$ref": "#/definitions/foo"
       }
     }
   })JSON");
@@ -2562,15 +2558,14 @@ TEST(AlterSchema_lint_draft7, unknown_keywords_prefix_7) {
     "$ref": "#/definitions/MyType",
     "unknownKeyword": "should be removed due to $ref siblings rule",
     "type": "object",
-    "title": "test"
+    "title": "should also be removed as per draft 7 ref siblings rule"
   })JSON");
 
   LINT_AND_FIX_FOR_READABILITY(document);
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$ref": "#/definitions/MyType",
-    "title": "test"
+    "$ref": "#/definitions/MyType"
   })JSON");
 
   EXPECT_EQ(document, expected);
