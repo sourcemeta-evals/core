@@ -786,4 +786,54 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (this->is_mailto()) {
+      return std::filesystem::path{};
+    }
+    return std::filesystem::path{uri_path.value_or(std::string{})};
+  }
+
+  const auto uri_host{this->host()};
+  const auto path_str{uri_path.value_or(std::string{})};
+
+  std::istringstream host_input{
+      uri_host.has_value() ? std::string{uri_host.value()} : std::string{}};
+  std::ostringstream host_output;
+  uri_unescape(host_input, host_output);
+  const auto decoded_host{host_output.str()};
+
+  std::istringstream path_input{path_str};
+  std::ostringstream path_output;
+  uri_unescape(path_input, path_output);
+  const auto decoded_path{path_output.str()};
+
+  if (uri_host.has_value() && !decoded_host.empty() &&
+      decoded_host != "localhost") {
+#ifdef _WIN32
+    return std::filesystem::path{"\\\\" + decoded_host + decoded_path};
+#else
+    std::filesystem::path result{"//"};
+    result /= decoded_host;
+    if (!decoded_path.empty() && decoded_path[0] == '/') {
+      result += decoded_path;
+    } else {
+      result /= decoded_path;
+    }
+    return result;
+#endif
+  }
+
+  if (decoded_path.size() >= 4 && decoded_path[0] == '/' &&
+      std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+      decoded_path[2] == ':') {
+    return std::filesystem::path{decoded_path.substr(1)};
+  }
+
+  return std::filesystem::path{decoded_path};
+}
+
 } // namespace sourcemeta::core
