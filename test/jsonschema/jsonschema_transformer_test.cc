@@ -1187,3 +1187,84 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, for_each_rule_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  std::vector<std::string> rule_names;
+  bundle.for_each_rule([&rule_names](const auto &rule_view) {
+    rule_names.push_back(std::string{rule_view.name});
+  });
+
+  EXPECT_EQ(rule_names.size(), 0);
+}
+
+TEST(JSONSchema_transformer, for_each_rule_single) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::vector<std::string> rule_names;
+  std::vector<std::string> rule_messages;
+  bundle.for_each_rule([&rule_names, &rule_messages](const auto &rule_view) {
+    rule_names.push_back(std::string{rule_view.name});
+    rule_messages.push_back(std::string{rule_view.message});
+  });
+
+  EXPECT_EQ(rule_names.size(), 1);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_messages.size(), 1);
+  EXPECT_EQ(rule_messages[0], "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, for_each_rule_multiple) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::vector<std::string> rule_names;
+  std::vector<std::string> rule_messages;
+  bundle.for_each_rule([&rule_names, &rule_messages](const auto &rule_view) {
+    rule_names.push_back(std::string{rule_view.name});
+    rule_messages.push_back(std::string{rule_view.message});
+  });
+
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_EQ(rule_messages.size(), 3);
+
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_3") != rule_names.end());
+
+  EXPECT_TRUE(std::find(rule_messages.begin(), rule_messages.end(),
+                        "Keyword foo is not permitted") != rule_messages.end());
+  EXPECT_TRUE(std::find(rule_messages.begin(), rule_messages.end(),
+                        "Keyword bar is not permitted") != rule_messages.end());
+  EXPECT_TRUE(std::find(rule_messages.begin(), rule_messages.end(),
+                        "Example rule 3") != rule_messages.end());
+}
+
+TEST(JSONSchema_transformer, for_each_rule_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_TRUE(bundle.remove("example_rule_2"));
+
+  std::vector<std::string> rule_names;
+  bundle.for_each_rule([&rule_names](const auto &rule_view) {
+    rule_names.push_back(std::string{rule_view.name});
+  });
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_3") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") == rule_names.end());
+}

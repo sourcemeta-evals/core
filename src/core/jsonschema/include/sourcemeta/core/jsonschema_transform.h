@@ -242,6 +242,19 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// A read-only view of a registered rule
+  struct RuleView {
+    const std::string &name;
+    const std::string &message;
+  };
+
+  /// Iterate over all registered rules in read-only mode
+  template <typename Func> auto for_each_rule(Func &&callback) const -> void {
+    for (const auto &[name, rule] : this->rules) {
+      callback(RuleView{rule->name(), rule->message()});
+    }
+  }
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
