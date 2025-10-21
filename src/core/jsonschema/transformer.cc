@@ -239,4 +239,8 @@ auto SchemaTransformer::remove(const std::string &name) -> bool {
   return this->rules.erase(name) > 0;
 }
 
+auto SchemaTransformer::size() const noexcept -> std::size_t {
+  return this->rules.size();
+}
+
 } // namespace sourcemeta::core

@@ -217,6 +217,19 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Get the number of rules registered in the bundle
+  [[nodiscard]] auto size() const noexcept -> std::size_t;
+
+  /// Visit each rule in the bundle for read-only introspection.
+  /// The visitor function is called with a const reference to each rule.
+  /// The order of visitation is unspecified and may change between calls
+  /// if rules are added or removed. Do not modify the bundle during visitation.
+  template <class F> auto visit(F &&f) const -> void {
+    for (const auto &kv : this->rules) {
+      f(*kv.second);
+    }
+  }
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
