@@ -6,7 +6,9 @@ extern "C" {
 
 #include <array>   // std::array
 #include <cstring> // std::memset
+#include <istream> // std::istream
 #include <sstream> // std::ostringstream
+#include <string>  // std::string
 
 namespace sourcemeta::core {
 
@@ -43,6 +45,61 @@ auto gzip(std::string_view input) -> std::optional<std::string> {
   }
 
   return compressed.str();
+}
+
+auto gunzip(std::istream &stream) -> std::optional<std::string> {
+  z_stream zs;
+  std::memset(&zs, 0, sizeof(zs));
+  int code = inflateInit2(&zs, 16 + MAX_WBITS);
+  if (code != Z_OK) {
+    return std::nullopt;
+  }
+
+  std::array<char, 4096> inbuf;
+  std::array<char, 4096> outbuf;
+  std::string output;
+
+  zs.next_in = nullptr;
+  zs.avail_in = 0;
+
+  do {
+    if (zs.avail_in == 0) {
+      stream.read(inbuf.data(), static_cast<std::streamsize>(inbuf.size()));
+      const auto got = stream.gcount();
+      if (got <= 0) {
+        break;
+      }
+      zs.next_in = reinterpret_cast<Bytef *>(inbuf.data());
+      zs.avail_in = static_cast<uInt>(got);
+    }
+
+    do {
+      zs.next_out = reinterpret_cast<Bytef *>(outbuf.data());
+      zs.avail_out = static_cast<uInt>(outbuf.size());
+      code = inflate(&zs, Z_NO_FLUSH);
+      if (code == Z_STREAM_ERROR || code == Z_DATA_ERROR ||
+          code == Z_MEM_ERROR) {
+        inflateEnd(&zs);
+        return std::nullopt;
+      }
+      const auto produced =
+          static_cast<std::size_t>(outbuf.size() - zs.avail_out);
+      if (produced > 0) {
+        output.append(outbuf.data(), produced);
+      }
+    } while (zs.avail_out == 0);
+
+    if (code == Z_STREAM_END) {
+      break;
+    }
+  } while (code == Z_OK || stream.good());
+
+  const int end_code = inflateEnd(&zs);
+  if (code != Z_STREAM_END || end_code != Z_OK) {
+    return std::nullopt;
+  }
+
+  return output;
 }
 
 } // namespace sourcemeta::core
