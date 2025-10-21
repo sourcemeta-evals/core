@@ -45,4 +45,63 @@ auto gzip(std::string_view input) -> std::optional<std::string> {
   return compressed.str();
 }
 
+auto gunzip(std::istream &input) -> std::optional<std::string> {
+  z_stream stream;
+  std::memset(&stream, 0, sizeof(stream));
+  int code = inflateInit2(&stream, 16 + MAX_WBITS);
+  if (code != Z_OK) {
+    return std::nullopt;
+  }
+
+  std::array<char, 4096> in_buffer;
+  std::array<char, 4096> out_buffer;
+  std::ostringstream result;
+  bool finished = false;
+
+  while (!finished) {
+    if (stream.avail_in == 0) {
+      input.read(in_buffer.data(),
+                 static_cast<std::streamsize>(in_buffer.size()));
+      const auto got = input.gcount();
+      if (got <= 0) {
+        break;
+      }
+      stream.next_in = reinterpret_cast<Bytef *>(in_buffer.data());
+      stream.avail_in = static_cast<uInt>(got);
+    }
+
+    do {
+      stream.next_out = reinterpret_cast<Bytef *>(out_buffer.data());
+      stream.avail_out = static_cast<uInt>(out_buffer.size());
+      const int ret = inflate(&stream, Z_NO_FLUSH);
+
+      const auto produced = out_buffer.size() - stream.avail_out;
+      if (produced > 0) {
+        result.write(out_buffer.data(), static_cast<std::streamsize>(produced));
+      }
+
+      if (ret == Z_STREAM_END) {
+        finished = true;
+        break;
+      }
+      if (ret != Z_OK && ret != Z_BUF_ERROR) {
+        inflateEnd(&stream);
+        return std::nullopt;
+      }
+    } while (stream.avail_out == 0);
+  }
+
+  if (!finished) {
+    inflateEnd(&stream);
+    return std::nullopt;
+  }
+
+  code = inflateEnd(&stream);
+  if (code != Z_OK) {
+    return std::nullopt;
+  }
+
+  return result.str();
+}
+
 } // namespace sourcemeta::core
