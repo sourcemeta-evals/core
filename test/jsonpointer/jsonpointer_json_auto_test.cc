@@ -50,6 +50,17 @@ TEST(JSONPointer_json_auto, roundtrip_with_brackets) {
   EXPECT_EQ(pointer, back.value());
 }
 
+TEST(JSONPointer_json_auto, roundtrip_with_rfc6901_escapes) {
+  const sourcemeta::core::Pointer pointer{"foo~bar", "a/b"};
+  const auto result{sourcemeta::core::to_json(pointer)};
+  const sourcemeta::core::JSON expected{"/foo~0bar/a~1b"};
+  EXPECT_EQ(result, expected);
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
