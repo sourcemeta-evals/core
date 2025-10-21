@@ -181,3 +181,27 @@ TEST(JSONSchema_SchemaMapResolver, embedded_resource_with_callback) {
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/test"));
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/string"));
 }
+
+TEST(JSONSchema_SchemaMapResolver, draft4_uses_id_keyword) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#"
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#"
+  })JSON");
+
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/test").has_value());
+  const auto resolved = resolver("https://www.sourcemeta.com/test").value();
+  EXPECT_EQ(resolved, expected);
+  // Verify that the "id" keyword is used, not "$id"
+  EXPECT_TRUE(resolved.defines("id"));
+  EXPECT_FALSE(resolved.defines("$id"));
+}
