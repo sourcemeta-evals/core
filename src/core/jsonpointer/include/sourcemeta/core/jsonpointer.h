@@ -652,4 +652,85 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    auto mix = [](std::size_t seed, std::size_t value) noexcept -> std::size_t {
+      return seed ^ (value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2));
+    };
+
+    auto token_hash = [](const sourcemeta::core::Pointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        const auto hash = token.property_hash();
+        return static_cast<std::size_t>(hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    const std::size_t n = pointer.size();
+    std::size_t seed = n;
+
+    if (n == 0) {
+      return mix(seed, 1469598103934665603ULL);
+    } else if (n == 1) {
+      seed = mix(seed, token_hash(pointer.at(0)));
+    } else if (n == 2) {
+      seed = mix(seed, token_hash(pointer.at(0)));
+      seed = mix(seed, token_hash(pointer.at(1)));
+    } else {
+      const std::size_t mid = n / 2;
+      seed = mix(seed, token_hash(pointer.at(0)));
+      seed = mix(seed, token_hash(pointer.at(mid)));
+      seed = mix(seed, token_hash(pointer.at(n - 1)));
+    }
+
+    return seed;
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    auto mix = [](std::size_t seed, std::size_t value) noexcept -> std::size_t {
+      return seed ^ (value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2));
+    };
+
+    auto token_hash =
+        [](const sourcemeta::core::WeakPointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        const auto hash = token.property_hash();
+        return static_cast<std::size_t>(hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    const std::size_t n = pointer.size();
+    std::size_t seed = n;
+
+    if (n == 0) {
+      return mix(seed, 1469598103934665603ULL);
+    } else if (n == 1) {
+      seed = mix(seed, token_hash(pointer.at(0)));
+    } else if (n == 2) {
+      seed = mix(seed, token_hash(pointer.at(0)));
+      seed = mix(seed, token_hash(pointer.at(1)));
+    } else {
+      const std::size_t mid = n / 2;
+      seed = mix(seed, token_hash(pointer.at(0)));
+      seed = mix(seed, token_hash(pointer.at(mid)));
+      seed = mix(seed, token_hash(pointer.at(n - 1)));
+    }
+
+    return seed;
+  }
+};
+
+} // namespace std
+
 #endif
