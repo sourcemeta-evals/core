@@ -652,4 +652,7 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+// Include hash specializations for std::unordered_map and std::unordered_set
+#include <sourcemeta/core/jsonpointer_hash.h>
+
 #endif
