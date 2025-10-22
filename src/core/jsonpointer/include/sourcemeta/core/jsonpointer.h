@@ -650,6 +650,58 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 }
 
+namespace detail {
+template <typename PointerT>
+inline auto hash_pointer(const PointerT &pointer) noexcept -> std::size_t {
+  std::size_t seed = pointer.size();
+  const auto hash_combine = [](std::size_t &seed, std::size_t value) noexcept {
+    seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+  };
+
+  if (pointer.empty()) {
+    return seed;
+  }
+
+  const auto hash_token = [](const auto &token) noexcept -> std::size_t {
+    if (token.is_property()) {
+      return static_cast<std::size_t>(token.property_hash().a);
+    } else {
+      return static_cast<std::size_t>(token.to_index());
+    }
+  };
+
+  const auto size = pointer.size();
+  if (size == 1) {
+    hash_combine(seed, hash_token(pointer.at(0)));
+  } else if (size == 2) {
+    hash_combine(seed, hash_token(pointer.at(0)));
+    hash_combine(seed, hash_token(pointer.at(1)));
+  } else {
+    hash_combine(seed, hash_token(pointer.at(0)));
+    hash_combine(seed, hash_token(pointer.at(size / 2)));
+    hash_combine(seed, hash_token(pointer.at(size - 1)));
+  }
+
+  return seed;
+}
+} // namespace detail
+
 } // namespace sourcemeta::core
+
+namespace std {
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::hash_pointer(pointer);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::hash_pointer(pointer);
+  }
+};
+} // namespace std
 
 #endif
