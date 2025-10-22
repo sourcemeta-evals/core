@@ -239,4 +239,11 @@ auto SchemaTransformer::remove(const std::string &name) -> bool {
   return this->rules.erase(name) > 0;
 }
 
+auto SchemaTransformer::rules_for_each(
+    const SchemaTransformer::RuleIteratorCallback &callback) const -> void {
+  for (const auto &[name, rule] : this->rules) {
+    callback(name, rule->message());
+  }
+}
+
 } // namespace sourcemeta::core

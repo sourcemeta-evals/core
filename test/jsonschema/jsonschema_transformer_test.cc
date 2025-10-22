@@ -1187,3 +1187,70 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, rules_for_each_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  std::vector<std::pair<std::string, std::string>> rules;
+  bundle.rules_for_each([&rules](const auto &name, const auto &message) {
+    rules.emplace_back(name, message);
+  });
+
+  EXPECT_TRUE(rules.empty());
+}
+
+TEST(JSONSchema_transformer, rules_for_each_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::vector<std::pair<std::string, std::string>> rules;
+  bundle.rules_for_each([&rules](const auto &name, const auto &message) {
+    rules.emplace_back(name, message);
+  });
+
+  EXPECT_EQ(rules.size(), 1);
+  EXPECT_EQ(rules.at(0).first, "example_rule_1");
+  EXPECT_EQ(rules.at(0).second, "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, rules_for_each_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::vector<std::pair<std::string, std::string>> rules;
+  bundle.rules_for_each([&rules](const auto &name, const auto &message) {
+    rules.emplace_back(name, message);
+  });
+
+  EXPECT_EQ(rules.size(), 3);
+
+  // Rules are stored in a map, so they should be sorted by name
+  EXPECT_EQ(rules.at(0).first, "example_rule_1");
+  EXPECT_EQ(rules.at(0).second, "Keyword foo is not permitted");
+  EXPECT_EQ(rules.at(1).first, "example_rule_2");
+  EXPECT_EQ(rules.at(1).second, "Keyword bar is not permitted");
+  EXPECT_EQ(rules.at(2).first, "example_rule_3");
+  EXPECT_EQ(rules.at(2).second, "Example rule 3");
+}
+
+TEST(JSONSchema_transformer, rules_for_each_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  bundle.remove("example_rule_2");
+
+  std::vector<std::pair<std::string, std::string>> rules;
+  bundle.rules_for_each([&rules](const auto &name, const auto &message) {
+    rules.emplace_back(name, message);
+  });
+
+  EXPECT_EQ(rules.size(), 2);
+  EXPECT_EQ(rules.at(0).first, "example_rule_1");
+  EXPECT_EQ(rules.at(0).second, "Keyword foo is not permitted");
+  EXPECT_EQ(rules.at(1).first, "example_rule_3");
+  EXPECT_EQ(rules.at(1).second, "Example rule 3");
+}

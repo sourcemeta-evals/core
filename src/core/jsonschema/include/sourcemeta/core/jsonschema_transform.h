@@ -242,6 +242,12 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// Iterate over the registered rules in read-only mode
+  /// The callback is called for each rule with the rule's name and message
+  using RuleIteratorCallback =
+      std::function<void(const std::string_view, const std::string_view)>;
+  auto rules_for_each(const RuleIteratorCallback &callback) const -> void;
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
