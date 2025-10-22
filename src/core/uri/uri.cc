@@ -786,4 +786,51 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto scheme_value = this->scheme();
+  const auto path_value = this->path();
+
+  // Get the raw path string (may be empty)
+  const std::string raw_path = path_value.value_or("");
+
+  // Decode percent-encoded characters
+  std::istringstream input{raw_path};
+  std::ostringstream output;
+  uri_unescape(input, output);
+  const std::string decoded_path = output.str();
+
+  // Handle file:// URIs specially
+  if (scheme_value && scheme_value.value() == "file") {
+    const auto host_value = this->host();
+
+    // Check if this is a local file (no host or localhost)
+    const bool is_local = !host_value.has_value() || host_value->empty() ||
+                          *host_value == "localhost";
+
+    if (!is_local) {
+      // UNC-like path: //host/path
+      std::string tail = decoded_path;
+      if (!tail.empty() && tail.front() == '/') {
+        tail.erase(0, 1);
+      }
+      return std::filesystem::path("//" + std::string(*host_value) +
+                                   (tail.empty() ? "" : "/" + tail));
+    }
+
+    // Local file - check for Windows drive letter pattern: /X:
+    if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+        decoded_path[2] == ':') {
+      // Remove leading slash for Windows drive paths
+      return std::filesystem::path(decoded_path.substr(1));
+    }
+
+    // Regular UNIX path
+    return std::filesystem::path(decoded_path);
+  }
+
+  // Non-file scheme: return just the decoded path component
+  return std::filesystem::path(decoded_path);
+}
+
 } // namespace sourcemeta::core
