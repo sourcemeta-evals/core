@@ -54,6 +54,13 @@ const WeakPointer empty_weak_pointer;
 /// A JSON Pointer with unresolved wildcards
 using PointerTemplate = GenericPointerTemplate<Pointer>;
 
+} // namespace sourcemeta::core
+
+// Include hash specializations after type definitions
+#include <sourcemeta/core/jsonpointer_hash.h>
+
+namespace sourcemeta::core {
+
 /// @ingroup jsonpointer
 /// Get a value from a JSON document using a JSON Pointer (`const` overload).
 ///
