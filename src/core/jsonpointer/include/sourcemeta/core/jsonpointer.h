@@ -652,4 +652,118 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+
+    if (size == 1) {
+      const auto &token = pointer.at(0);
+      if (token.is_property()) {
+        result = static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        result = static_cast<std::size_t>(token.to_index());
+      }
+    } else if (size == 2) {
+      const auto &first = pointer.at(0);
+      const auto &last = pointer.at(1);
+
+      std::size_t first_hash =
+          first.is_property()
+              ? static_cast<std::size_t>(first.property_hash().a)
+              : static_cast<std::size_t>(first.to_index());
+      std::size_t last_hash =
+          last.is_property() ? static_cast<std::size_t>(last.property_hash().a)
+                             : static_cast<std::size_t>(last.to_index());
+
+      result = first_hash ^ (last_hash << 1);
+    } else {
+      const auto &first = pointer.at(0);
+      const auto &middle = pointer.at(size / 2);
+      const auto &last = pointer.at(size - 1);
+
+      std::size_t first_hash =
+          first.is_property()
+              ? static_cast<std::size_t>(first.property_hash().a)
+              : static_cast<std::size_t>(first.to_index());
+      std::size_t middle_hash =
+          middle.is_property()
+              ? static_cast<std::size_t>(middle.property_hash().a)
+              : static_cast<std::size_t>(middle.to_index());
+      std::size_t last_hash =
+          last.is_property() ? static_cast<std::size_t>(last.property_hash().a)
+                             : static_cast<std::size_t>(last.to_index());
+
+      result = first_hash ^ (middle_hash << 1) ^ (last_hash << 2);
+    }
+
+    return result;
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+
+    if (size == 1) {
+      const auto &token = pointer.at(0);
+      if (token.is_property()) {
+        result = static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        result = static_cast<std::size_t>(token.to_index());
+      }
+    } else if (size == 2) {
+      const auto &first = pointer.at(0);
+      const auto &last = pointer.at(1);
+
+      std::size_t first_hash =
+          first.is_property()
+              ? static_cast<std::size_t>(first.property_hash().a)
+              : static_cast<std::size_t>(first.to_index());
+      std::size_t last_hash =
+          last.is_property() ? static_cast<std::size_t>(last.property_hash().a)
+                             : static_cast<std::size_t>(last.to_index());
+
+      result = first_hash ^ (last_hash << 1);
+    } else {
+      const auto &first = pointer.at(0);
+      const auto &middle = pointer.at(size / 2);
+      const auto &last = pointer.at(size - 1);
+
+      std::size_t first_hash =
+          first.is_property()
+              ? static_cast<std::size_t>(first.property_hash().a)
+              : static_cast<std::size_t>(first.to_index());
+      std::size_t middle_hash =
+          middle.is_property()
+              ? static_cast<std::size_t>(middle.property_hash().a)
+              : static_cast<std::size_t>(middle.to_index());
+      std::size_t last_hash =
+          last.is_property() ? static_cast<std::size_t>(last.property_hash().a)
+                             : static_cast<std::size_t>(last.to_index());
+
+      result = first_hash ^ (middle_hash << 1) ^ (last_hash << 2);
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
