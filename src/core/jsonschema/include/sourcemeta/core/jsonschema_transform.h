@@ -288,9 +288,6 @@ public:
       // by definition change the score
       -> std::pair<bool, std::uint8_t>;
 
-  [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
-  [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
-
   /// Iterator type for read-only access to rules
   using const_iterator =
       std::map<std::string,
