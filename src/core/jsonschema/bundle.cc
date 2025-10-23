@@ -261,7 +261,7 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
           sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
       if (base_dialect_value.has_value()) {
         sourcemeta::core::reidentify(schema, default_id.value(),
-                                     base_dialect_value.value());
+                                      base_dialect_value.value());
       }
     }
   }
