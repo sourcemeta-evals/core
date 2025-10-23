@@ -250,6 +250,22 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  // Add the default identifier to the schema if it doesn't have one
+  if (default_id.has_value() && schema.is_object()) {
+    const bool has_id = schema.defines("$id") || schema.defines("id");
+    if (!has_id) {
+      std::string id_value = default_id.value();
+      if (!id_value.empty()) {
+        sourcemeta::core::URI uri{id_value};
+        if (auto nofrag = uri.recompose_without_fragment()) {
+          id_value = *nofrag;
+        }
+      }
+      // Let reidentify decide keyword and wrapping
+      reidentify(schema, id_value, resolver, default_dialect);
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
