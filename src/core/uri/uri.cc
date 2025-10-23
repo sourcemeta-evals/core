@@ -788,50 +788,53 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
 
 auto URI::to_path() const -> std::filesystem::path {
   const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+  const auto uri_host{this->host()};
 
   if (uri_scheme.has_value() && uri_scheme.value() == "file") {
-    const auto uri_host{this->host()};
-    const auto uri_path{this->path()};
-
-    if (!uri_path.has_value()) {
-      throw URIError{"file:// URI must have a path component"};
-    }
-
-    std::istringstream input{uri_path.value()};
-    std::ostringstream output;
-    uri_unescape(input, output);
-    std::string unescaped_path{output.str()};
+    std::ostringstream decoded_stream;
 
     if (uri_host.has_value() && !uri_host.value().empty()) {
       std::istringstream host_input{std::string{uri_host.value()}};
-      std::ostringstream host_output;
-      uri_unescape(host_input, host_output);
-      std::string unescaped_host{host_output.str()};
+      uri_unescape(host_input, decoded_stream);
+      const std::string decoded_host{decoded_stream.str()};
+      decoded_stream.str("");
+      decoded_stream.clear();
 
-#ifdef _WIN32
-      return std::filesystem::path{"\\\\" + unescaped_host + unescaped_path};
-#else
-      return std::filesystem::path{"//" + unescaped_host + unescaped_path};
-#endif
+      if (uri_path.has_value()) {
+        std::istringstream path_input{uri_path.value()};
+        uri_unescape(path_input, decoded_stream);
+        std::string decoded_path{decoded_stream.str()};
+        std::ranges::replace(decoded_path, '/', '\\');
+        return std::filesystem::path{"\\\\" + decoded_host + decoded_path};
+      } else {
+        return std::filesystem::path{"\\\\" + decoded_host};
+      }
     }
 
-#ifdef _WIN32
-    if (unescaped_path.size() >= 3 && unescaped_path[0] == '/' &&
-        std::isalpha(static_cast<unsigned char>(unescaped_path[1])) &&
-        unescaped_path[2] == ':') {
-      return std::filesystem::path{unescaped_path.substr(1)};
-    }
-#endif
+    if (uri_path.has_value()) {
+      std::istringstream path_input{uri_path.value()};
+      uri_unescape(path_input, decoded_stream);
+      std::string decoded_path{decoded_stream.str()};
 
-    return std::filesystem::path{unescaped_path};
+      if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+          std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+          decoded_path[2] == ':') {
+        decoded_path = decoded_path.substr(1);
+        std::ranges::replace(decoded_path, '/', '\\');
+      }
+
+      return std::filesystem::path{decoded_path};
+    }
+
+    return std::filesystem::path{};
   }
 
-  const auto uri_path{this->path()};
   if (uri_path.has_value()) {
-    std::istringstream input{uri_path.value()};
-    std::ostringstream output;
-    uri_unescape(input, output);
-    return std::filesystem::path{output.str()};
+    std::ostringstream decoded_stream;
+    std::istringstream path_input{uri_path.value()};
+    uri_unescape(path_input, decoded_stream);
+    return std::filesystem::path{decoded_stream.str()};
   }
 
   return std::filesystem::path{};
