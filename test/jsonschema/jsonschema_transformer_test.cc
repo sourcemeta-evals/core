@@ -1187,3 +1187,136 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterate_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+
+  std::size_t count = 0;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    count++;
+  }
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterate_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::size_t count = 0;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    count++;
+    EXPECT_EQ(it->first, "example_rule_1");
+    EXPECT_EQ(it->second->name(), "example_rule_1");
+    EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+  }
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterate_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::size_t count = 0;
+  std::vector<std::string> rule_names;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    count++;
+    rule_names.push_back(it->first);
+    EXPECT_EQ(it->first, it->second->name());
+  }
+
+  EXPECT_EQ(count, 3);
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_3") != rule_names.end());
+}
+
+TEST(JSONSchema_transformer, iterate_with_range_for) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::size_t count = 0;
+  for (const auto &entry : bundle) {
+    count++;
+    EXPECT_EQ(entry.first, entry.second->name());
+  }
+  EXPECT_EQ(count, 2);
+}
+
+TEST(JSONSchema_transformer, iterate_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_TRUE(bundle.remove("example_rule_2"));
+
+  std::size_t count = 0;
+  std::vector<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    count++;
+    rule_names.push_back(entry.first);
+  }
+
+  EXPECT_EQ(count, 2);
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_3") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") == rule_names.end());
+}
+
+TEST(JSONSchema_transformer, iterate_cbegin_cend) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::size_t count = 0;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    count++;
+    EXPECT_EQ(it->first, it->second->name());
+  }
+  EXPECT_EQ(count, 2);
+}
+
+TEST(JSONSchema_transformer, iterate_const_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  const auto &const_bundle = bundle;
+
+  std::size_t count = 0;
+  for (auto it = const_bundle.begin(); it != const_bundle.end(); ++it) {
+    count++;
+    EXPECT_EQ(it->first, it->second->name());
+  }
+  EXPECT_EQ(count, 3);
+}
+
+TEST(JSONSchema_transformer, iterate_introspect_rule_properties) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule4>();
+
+  std::map<std::string, std::string> rule_messages;
+  for (const auto &entry : bundle) {
+    rule_messages[entry.second->name()] = entry.second->message();
+  }
+
+  EXPECT_EQ(rule_messages.size(), 3);
+  EXPECT_EQ(rule_messages["example_rule_1"], "Keyword foo is not permitted");
+  EXPECT_EQ(rule_messages["example_rule_2"], "Keyword bar is not permitted");
+  EXPECT_EQ(rule_messages["example_rule_4"], "Example rule 4");
+}
