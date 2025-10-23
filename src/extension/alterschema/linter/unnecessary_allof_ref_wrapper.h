@@ -52,7 +52,7 @@ public:
     return true;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     // Extract the $ref from the allOf wrapper
     auto ref_value = schema.at("allOf").at(0).at("$ref");
     schema.erase("allOf");
