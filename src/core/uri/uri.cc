@@ -786,4 +786,64 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+
+  // Handle file:// URIs
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+    const auto uri_path{this->path()};
+
+    // UNC path (Windows network path): file://server/share/file
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      std::string result = "\\\\";
+      result += uri_host.value();
+      if (uri_path.has_value()) {
+        // Decode the URI-encoded path
+        std::istringstream input{uri_path.value()};
+        std::ostringstream output;
+        uri_unescape(input, output);
+        std::string path_str = output.str();
+        std::ranges::replace(path_str, '/', '\\');
+        result += path_str;
+      }
+      return std::filesystem::path{result};
+    }
+
+    // Regular file:// URI
+    if (uri_path.has_value()) {
+      // Decode the URI-encoded path
+      std::istringstream input{uri_path.value()};
+      std::ostringstream output;
+      uri_unescape(input, output);
+      std::string path_str = output.str();
+
+      // Check if this is a Windows path (has drive letter)
+      // Format: /C:/path or /c:/path
+      if (path_str.size() >= 3 && path_str[0] == '/' &&
+          std::isalpha(static_cast<unsigned char>(path_str[1])) &&
+          path_str[2] == ':') {
+        // Remove leading slash and convert to Windows path
+        path_str = path_str.substr(1);
+        std::ranges::replace(path_str, '/', '\\');
+        return std::filesystem::path{path_str};
+      }
+
+      // Unix absolute path
+      return std::filesystem::path{path_str};
+    }
+
+    // Empty file:// URI
+    return std::filesystem::path{};
+  }
+
+  // For non-file URIs, return the path component
+  const auto uri_path{this->path()};
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
