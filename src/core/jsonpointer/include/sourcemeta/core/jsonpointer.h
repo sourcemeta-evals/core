@@ -587,17 +587,7 @@ auto to_json(const T &value) -> JSON {
 /// Deserialise a Pointer from JSON
 template <typename T>
   requires std::is_same_v<T, Pointer>
-auto from_json(const JSON &value) -> std::optional<T> {
-  if (!value.is_string()) {
-    return std::nullopt;
-  }
-
-  try {
-    return to_pointer(value.to_string());
-  } catch (const PointerParseError &) {
-    return std::nullopt;
-  }
-}
+auto from_json(const JSON &value) -> std::optional<T>;
 
 } // namespace sourcemeta::core
 
