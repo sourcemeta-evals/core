@@ -271,9 +271,6 @@ public:
       // by definition change the score
       -> std::pair<bool, std::uint8_t>;
 
-  [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
-  [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
-
   /// Get the number of registered rules
   [[nodiscard]] auto size() const -> std::size_t;
 
