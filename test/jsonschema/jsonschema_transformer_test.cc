@@ -1187,3 +1187,132 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iteration_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_TRUE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iteration_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 1);
+  EXPECT_TRUE(bundle.contains("example_rule_1"));
+  EXPECT_FALSE(bundle.contains("nonexistent"));
+
+  const auto &rule = bundle.at("example_rule_1");
+  EXPECT_EQ(rule.name(), "example_rule_1");
+  EXPECT_EQ(rule.message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, iteration_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 3);
+  EXPECT_TRUE(bundle.contains("example_rule_1"));
+  EXPECT_TRUE(bundle.contains("example_rule_2"));
+  EXPECT_TRUE(bundle.contains("example_rule_3"));
+  EXPECT_FALSE(bundle.contains("nonexistent"));
+}
+
+TEST(JSONSchema_transformer, iteration_at_throws_on_missing) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_THROW(bundle.at("nonexistent"), std::out_of_range);
+}
+
+TEST(JSONSchema_transformer, iteration_for_loop) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::vector<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    rule_names.push_back(entry.second->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+  EXPECT_EQ(rule_names[2], "example_rule_3");
+}
+
+TEST(JSONSchema_transformer, iteration_explicit_iterators) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> rule_names;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    rule_names.push_back(it->second->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+}
+
+TEST(JSONSchema_transformer, iteration_const_iterators) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> rule_names;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    rule_names.push_back(it->second->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+}
+
+TEST(JSONSchema_transformer, iteration_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_EQ(bundle.size(), 3);
+  EXPECT_TRUE(bundle.contains("example_rule_2"));
+
+  bundle.remove("example_rule_2");
+
+  EXPECT_EQ(bundle.size(), 2);
+  EXPECT_FALSE(bundle.contains("example_rule_2"));
+  EXPECT_TRUE(bundle.contains("example_rule_1"));
+  EXPECT_TRUE(bundle.contains("example_rule_3"));
+
+  std::vector<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    rule_names.push_back(entry.second->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_3");
+}
+
+TEST(JSONSchema_transformer, iteration_rule_properties) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  for (const auto &entry : bundle) {
+    const auto &rule = *entry.second;
+    EXPECT_FALSE(rule.name().empty());
+    EXPECT_FALSE(rule.message().empty());
+    EXPECT_EQ(entry.first, rule.name());
+  }
+}

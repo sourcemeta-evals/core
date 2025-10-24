@@ -242,6 +242,37 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// Get the number of registered rules
+  [[nodiscard]] auto size() const -> std::size_t;
+
+  /// Check if a rule with the given name is registered
+  [[nodiscard]] auto contains(const std::string &name) const -> bool;
+
+  /// Check if the transformer has no registered rules
+  [[nodiscard]] auto empty() const -> bool;
+
+  /// Get a const reference to a rule by name
+  /// Throws std::out_of_range if the rule does not exist
+  [[nodiscard]] auto at(const std::string &name) const
+      -> const SchemaTransformRule &;
+
+  /// Iterator type for read-only access to rules
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> const_iterator;
+
+  /// Get iterator to the end of the rules
+  [[nodiscard]] auto end() const -> const_iterator;
+
+  /// Get iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const -> const_iterator;
+
+  /// Get iterator to the end of the rules
+  [[nodiscard]] auto cend() const -> const_iterator;
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
