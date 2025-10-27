@@ -28,6 +28,15 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_round_trip) {
+  const sourcemeta::core::Pointer pointer{"foo", "[\\-]", "bar"};
+  const auto json_value{sourcemeta::core::to_json(pointer)};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(json_value)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(pointer, result.value());
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
