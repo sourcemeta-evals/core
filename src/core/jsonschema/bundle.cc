@@ -248,6 +248,23 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const std::optional<std::string> &default_id,
             const std::optional<Pointer> &default_container,
             const SchemaFrame::Paths &paths) -> void {
+  // If a default_id is provided and the schema doesn't have an identifier,
+  // add it to make the bundled schema easier for consumers to process
+  if (default_id.has_value()) {
+    const auto existing_id{sourcemeta::core::identify(
+        schema, resolver,
+        sourcemeta::core::SchemaIdentificationStrategy::Strict, default_dialect,
+        std::nullopt)};
+    if (!existing_id.has_value()) {
+      const auto base_dialect{
+          sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+      if (base_dialect.has_value()) {
+        sourcemeta::core::reidentify(schema, default_id.value(),
+                                     base_dialect.value());
+      }
+    }
+  }
+
   SchemaFrame frame{SchemaFrame::Mode::References};
 
   if (default_container.has_value()) {
