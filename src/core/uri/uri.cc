@@ -786,4 +786,67 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+  const auto uri_host{this->host()};
+
+  // For file:// URIs, properly decode and handle Windows/UNIX paths
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    std::string result_path;
+
+    // Handle UNC paths (file://server/share/path)
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      // UNC path: \\server\share\path
+      std::istringstream host_input{std::string{uri_host.value()}};
+      std::ostringstream host_output;
+      uri_unescape(host_input, host_output);
+      result_path = "\\\\" + host_output.str();
+
+      if (uri_path.has_value() && !uri_path.value().empty()) {
+        std::istringstream path_input{uri_path.value()};
+        std::ostringstream path_output;
+        uri_unescape(path_input, path_output);
+        std::string decoded_path = path_output.str();
+        std::ranges::replace(decoded_path, '/', '\\');
+        result_path += decoded_path;
+      }
+
+      return std::filesystem::path{result_path};
+    }
+
+    // Handle regular file:// paths (both Windows and UNIX)
+    if (uri_path.has_value() && !uri_path.value().empty()) {
+      std::istringstream path_input{uri_path.value()};
+      std::ostringstream path_output;
+      uri_unescape(path_input, path_output);
+      std::string decoded_path = path_output.str();
+
+      // Check if it's a Windows path (starts with /C:/ or similar)
+      if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+          decoded_path[2] == ':') {
+        // Windows absolute path: remove leading slash and convert to
+        // backslashes
+        decoded_path = decoded_path.substr(1);
+        std::ranges::replace(decoded_path, '/', '\\');
+        return std::filesystem::path{decoded_path};
+      }
+
+      // UNIX absolute path
+      return std::filesystem::path{decoded_path};
+    }
+
+    // Empty path for file:// URI
+    return std::filesystem::path{"/"};
+  }
+
+  // For non-file:// URIs, return the path component
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  // No path component
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
