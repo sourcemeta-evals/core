@@ -644,7 +644,17 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 
   try {
-    return to_pointer(value.to_string());
+    const auto str = value.to_string();
+    // Check if the string is JSON-encoded (starts with a quote)
+    if (!str.empty() && str.front() == '"') {
+      // Parse the JSON-encoded string to get the plain string
+      const auto parsed = parse_json(str);
+      if (parsed.is_string()) {
+        return to_pointer(parsed.to_string());
+      }
+      return std::nullopt;
+    }
+    return to_pointer(str);
   } catch (const PointerParseError &) {
     return std::nullopt;
   }
