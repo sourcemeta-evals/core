@@ -786,4 +786,63 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+
+  // Handle file:// URIs
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+    const auto uri_path{this->path()};
+
+    // UNC path: file://server/share/path
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      std::ostringstream result;
+      std::istringstream host_input{std::string{uri_host.value()}};
+      uri_unescape(host_input, result);
+
+      if (uri_path.has_value()) {
+        std::istringstream path_input{uri_path.value()};
+        uri_unescape(path_input, result);
+      }
+
+      auto path_str{result.str()};
+      // Convert to UNC format: //server/share/path
+      std::ranges::replace(path_str, '/', '\\');
+      return std::filesystem::path{"\\\\" + path_str};
+    }
+
+    // Regular file path
+    if (uri_path.has_value()) {
+      std::ostringstream result;
+      std::istringstream path_input{uri_path.value()};
+      uri_unescape(path_input, result);
+      auto path_str{result.str()};
+
+      // Check if it's a Windows path (starts with /C:/ or similar)
+      if (path_str.size() >= 3 && path_str[0] == '/' &&
+          std::isalpha(static_cast<unsigned char>(path_str[1])) &&
+          path_str[2] == ':') {
+        // Remove leading slash and convert to Windows format
+        path_str = path_str.substr(1);
+        std::ranges::replace(path_str, '/', '\\');
+        return std::filesystem::path{path_str};
+      }
+
+      // Unix path - return as-is
+      return std::filesystem::path{path_str};
+    }
+
+    // Empty file:// URI
+    return std::filesystem::path{};
+  }
+
+  // Non-file:// URI - return the path component
+  const auto uri_path{this->path()};
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
