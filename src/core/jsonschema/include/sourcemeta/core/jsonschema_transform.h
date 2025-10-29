@@ -217,6 +217,12 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const noexcept { return this->rules.cbegin(); }
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto end() const noexcept { return this->rules.cend(); }
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///

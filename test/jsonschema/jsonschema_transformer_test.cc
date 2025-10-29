@@ -1187,3 +1187,80 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterate_rules_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  std::size_t count = 0;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    count++;
+  }
+
+  EXPECT_EQ(count, 0);
+}
+
+TEST(JSONSchema_transformer, iterate_rules_single) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::size_t count = 0;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    count++;
+    EXPECT_EQ(it->first, "example_rule_1");
+    EXPECT_EQ(it->second->name(), "example_rule_1");
+    EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+  }
+
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterate_rules_multiple) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::set<std::string> rule_names;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    rule_names.insert(it->first);
+    EXPECT_EQ(it->first, it->second->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, iterate_rules_range_based_for) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::size_t count = 0;
+  for (const auto &[name, rule] : bundle) {
+    count++;
+    EXPECT_EQ(name, rule->name());
+  }
+
+  EXPECT_EQ(count, 2);
+}
+
+TEST(JSONSchema_transformer, iterate_rules_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_TRUE(bundle.remove("example_rule_2"));
+
+  std::set<std::string> rule_names;
+  for (const auto &[name, rule] : bundle) {
+    rule_names.insert(name);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_FALSE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_3"));
+}
