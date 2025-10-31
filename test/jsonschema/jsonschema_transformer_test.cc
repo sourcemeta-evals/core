@@ -512,6 +512,67 @@ TEST(JSONSchema_transformer, check_no_match) {
   EXPECT_TRUE(entries.empty());
 }
 
+TEST(JSONSchema_transformer, iterator_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 0);
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_NE(bundle.begin(), bundle.end());
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 1);
+
+  auto it = bundle.begin();
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_NE(it->second, nullptr);
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_EQ(std::distance(bundle.begin(), bundle.end()), 3);
+
+  std::set<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    EXPECT_NE(entry.second, nullptr);
+    rule_names.insert(entry.first);
+    EXPECT_EQ(entry.first, entry.second->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+  EXPECT_TRUE(rule_names.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, iterator_cbegin_cend) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_EQ(std::distance(bundle.cbegin(), bundle.cend()), 2);
+
+  std::set<std::string> rule_names;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    EXPECT_NE(it->second, nullptr);
+    rule_names.insert(it->first);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(rule_names.contains("example_rule_1"));
+  EXPECT_TRUE(rule_names.contains("example_rule_2"));
+}
+
 TEST(JSONSchema_transformer, check_empty) {
   sourcemeta::core::SchemaTransformer bundle;
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
