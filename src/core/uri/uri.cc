@@ -808,7 +808,7 @@ auto URI::to_path() const -> std::filesystem::path {
       return std::filesystem::path{unc_path.str()};
     }
 
-    if (!path_string.empty() && path_string.size() >= 2 &&
+    if (!path_string.empty() && path_string.size() >= 3 &&
         path_string[0] == '/' && path_string[2] == ':') {
       return std::filesystem::path{path_string.substr(1)};
     }
