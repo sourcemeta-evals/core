@@ -42,6 +42,12 @@ public:
       return false;
     }
 
+    // Only handle the simple case where the branch contains ONLY $ref
+    // If there are other keywords, UnnecessaryAllOfWrapperModern will handle it
+    if (branch.size() != 1) {
+      return false;
+    }
+
     // The schema must not have $ref as a sibling to allOf
     // (otherwise we can't safely extract)
     if (schema.defines("$ref")) {
@@ -55,12 +61,14 @@ public:
     // Extract the single branch from allOf
     auto branch = schema.at("allOf").at(0);
 
+    // Move all properties from the branch to the parent schema
+    // Use try_assign_before to maintain keyword ordering (insert before
+    // "allOf")
+    for (const auto &entry : branch.as_object()) {
+      schema.try_assign_before(entry.first, entry.second, "allOf");
+    }
+
     // Remove the allOf keyword
     schema.erase("allOf");
-
-    // Move all properties from the branch to the parent schema
-    for (const auto &entry : branch.as_object()) {
-      schema.assign(entry.first, entry.second);
-    }
   }
 };
