@@ -652,4 +652,104 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash specialization for Pointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is computed in O(1) time by sampling the
+/// first, last, and middle tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+    const auto size = pointer.size();
+
+    const auto &first_token = pointer.at(0);
+    if (first_token.is_property()) {
+      const auto hash = first_token.property_hash();
+      result ^= static_cast<std::size_t>(hash.a);
+    } else {
+      result ^= static_cast<std::size_t>(first_token.to_index());
+    }
+
+    if (size > 1) {
+      const auto &last_token = pointer.back();
+      if (last_token.is_property()) {
+        const auto hash = last_token.property_hash();
+        result ^= (static_cast<std::size_t>(hash.a) << 1);
+      } else {
+        result ^= (static_cast<std::size_t>(last_token.to_index()) << 1);
+      }
+    }
+
+    if (size > 2) {
+      const auto &middle_token = pointer.at(size / 2);
+      if (middle_token.is_property()) {
+        const auto hash = middle_token.property_hash();
+        result ^= (static_cast<std::size_t>(hash.a) << 2);
+      } else {
+        result ^= (static_cast<std::size_t>(middle_token.to_index()) << 2);
+      }
+    }
+
+    result ^= (static_cast<std::size_t>(size) << 3);
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash specialization for WeakPointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is computed in O(1) time by sampling the
+/// first, last, and middle tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+    const auto size = pointer.size();
+
+    const auto &first_token = pointer.at(0);
+    if (first_token.is_property()) {
+      const auto hash = first_token.property_hash();
+      result ^= static_cast<std::size_t>(hash.a);
+    } else {
+      result ^= static_cast<std::size_t>(first_token.to_index());
+    }
+
+    if (size > 1) {
+      const auto &last_token = pointer.back();
+      if (last_token.is_property()) {
+        const auto hash = last_token.property_hash();
+        result ^= (static_cast<std::size_t>(hash.a) << 1);
+      } else {
+        result ^= (static_cast<std::size_t>(last_token.to_index()) << 1);
+      }
+    }
+
+    if (size > 2) {
+      const auto &middle_token = pointer.at(size / 2);
+      if (middle_token.is_property()) {
+        const auto hash = middle_token.property_hash();
+        result ^= (static_cast<std::size_t>(hash.a) << 2);
+      } else {
+        result ^= (static_cast<std::size_t>(middle_token.to_index()) << 2);
+      }
+    }
+
+    result ^= (static_cast<std::size_t>(size) << 3);
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
