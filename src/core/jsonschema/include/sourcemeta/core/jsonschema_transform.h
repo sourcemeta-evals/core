@@ -242,6 +242,97 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// A read-only view of a rule for introspection purposes.
+  /// This provides access to the name and message of a registered rule
+  /// without exposing the full rule implementation.
+  class RuleView {
+  public:
+    RuleView(const SchemaTransformRule &rule) : rule_{rule} {}
+
+    /// Get the name of the rule
+    [[nodiscard]] auto name() const -> const std::string & {
+      return this->rule_.name();
+    }
+
+    /// Get the message of the rule
+    [[nodiscard]] auto message() const -> const std::string & {
+      return this->rule_.message();
+    }
+
+  private:
+    const SchemaTransformRule &rule_;
+  };
+
+  /// Iterator type for iterating over rules in read-only mode
+  class RuleIterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = RuleView;
+    using reference = RuleView;
+
+    class pointer {
+    public:
+      explicit pointer(RuleView view) : view_(view) {}
+      auto operator->() const -> const RuleView * { return &view_; }
+
+    private:
+      RuleView view_;
+    };
+
+    RuleIterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : it_(it) {}
+
+    auto operator*() const -> reference { return RuleView(*this->it_->second); }
+
+    auto operator->() const -> pointer {
+      return pointer(RuleView(*this->it_->second));
+    }
+
+    auto operator++() -> RuleIterator & {
+      ++this->it_;
+      return *this;
+    }
+
+    auto operator++(int) -> RuleIterator {
+      RuleIterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    friend auto operator==(const RuleIterator &a, const RuleIterator &b)
+        -> bool {
+      return a.it_ == b.it_;
+    }
+
+    friend auto operator!=(const RuleIterator &a, const RuleIterator &b)
+        -> bool {
+      return a.it_ != b.it_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it_;
+  };
+
+  /// Get an iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> RuleIterator {
+    return RuleIterator(this->rules.begin());
+  }
+
+  /// Get an iterator to the end of the rules
+  [[nodiscard]] auto end() const -> RuleIterator {
+    return RuleIterator(this->rules.end());
+  }
+
+  /// Get the number of rules in the transformer
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
+
+  /// Check if the transformer has no rules
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
