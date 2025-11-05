@@ -786,4 +786,70 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+
+  // Handle file:// URIs
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+    const auto uri_path{this->path()};
+
+    // Decode the path component
+    std::string decoded_path;
+    if (uri_path.has_value()) {
+      std::istringstream input{uri_path.value()};
+      std::ostringstream output;
+      uri_unescape(input, output);
+      decoded_path = output.str();
+    }
+
+    // Handle UNC paths (Windows network paths)
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      // UNC path: file://host/share/path -> \\host\share\path
+      std::string unc_path = "\\\\";
+
+      // Decode the host
+      std::istringstream host_input{std::string{uri_host.value()}};
+      std::ostringstream host_output;
+      uri_unescape(host_input, host_output);
+      unc_path += host_output.str();
+
+      // Add the path part
+      if (!decoded_path.empty()) {
+        std::ranges::replace(decoded_path, '/', '\\');
+        unc_path += decoded_path;
+      }
+
+      return std::filesystem::path{unc_path};
+    }
+
+    // Regular file path
+    if (!decoded_path.empty()) {
+      // Check if it's a Windows drive path (starts with /C:/ or similar)
+      if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+          decoded_path[2] == ':') {
+        // Windows path: file:///C:/path -> C:\path
+        std::string windows_path = decoded_path.substr(1);
+        std::ranges::replace(windows_path, '/', '\\');
+        return std::filesystem::path{windows_path};
+      }
+
+      // Unix absolute path: file:///path -> /path
+      return std::filesystem::path{decoded_path};
+    }
+
+    // Empty path
+    return std::filesystem::path{"/"};
+  }
+
+  // For non-file:// URIs, return the path component
+  const auto uri_path{this->path()};
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  // No path component
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
