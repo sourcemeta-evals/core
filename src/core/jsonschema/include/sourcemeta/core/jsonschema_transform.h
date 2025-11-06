@@ -242,6 +242,83 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// A read-only view of a rule for introspection
+  class RuleView {
+  public:
+    RuleView(const SchemaTransformRule *rule) : rule_(rule) {}
+
+    [[nodiscard]] auto name() const -> const std::string & {
+      return rule_->name();
+    }
+
+    [[nodiscard]] auto message() const -> const std::string & {
+      return rule_->message();
+    }
+
+  private:
+    const SchemaTransformRule *rule_;
+  };
+
+  /// Iterator type for iterating over rules
+  class RuleIterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = RuleView;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const SchemaTransformRule *;
+    using reference = RuleView;
+
+    RuleIterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : it_(it) {}
+
+    auto operator*() const -> RuleView { return RuleView{it_->second.get()}; }
+
+    auto operator->() const -> const SchemaTransformRule * {
+      return it_->second.get();
+    }
+
+    auto operator++() -> RuleIterator & {
+      ++it_;
+      return *this;
+    }
+
+    auto operator++(int) -> RuleIterator {
+      RuleIterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    auto operator==(const RuleIterator &other) const -> bool {
+      return it_ == other.it_;
+    }
+
+    auto operator!=(const RuleIterator &other) const -> bool {
+      return it_ != other.it_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it_;
+  };
+
+  /// Get an iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> RuleIterator {
+    return RuleIterator(this->rules.begin());
+  }
+
+  /// Get an iterator to the end of the rules
+  [[nodiscard]] auto end() const -> RuleIterator {
+    return RuleIterator(this->rules.end());
+  }
+
+  /// Get the number of rules in the transformer
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
+
+  /// Check if the transformer has no rules
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
