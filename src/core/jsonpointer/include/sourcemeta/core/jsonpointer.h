@@ -652,4 +652,80 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+    const auto size = pointer.size();
+
+    auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    if (size == 1) {
+      result = hash_token(pointer.at(0));
+    } else if (size == 2) {
+      const auto h0 = hash_token(pointer.at(0));
+      const auto h1 = hash_token(pointer.at(1));
+      result = h0 ^ (h1 << 1);
+    } else {
+      const auto h_first = hash_token(pointer.at(0));
+      const auto h_middle = hash_token(pointer.at(size / 2));
+      const auto h_last = hash_token(pointer.at(size - 1));
+      result = h_first ^ (h_middle << 1) ^ (h_last << 2);
+    }
+
+    return result ^ (size << 3);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+    const auto size = pointer.size();
+
+    auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    if (size == 1) {
+      result = hash_token(pointer.at(0));
+    } else if (size == 2) {
+      const auto h0 = hash_token(pointer.at(0));
+      const auto h1 = hash_token(pointer.at(1));
+      result = h0 ^ (h1 << 1);
+    } else {
+      const auto h_first = hash_token(pointer.at(0));
+      const auto h_middle = hash_token(pointer.at(size / 2));
+      const auto h_last = hash_token(pointer.at(size - 1));
+      result = h_first ^ (h_middle << 1) ^ (h_last << 2);
+    }
+
+    return result ^ (size << 3);
+  }
+};
+
+} // namespace std
+
 #endif
