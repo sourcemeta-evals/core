@@ -14,7 +14,6 @@ vendor/jsonschema-test-suite
 .gitattributes
 Brewfile
 Brewfile.lock.json
-vendor/bearssl.mask
 vendor/boost-regex.mask
 vendor/googlebenchmark.mask
 vendor/googletest.mask
@@ -31,4 +30,3 @@ vendor/jsontestsuite.mask
 vendor/referencing-suite.mask
 vendor/uriparser.mask
 vendor/yaml.mask
-vendor/zlib.mask
