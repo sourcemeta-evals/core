@@ -271,25 +271,26 @@ public:
       // by definition change the score
       -> std::pair<bool, std::uint8_t>;
 
-  [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
-  [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
-
   /// Iterator type for read-only access to rules
   using const_iterator =
       std::map<std::string,
                std::unique_ptr<SchemaTransformRule>>::const_iterator;
 
   /// Get iterator to the beginning of the rules
-  [[nodiscard]] auto begin() const -> const_iterator;
+  [[nodiscard]] auto begin() const -> const_iterator {
+    return this->rules.cbegin();
+  }
 
   /// Get iterator to the end of the rules
-  [[nodiscard]] auto end() const -> const_iterator;
+  [[nodiscard]] auto end() const -> const_iterator {
+    return this->rules.cend();
+  }
 
   /// Get the number of registered rules
-  [[nodiscard]] auto size() const -> std::size_t;
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
 
   /// Check if the transformer has no rules
-  [[nodiscard]] auto empty() const -> bool;
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
 
 private:
 // Exporting symbols that depends on the standard C++ library is considered
