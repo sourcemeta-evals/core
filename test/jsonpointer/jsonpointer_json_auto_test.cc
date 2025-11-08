@@ -28,6 +28,37 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, pattern_properties_with_backslash) {
+  // This simulates the patternProperties case with a backslash in the key
+  // The pointer should be: /patternProperties/[\\-]
+  const sourcemeta::core::Pointer pointer{"patternProperties", "[\\-]"};
+
+  // Serialize to JSON
+  const auto serialized{sourcemeta::core::to_json(pointer)};
+
+  // Deserialize back
+  const auto deserialized{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(serialized)};
+
+  EXPECT_TRUE(deserialized.has_value());
+  EXPECT_EQ(pointer, deserialized.value());
+}
+
+TEST(JSONPointer_json_auto, pattern_properties_double_backslash) {
+  // Test with double backslash which is common in regex patterns
+  const sourcemeta::core::Pointer pointer{"patternProperties", "[\\\\-]"};
+
+  // Serialize to JSON
+  const auto serialized{sourcemeta::core::to_json(pointer)};
+
+  // Deserialize back
+  const auto deserialized{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(serialized)};
+
+  EXPECT_TRUE(deserialized.has_value());
+  EXPECT_EQ(pointer, deserialized.value());
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
