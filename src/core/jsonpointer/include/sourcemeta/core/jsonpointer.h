@@ -652,4 +652,144 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+// Hash support for Pointer and WeakPointer to enable use in
+// std::unordered_map and std::unordered_set
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash specialization for Pointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling the first, last, and
+/// middle tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    // Empty pointer has hash 0
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+
+    // Helper to hash a single token
+    auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        // Use both members of the pre-computed property hash for better
+        // distribution
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a) ^
+               (static_cast<std::size_t>(prop_hash.b) << 11);
+      } else {
+        // For integer tokens, use the index itself
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first token
+    result = hash_token(pointer.at(0));
+
+    // Sample last token if different from first
+    if (size > 1) {
+      const std::size_t last_hash = hash_token(pointer.back());
+      result ^= (last_hash << 7) | (last_hash >> (sizeof(std::size_t) * 8 - 7));
+    }
+
+    // Sample middle token if we have at least 3 tokens
+    if (size > 2) {
+      const std::size_t mid_hash = hash_token(pointer.at(size / 2));
+      result ^= (mid_hash << 13) | (mid_hash >> (sizeof(std::size_t) * 8 - 13));
+    }
+
+    // Sample one-third position if we have at least 4 tokens
+    if (size > 3) {
+      const std::size_t third_hash = hash_token(pointer.at(size / 3));
+      result ^=
+          (third_hash << 17) | (third_hash >> (sizeof(std::size_t) * 8 - 17));
+    }
+
+    // Sample two-thirds position if we have at least 5 tokens
+    if (size > 4) {
+      const std::size_t twothird_hash = hash_token(pointer.at((size * 2) / 3));
+      result ^= (twothird_hash << 23) |
+                (twothird_hash >> (sizeof(std::size_t) * 8 - 23));
+    }
+
+    // Mix in the size to differentiate pointers with same sampled tokens
+    result ^= (size << 19) | (size >> (sizeof(std::size_t) * 8 - 19));
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash specialization for WeakPointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling the first, last, and
+/// middle tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    // Empty pointer has hash 0
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+
+    // Helper to hash a single token
+    auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        // Use both members of the pre-computed property hash for better
+        // distribution
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a) ^
+               (static_cast<std::size_t>(prop_hash.b) << 11);
+      } else {
+        // For integer tokens, use the index itself
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first token
+    result = hash_token(pointer.at(0));
+
+    // Sample last token if different from first
+    if (size > 1) {
+      const std::size_t last_hash = hash_token(pointer.back());
+      result ^= (last_hash << 7) | (last_hash >> (sizeof(std::size_t) * 8 - 7));
+    }
+
+    // Sample middle token if we have at least 3 tokens
+    if (size > 2) {
+      const std::size_t mid_hash = hash_token(pointer.at(size / 2));
+      result ^= (mid_hash << 13) | (mid_hash >> (sizeof(std::size_t) * 8 - 13));
+    }
+
+    // Sample one-third position if we have at least 4 tokens
+    if (size > 3) {
+      const std::size_t third_hash = hash_token(pointer.at(size / 3));
+      result ^=
+          (third_hash << 17) | (third_hash >> (sizeof(std::size_t) * 8 - 17));
+    }
+
+    // Sample two-thirds position if we have at least 5 tokens
+    if (size > 4) {
+      const std::size_t twothird_hash = hash_token(pointer.at((size * 2) / 3));
+      result ^= (twothird_hash << 23) |
+                (twothird_hash >> (sizeof(std::size_t) * 8 - 23));
+    }
+
+    // Mix in the size to differentiate pointers with same sampled tokens
+    result ^= (size << 19) | (size >> (sizeof(std::size_t) * 8 - 19));
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
