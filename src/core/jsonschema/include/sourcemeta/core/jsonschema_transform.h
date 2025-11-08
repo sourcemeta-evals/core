@@ -242,6 +242,70 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// A read-only view of a registered rule
+  struct RuleView {
+    const std::string &name;
+    const std::string &message;
+  };
+
+  /// Iterator for read-only access to registered rules
+  class ConstIterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = RuleView;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const RuleView *;
+    using reference = const RuleView &;
+
+    ConstIterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : it_{it} {}
+
+    auto operator*() const -> RuleView {
+      return RuleView{it_->first, it_->second->message()};
+    }
+
+    auto operator++() -> ConstIterator & {
+      ++it_;
+      return *this;
+    }
+
+    auto operator++(int) -> ConstIterator {
+      ConstIterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    auto operator==(const ConstIterator &other) const -> bool {
+      return it_ == other.it_;
+    }
+
+    auto operator!=(const ConstIterator &other) const -> bool {
+      return it_ != other.it_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it_;
+  };
+
+  /// Get an iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> ConstIterator {
+    return ConstIterator{this->rules.begin()};
+  }
+
+  /// Get an iterator to the end of the rules
+  [[nodiscard]] auto end() const -> ConstIterator {
+    return ConstIterator{this->rules.end()};
+  }
+
+  /// Get the number of registered rules
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
+
+  /// Check if the transformer has no registered rules
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
