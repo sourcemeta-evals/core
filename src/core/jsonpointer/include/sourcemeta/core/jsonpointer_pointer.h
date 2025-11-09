@@ -612,4 +612,86 @@ private:
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    std::size_t result = 0;
+    const auto size = pointer.size();
+
+    if (size == 0) {
+      return result;
+    }
+
+    if (size == 1) {
+      const auto &token = pointer.at(0);
+      if (token.is_property()) {
+        const auto property_hash = token.property_hash();
+        return static_cast<std::size_t>(property_hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    }
+
+    if (size == 2) {
+      const auto &first = pointer.at(0);
+      const auto &last = pointer.at(1);
+
+      std::size_t hash1 = 0;
+      std::size_t hash2 = 0;
+
+      if (first.is_property()) {
+        const auto property_hash = first.property_hash();
+        hash1 = static_cast<std::size_t>(property_hash.a);
+      } else {
+        hash1 = static_cast<std::size_t>(first.to_index());
+      }
+
+      if (last.is_property()) {
+        const auto property_hash = last.property_hash();
+        hash2 = static_cast<std::size_t>(property_hash.a);
+      } else {
+        hash2 = static_cast<std::size_t>(last.to_index());
+      }
+
+      return hash1 ^ (hash2 << 1);
+    }
+
+    const auto &first = pointer.at(0);
+    const auto &middle = pointer.at(size / 2);
+    const auto &last = pointer.at(size - 1);
+
+    std::size_t hash1 = 0;
+    std::size_t hash2 = 0;
+    std::size_t hash3 = 0;
+
+    if (first.is_property()) {
+      const auto property_hash = first.property_hash();
+      hash1 = static_cast<std::size_t>(property_hash.a);
+    } else {
+      hash1 = static_cast<std::size_t>(first.to_index());
+    }
+
+    if (middle.is_property()) {
+      const auto property_hash = middle.property_hash();
+      hash2 = static_cast<std::size_t>(property_hash.a);
+    } else {
+      hash2 = static_cast<std::size_t>(middle.to_index());
+    }
+
+    if (last.is_property()) {
+      const auto property_hash = last.property_hash();
+      hash3 = static_cast<std::size_t>(property_hash.a);
+    } else {
+      hash3 = static_cast<std::size_t>(last.to_index());
+    }
+
+    return hash1 ^ (hash2 << 1) ^ (hash3 << 2);
+  }
+};
+
+} // namespace std
+
 #endif
