@@ -612,4 +612,51 @@ private:
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// std::hash specialization for GenericPointer to enable use with
+/// std::unordered_map and std::unordered_set. The hash function is O(1)
+/// by sampling the first, last, and middle tokens.
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    const auto size = pointer.size();
+
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result = size;
+
+    const auto hash_token = [](const typename sourcemeta::core::GenericPointer<
+                                PropertyT, Hash>::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        const auto property_hash = token.property_hash();
+        return static_cast<std::size_t>(property_hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    result ^=
+        hash_token(pointer.at(0)) + 0x9e3779b9 + (result << 6) + (result >> 2);
+
+    if (size > 1) {
+      result ^= hash_token(pointer.at(size - 1)) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    }
+
+    if (size > 2) {
+      result ^= hash_token(pointer.at(size / 2)) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
