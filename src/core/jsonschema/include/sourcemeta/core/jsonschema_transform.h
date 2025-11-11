@@ -243,6 +243,84 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// A read-only view of a rule for introspection
+  class RuleView {
+  public:
+    RuleView(const std::string &rule_name, const std::string &rule_message)
+        : name_(rule_name), message_(rule_message) {}
+
+    [[nodiscard]] auto name() const -> const std::string & { return name_; }
+    [[nodiscard]] auto message() const -> const std::string & {
+      return message_;
+    }
+
+    auto operator->() const -> const RuleView * { return this; }
+
+  private:
+    const std::string &name_;
+    const std::string &message_;
+  };
+
+  /// Iterator type for iterating over rules
+  class RuleIterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = RuleView;
+    using pointer = RuleView;
+    using reference = RuleView;
+
+    RuleIterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : it_(it) {}
+
+    auto operator*() const -> RuleView {
+      return RuleView{it_->second->name(), it_->second->message()};
+    }
+
+    auto operator->() const -> RuleView {
+      return RuleView{it_->second->name(), it_->second->message()};
+    }
+
+    auto operator++() -> RuleIterator & {
+      ++it_;
+      return *this;
+    }
+
+    auto operator++(int) -> RuleIterator {
+      RuleIterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    friend auto operator==(const RuleIterator &a, const RuleIterator &b)
+        -> bool {
+      return a.it_ == b.it_;
+    }
+
+    friend auto operator!=(const RuleIterator &a, const RuleIterator &b)
+        -> bool {
+      return a.it_ != b.it_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it_;
+  };
+
+  /// Get an iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> RuleIterator;
+
+  /// Get an iterator to the end of the rules
+  [[nodiscard]] auto end() const -> RuleIterator;
+
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto size() const -> std::size_t;
+
+  /// Check if the bundle is empty
+  [[nodiscard]] auto empty() const -> bool;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
