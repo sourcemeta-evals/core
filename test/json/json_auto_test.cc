@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <map>
 #include <optional>
 #include <set>
@@ -43,8 +44,9 @@ TEST(JSON_auto, object_hash) {
   const auto result{sourcemeta::core::to_json(value)};
   EXPECT_TRUE(result.is_array());
   EXPECT_FALSE(result.empty());
-  const auto back{sourcemeta::core::from_json<
-      sourcemeta::core::JSON::Object::Container::hash_type>(result)};
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::JSON::Object::hash_type>(
+          result)};
   EXPECT_TRUE(back.has_value());
   EXPECT_EQ(value, back.value());
 }
@@ -108,6 +110,31 @@ TEST(JSON_auto, optional_without_value_2) {
   EXPECT_EQ(result, expected);
   const auto back{
       sourcemeta::core::from_json<std::optional<std::size_t>>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(value, back.value());
+}
+
+TEST(JSON_auto, vector_strings_without_iterators) {
+  const std::vector<std::string> value{"foo", "bar", "baz"};
+  const auto result{sourcemeta::core::to_json(value)};
+
+  const auto expected{sourcemeta::core::parse_json(R"JSON([
+    "foo", "bar", "baz"
+  ])JSON")};
+
+  EXPECT_EQ(result, expected);
+  const auto back{
+      sourcemeta::core::from_json<std::vector<std::string>>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(value, back.value());
+}
+
+TEST(JSON_auto, vector_paths_without_iterators) {
+  const std::vector<std::filesystem::path> value{TEST_DIRECTORY};
+  const auto result{sourcemeta::core::to_json(value)};
+  EXPECT_EQ(result.size(), 1);
+  const auto back{
+      sourcemeta::core::from_json<std::vector<std::filesystem::path>>(result)};
   EXPECT_TRUE(back.has_value());
   EXPECT_EQ(value, back.value());
 }
@@ -235,6 +262,25 @@ TEST(JSON_auto, map_without_iterators) {
   EXPECT_EQ(value, back.value());
 }
 
+TEST(JSON_auto, map_of_map) {
+  const std::map<std::string, std::map<std::string, std::size_t>> value{
+      {"foo", {{"bar", 1}, {"baz", 2}}}};
+  const auto result{sourcemeta::core::to_json(value)};
+
+  const auto expected{sourcemeta::core::parse_json(R"JSON({
+    "foo": {
+      "bar": 1,
+      "baz": 2
+    }
+  })JSON")};
+
+  EXPECT_EQ(result, expected);
+  const auto back{sourcemeta::core::from_json<
+      std::map<std::string, std::map<std::string, std::size_t>>>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(value, back.value());
+}
+
 TEST(JSON_auto, map_without_iterators_and_transform) {
   const std::map<std::string, std::size_t> value{
       {"foo", 1}, {"bar", 2}, {"baz", 3}};
@@ -282,6 +328,16 @@ TEST(JSON_auto, unordered_set_without_iterators) {
   EXPECT_EQ(result, expected);
   const auto back{
       sourcemeta::core::from_json<std::unordered_set<std::string>>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(value, back.value());
+}
+
+TEST(JSON_auto, unsigned_long_long) {
+  const unsigned long long value{15};
+  const auto result{sourcemeta::core::to_json(value)};
+  const auto expected{sourcemeta::core::JSON{15}};
+  EXPECT_EQ(result, expected);
+  const auto back{sourcemeta::core::from_json<unsigned long long>(result)};
   EXPECT_TRUE(back.has_value());
   EXPECT_EQ(value, back.value());
 }
@@ -381,6 +437,86 @@ TEST(JSON_auto, tuple_4) {
   EXPECT_EQ(value, back.value());
 }
 
+TEST(JSON_auto, file_time_1) {
+  const std::filesystem::path file{std::filesystem::path{TEST_DIRECTORY} /
+                                   "stub_valid.json"};
+  EXPECT_TRUE(std::filesystem::exists(file));
+  const auto value{std::filesystem::last_write_time(file)};
+  const auto result{sourcemeta::core::to_json(value)};
+  EXPECT_TRUE(result.is_integer());
+  const auto back{
+      sourcemeta::core::from_json<std::filesystem::file_time_type>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(value, back.value());
+}
+
+TEST(JSON_auto, file_time_2) {
+  const std::filesystem::path file{std::filesystem::path{TEST_DIRECTORY} /
+                                   "stub_invalid_1.json"};
+  EXPECT_TRUE(std::filesystem::exists(file));
+  const auto value{std::filesystem::last_write_time(file)};
+  const auto result{sourcemeta::core::to_json(value)};
+  EXPECT_TRUE(result.is_integer());
+  const auto back{
+      sourcemeta::core::from_json<std::filesystem::file_time_type>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(value, back.value());
+}
+
+TEST(JSON_auto, file_time_3) {
+  const std::filesystem::path file{std::filesystem::path{TEST_DIRECTORY} /
+                                   "stub_invalid_2.json"};
+  EXPECT_TRUE(std::filesystem::exists(file));
+  const auto value{std::filesystem::last_write_time(file)};
+  const auto result{sourcemeta::core::to_json(value)};
+  EXPECT_TRUE(result.is_integer());
+  const auto back{
+      sourcemeta::core::from_json<std::filesystem::file_time_type>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(value, back.value());
+}
+
+TEST(JSON_auto, file_time_4) {
+  const std::filesystem::path file{std::filesystem::path{TEST_DIRECTORY} /
+                                   "stub_bigint.json"};
+  EXPECT_TRUE(std::filesystem::exists(file));
+  const auto value{std::filesystem::last_write_time(file)};
+  const auto result{sourcemeta::core::to_json(value)};
+  EXPECT_TRUE(result.is_integer());
+  const auto back{
+      sourcemeta::core::from_json<std::filesystem::file_time_type>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(value, back.value());
+}
+
+TEST(JSON_auto, file_time_idempotency) {
+  const std::filesystem::path file{std::filesystem::path{TEST_DIRECTORY} /
+                                   "stub_valid.json"};
+  EXPECT_TRUE(std::filesystem::exists(file));
+
+  const auto value_1{std::filesystem::last_write_time(file)};
+  const auto result_1{sourcemeta::core::to_json(value_1)};
+
+  const auto value_2{std::filesystem::last_write_time(file)};
+  const auto result_2{sourcemeta::core::to_json(value_2)};
+
+  const auto value_3{std::filesystem::last_write_time(file)};
+  const auto result_3{sourcemeta::core::to_json(value_3)};
+
+  EXPECT_EQ(result_1, result_2);
+  EXPECT_EQ(result_2, result_3);
+  EXPECT_EQ(result_3, result_1);
+}
+
+TEST(JSON_auto, filesystem_path) {
+  const std::filesystem::path value{TEST_DIRECTORY};
+  const auto result{sourcemeta::core::to_json(value)};
+  EXPECT_TRUE(result.is_string());
+  const auto back{sourcemeta::core::from_json<std::filesystem::path>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(value, back.value());
+}
+
 TEST(JSON_auto, from_json_invalid_bool) {
   const sourcemeta::core::JSON document{42};
   const auto result{sourcemeta::core::from_json<bool>(document)};
@@ -395,8 +531,9 @@ TEST(JSON_auto, from_json_invalid_integer) {
 
 TEST(JSON_auto, from_json_invalid_hash_1) {
   const sourcemeta::core::JSON document{true};
-  const auto result{sourcemeta::core::from_json<
-      sourcemeta::core::JSON::Object::Container::hash_type>(document)};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::JSON::Object::hash_type>(
+          document)};
   EXPECT_FALSE(result.has_value());
 }
 
@@ -405,8 +542,9 @@ TEST(JSON_auto, from_json_invalid_hash_2) {
     "foo", "bar", "baz"
   ])JSON")};
 
-  const auto result{sourcemeta::core::from_json<
-      sourcemeta::core::JSON::Object::Container::hash_type>(document)};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::JSON::Object::hash_type>(
+          document)};
   EXPECT_FALSE(result.has_value());
 }
 
@@ -415,8 +553,9 @@ TEST(JSON_auto, from_json_invalid_hash_3) {
     "foo", "bar", "baz", "qux"
   ])JSON")};
 
-  const auto result{sourcemeta::core::from_json<
-      sourcemeta::core::JSON::Object::Container::hash_type>(document)};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::JSON::Object::hash_type>(
+          document)};
   EXPECT_FALSE(result.has_value());
 }
 

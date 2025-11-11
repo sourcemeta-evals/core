@@ -1,6 +1,7 @@
 // See https://pyyaml.org/wiki/LibYAML for basic documentation
 #include <yaml.h>
 
+#include <sourcemeta/core/io.h>
 #include <sourcemeta/core/json_error.h>
 #include <sourcemeta/core/yaml.h>
 
@@ -143,6 +144,14 @@ auto read_yaml(const std::filesystem::path &path) -> JSON {
   std::ostringstream buffer;
   buffer << stream.rdbuf();
   return parse_yaml(buffer.str());
+}
+
+auto read_yaml_or_json(const std::filesystem::path &path,
+                       const JSON::ParseCallback &callback) -> JSON {
+  return path.extension() == ".yaml" || path.extension() == ".yml"
+             // TODO: We should be able to pass a parse callback to YAML
+             ? read_yaml(path)
+             : read_json(path, callback);
 }
 
 } // namespace sourcemeta::core
