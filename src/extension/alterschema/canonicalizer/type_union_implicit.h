@@ -37,6 +37,17 @@ public:
       return false;
     }
 
+    // Don't apply if enum is already present for Draft 1 and Draft 2
+    if (vocabularies.contains("http://json-schema.org/draft-02/schema#") &&
+        schema.defines("enum")) {
+      return false;
+    }
+
+    if (vocabularies.contains("http://json-schema.org/draft-01/schema#") &&
+        schema.defines("enum")) {
+      return false;
+    }
+
     if (vocabularies.contains(
             "https://json-schema.org/draft/2020-12/vocab/core") &&
         schema.defines_any({"$ref", "$dynamicRef"})) {
