@@ -28,6 +28,22 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_with_backslashes) {
+  // Test that backslashes in pointer tokens are preserved correctly
+  // This is the case that was failing with patternProperties like "[\\-]"
+  const sourcemeta::core::Pointer pointer{"patternProperties", "[\\-]"};
+  const auto json_result{sourcemeta::core::to_json(pointer)};
+  EXPECT_TRUE(json_result.is_string());
+
+  // Deserialize back and verify the backslashes are preserved
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(json_result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+  EXPECT_EQ(back.value().size(), 2);
+  EXPECT_EQ(back.value().at(1).to_property(), "[\\-]");
+}
+
 TEST(JSONPointer_json_auto, from_json_regex_backslash_value) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
     "value": "/[\\-]/type"
