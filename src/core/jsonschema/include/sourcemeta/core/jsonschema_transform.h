@@ -242,6 +242,61 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  /// A read-only iterator for introspecting registered rules
+  class ConstIterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = const SchemaTransformRule;
+    using pointer = const SchemaTransformRule *;
+    using reference = const SchemaTransformRule &;
+
+    ConstIterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : it_(it) {}
+
+    auto operator*() const -> reference { return *it_->second; }
+    auto operator->() const -> pointer { return it_->second.get(); }
+    auto operator++() -> ConstIterator & {
+      ++it_;
+      return *this;
+    }
+    auto operator++(int) -> ConstIterator {
+      ConstIterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+    friend auto operator==(const ConstIterator &a, const ConstIterator &b)
+        -> bool {
+      return a.it_ == b.it_;
+    }
+    friend auto operator!=(const ConstIterator &a, const ConstIterator &b)
+        -> bool {
+      return a.it_ != b.it_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it_;
+  };
+
+  /// Get an iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> ConstIterator {
+    return ConstIterator(this->rules.begin());
+  }
+
+  /// Get an iterator to the end of the rules
+  [[nodiscard]] auto end() const -> ConstIterator {
+    return ConstIterator(this->rules.end());
+  }
+
+  /// Get the number of registered rules
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
+
+  /// Check if the transformer has no rules
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
