@@ -60,7 +60,18 @@ sourcemeta_library(NAMESPACE sourcemeta PROJECT core NAME alterschema
     linter/max_contains_without_contains.h
     linter/min_contains_without_contains.h
     linter/modern_official_dialect_with_empty_fragment.h
-    linter/then_without_if.h)
+    linter/then_empty.h
+    linter/else_empty.h
+    linter/then_without_if.h
+    linter/property_names_type_default.h
+    linter/property_names_default.h
+    linter/draft_ref_siblings.h
+    linter/definitions_to_defs.h
+    linter/unknown_keywords_prefix.h
+    linter/non_applicable_enum_validation_keywords.h
+
+    # Strict
+    strict/required_properties_in_properties.h)
 
 if(SOURCEMETA_CORE_INSTALL)
   sourcemeta_library_install(NAMESPACE sourcemeta PROJECT core NAME alterschema)
