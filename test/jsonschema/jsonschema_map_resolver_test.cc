@@ -181,3 +181,54 @@ TEST(JSONSchema_SchemaMapResolver, embedded_resource_with_callback) {
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/test"));
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/string"));
 }
+
+TEST(JSONSchema_SchemaMapResolver, draft4_uses_id_keyword) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#"
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/test").has_value());
+  const auto resolved = resolver("https://www.sourcemeta.com/test").value();
+
+  // Verify that the resolved schema has "id" (not "$id") for Draft 4
+  EXPECT_TRUE(resolved.defines("id"));
+  EXPECT_EQ(resolved.at("id").to_string(), "https://www.sourcemeta.com/test");
+  EXPECT_EQ(resolved.at("$schema").to_string(),
+            "http://json-schema.org/draft-04/schema#");
+}
+
+TEST(JSONSchema_SchemaMapResolver, draft4_embedded_resource_uses_id) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "definitions": {
+      "string": {
+        "id": "string",
+        "type": "string"
+      }
+    }
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/test").has_value());
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/string").has_value());
+
+  const auto embedded = resolver("https://www.sourcemeta.com/string").value();
+
+  // Verify that the embedded schema has "id" (not "$id") for Draft 4
+  EXPECT_TRUE(embedded.defines("id"));
+  EXPECT_EQ(embedded.at("id").to_string(), "https://www.sourcemeta.com/string");
+  EXPECT_EQ(embedded.at("$schema").to_string(),
+            "http://json-schema.org/draft-04/schema#");
+  EXPECT_EQ(embedded.at("type").to_string(), "string");
+}
