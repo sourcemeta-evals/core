@@ -28,6 +28,19 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, pattern_properties_with_hyphen) {
+  // Test case for patternProperties with special characters like hyphens
+  // This reproduces the issue from the deno benchmark case
+  const sourcemeta::core::Pointer pointer{"patternProperties", "[\\-]"};
+  const auto result{sourcemeta::core::to_json(pointer)};
+  const sourcemeta::core::JSON expected{"/patternProperties/[\\-]"};
+  EXPECT_EQ(result, expected);
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
