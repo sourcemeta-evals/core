@@ -46,8 +46,7 @@ auto SchemaTransformRule::transform(JSON &, const Result &) const -> void {
 auto SchemaTransformRule::rereference(const std::string &reference,
                                       const Pointer &origin, const Pointer &,
                                       const Pointer &) const -> Pointer {
-  throw SchemaReferenceError(reference, origin,
-                             "The reference broke after transformation");
+  throw SchemaBrokenReferenceError(reference, origin);
 }
 
 auto SchemaTransformRule::apply(JSON &schema, const JSON &root,
