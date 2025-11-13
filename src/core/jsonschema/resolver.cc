@@ -35,7 +35,7 @@ auto SchemaMapResolver::add(
     // resolve their dialect and identifiers, otherwise the
     // consumer might have no idea what to do with them
     subschema.assign("$schema", JSON{entry.dialect});
-    sourcemeta::core::reidentify(subschema, key.second, entry.dialect);
+    reidentify(subschema, key.second, entry.base_dialect);
 
     const auto result{this->schemas.emplace(key.second, subschema)};
     if (!result.second && result.first->second != schema) {
