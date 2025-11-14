@@ -786,4 +786,52 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+
+  // Handle file:// URIs
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    std::ostringstream path_stream;
+
+    // Check if this is a UNC path (has a host)
+    const auto uri_host{this->host()};
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      // UNC path: \\host\share\path
+      path_stream << "\\\\" << uri_host.value();
+    }
+
+    // Get the path component
+    const auto uri_path{this->path()};
+    if (uri_path.has_value()) {
+      std::istringstream input{uri_path.value()};
+      std::ostringstream unescaped;
+      uri_unescape(input, unescaped);
+      std::string decoded_path{unescaped.str()};
+
+      // For Windows drive paths (e.g., /C:/...), we need to remove the leading
+      // slash
+      if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+          decoded_path[2] == ':' && std::isalpha(decoded_path[1])) {
+        decoded_path = decoded_path.substr(1);
+      }
+
+      path_stream << decoded_path;
+    }
+
+    return std::filesystem::path{path_stream.str()};
+  }
+
+  // For non-file:// URIs, return the path component
+  const auto uri_path{this->path()};
+  if (uri_path.has_value()) {
+    std::istringstream input{uri_path.value()};
+    std::ostringstream unescaped;
+    uri_unescape(input, unescaped);
+    return std::filesystem::path{unescaped.str()};
+  }
+
+  // If there's no path, return an empty path
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
