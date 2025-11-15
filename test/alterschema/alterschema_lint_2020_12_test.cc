@@ -3865,7 +3865,8 @@ TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_3) {
 
   LINT_AND_FIX_FOR_READABILITY(document);
 
-  // The existing UnnecessaryAllOfWrapperModern rule extracts keywords from branches
+  // The existing UnnecessaryAllOfWrapperModern rule extracts keywords from
+  // branches
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$ref": "https://example.com",
@@ -3885,7 +3886,8 @@ TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_4) {
 
   LINT_AND_FIX_FOR_READABILITY(document);
 
-  // The existing UnnecessaryAllOfWrapperModern rule extracts keywords from branches
+  // The existing UnnecessaryAllOfWrapperModern rule extracts keywords from
+  // branches
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$ref": "https://example.com",
