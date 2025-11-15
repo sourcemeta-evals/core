@@ -217,6 +217,66 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// A read-only view of a registered rule
+  struct RuleView {
+    const std::string &name;
+    const std::string &message;
+    const SchemaTransformRule &rule;
+  };
+
+  /// Iterator type for iterating over registered rules
+  class Iterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = RuleView;
+    using pointer = void;
+    using reference = RuleView;
+
+    Iterator(std::map<std::string,
+                      std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : it_(it) {}
+
+    auto operator*() const -> RuleView {
+      return RuleView{it_->first, it_->second->message(), *it_->second};
+    }
+
+    auto operator++() -> Iterator & {
+      ++it_;
+      return *this;
+    }
+
+    auto operator++(int) -> Iterator {
+      Iterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    friend auto operator==(const Iterator &a, const Iterator &b) -> bool {
+      return a.it_ == b.it_;
+    }
+
+    friend auto operator!=(const Iterator &a, const Iterator &b) -> bool {
+      return a.it_ != b.it_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it_;
+  };
+
+  /// Get an iterator to the beginning of the registered rules
+  [[nodiscard]] auto begin() const -> Iterator;
+
+  /// Get an iterator to the end of the registered rules
+  [[nodiscard]] auto end() const -> Iterator;
+
+  /// Get the number of registered rules
+  [[nodiscard]] auto size() const -> std::size_t;
+
+  /// Check if there are no registered rules
+  [[nodiscard]] auto empty() const -> bool;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
