@@ -63,10 +63,10 @@ public:
     // Extract the $ref from the allOf branch
     auto ref_value = schema.at("allOf").front().at("$ref");
 
+    // Add the $ref before allOf to preserve keyword ordering
+    schema.try_assign_before("$ref", std::move(ref_value), "allOf");
+
     // Remove the allOf keyword
     schema.erase("allOf");
-
-    // Add the $ref at the schema level
-    schema.assign("$ref", std::move(ref_value));
   }
 };
