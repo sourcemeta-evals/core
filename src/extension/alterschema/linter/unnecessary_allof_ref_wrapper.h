@@ -40,7 +40,7 @@ public:
     return single_branch.size() == 1;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     const auto &allof_value = schema.at("allOf");
     const auto &single_branch = allof_value.at(0);
     const auto ref_value = single_branch.at("$ref");
