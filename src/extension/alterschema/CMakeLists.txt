@@ -46,6 +46,7 @@ sourcemeta_library(NAMESPACE sourcemeta PROJECT core NAME alterschema
     linter/unevaluated_properties_default.h
     linter/unsatisfiable_max_contains.h
     linter/unsatisfiable_min_properties.h
+    linter/unnecessary_allof_ref_wrapper.h
     linter/content_media_type_without_encoding.h
     linter/content_schema_without_media_type.h
     linter/additional_items_with_schema_items.h
