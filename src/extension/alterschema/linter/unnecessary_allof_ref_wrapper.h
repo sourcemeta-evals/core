@@ -45,7 +45,8 @@ public:
     const auto &single_branch = allof_value.at(0);
     const auto ref_value = single_branch.at("$ref");
 
+    // Insert $ref before allOf to preserve keyword ordering
+    schema.try_assign_before("$ref", ref_value, "allOf");
     schema.erase("allOf");
-    schema.assign("$ref", ref_value);
   }
 };
