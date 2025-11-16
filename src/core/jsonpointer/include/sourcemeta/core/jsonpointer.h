@@ -652,4 +652,103 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+// std::hash specializations for Pointer and WeakPointer
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash specialization for sourcemeta::core::Pointer to enable use with
+/// std::unordered_map and std::unordered_set. The hash is O(1) by sampling
+/// the first, last, and middle tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    const auto size = pointer.size();
+    std::size_t result = size;
+
+    // Helper lambda to hash a single token
+    auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        // Use the first member of the pre-computed property hash
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a);
+      } else {
+        // For index tokens, use the index itself
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first token
+    result ^=
+        hash_token(pointer.at(0)) + 0x9e3779b9 + (result << 6) + (result >> 2);
+
+    // Sample last token (if different from first)
+    if (size > 1) {
+      result ^= hash_token(pointer.back()) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    }
+
+    // Sample middle token (if there are at least 3 tokens)
+    if (size > 2) {
+      result ^= hash_token(pointer.at(size / 2)) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    }
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash specialization for sourcemeta::core::WeakPointer to enable use with
+/// std::unordered_map and std::unordered_set. The hash is O(1) by sampling
+/// the first, last, and middle tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    const auto size = pointer.size();
+    std::size_t result = size;
+
+    // Helper lambda to hash a single token
+    auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        // Use the first member of the pre-computed property hash
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a);
+      } else {
+        // For index tokens, use the index itself
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first token
+    result ^=
+        hash_token(pointer.at(0)) + 0x9e3779b9 + (result << 6) + (result >> 2);
+
+    // Sample last token (if different from first)
+    if (size > 1) {
+      result ^= hash_token(pointer.back()) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    }
+
+    // Sample middle token (if there are at least 3 tokens)
+    if (size > 2) {
+      result ^= hash_token(pointer.at(size / 2)) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
