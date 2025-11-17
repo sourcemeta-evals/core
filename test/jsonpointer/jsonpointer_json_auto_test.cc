@@ -28,6 +28,17 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_with_special_chars) {
+  // Test case for patternProperties with special characters like [\-]
+  const sourcemeta::core::JSON input{"/[\\-]"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value().size(), 1);
+  EXPECT_TRUE(result.value().at(0).is_property());
+  EXPECT_EQ(result.value().at(0).to_property(), "[\\-]");
+}
+
 TEST(JSONPointer_json_auto, from_json_regex_backslash_value) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
     "value": "/[\\-]/type"
