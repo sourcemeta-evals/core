@@ -57,10 +57,10 @@ public:
     return true;
   }
 
-  auto transform(JSON &schema) const -> void override {
-    // Extract the $ref from the allOf wrapper
+  auto transform(JSON &schema, const Result &) const -> void override {
+    // Extract the $ref from the allOf wrapper, preserving keyword order
     auto ref_value = schema.at("allOf").at(0).at("$ref");
+    schema.try_assign_before("$ref", std::move(ref_value), "allOf");
     schema.erase("allOf");
-    schema.assign("$ref", std::move(ref_value));
   }
 };
