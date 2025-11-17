@@ -786,4 +786,71 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+
+  // Handle file:// URIs
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    std::ostringstream path_stream;
+
+    // Check if this is a UNC path (has a host component)
+    const auto uri_host{this->host()};
+    const bool is_unc{uri_host.has_value() && !uri_host.value().empty()};
+
+    // Get the path component
+    const auto uri_path{this->path()};
+
+    if (is_unc) {
+      // UNC path: \\host\share\path
+      path_stream << "\\\\";
+      // Unescape the host
+      std::istringstream host_input{std::string{uri_host.value()}};
+      uri_unescape(host_input, path_stream);
+    }
+
+    if (uri_path.has_value() && !uri_path.value().empty()) {
+      std::string path_str{uri_path.value()};
+
+      // Check if this is a Windows drive path (e.g., /C:/...)
+      const bool is_windows_drive =
+          path_str.size() >= 3 && path_str[0] == '/' &&
+          std::isalpha(static_cast<unsigned char>(path_str[1])) &&
+          path_str[2] == ':';
+
+      if (is_windows_drive && !is_unc) {
+        // Skip the leading slash for Windows drive paths
+        path_str = path_str.substr(1);
+      }
+
+      // Unescape the path
+      std::istringstream path_input{path_str};
+      uri_unescape(path_input, path_stream);
+    }
+
+    std::string result{path_stream.str()};
+
+    // Convert forward slashes to backslashes on Windows paths
+    if (is_unc || (result.size() >= 2 &&
+                   std::isalpha(static_cast<unsigned char>(result[0])) &&
+                   result[1] == ':')) {
+      std::ranges::replace(result, '/', '\\');
+    }
+
+    return std::filesystem::path{result};
+  }
+
+  // For non-file:// URIs, return the path component
+  const auto uri_path{this->path()};
+  if (uri_path.has_value()) {
+    // Unescape the path
+    std::istringstream path_input{uri_path.value()};
+    std::ostringstream path_output;
+    uri_unescape(path_input, path_output);
+    return std::filesystem::path{path_output.str()};
+  }
+
+  // Return empty path if no path component exists
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
