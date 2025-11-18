@@ -3,27 +3,25 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
-#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
 
 #include "jsonschema_transform_rules.h"
 
-static auto
-transformer_callback_noop(const sourcemeta::core::Pointer &,
-                          const std::string_view, const std::string_view,
-                          const sourcemeta::core::SchemaTransformRule::Result &)
-    -> void {}
+static auto transformer_callback_noop(const sourcemeta::core::Pointer &,
+                                      const std::string_view,
+                                      const std::string_view,
+                                      const std::string_view) -> void {}
 
 using TestTransformTraces =
     std::vector<std::tuple<sourcemeta::core::Pointer, std::string, std::string,
-                           sourcemeta::core::SchemaTransformRule::Result>>;
+                           std::string>>;
 
 static auto transformer_callback_trace(TestTransformTraces &traces) -> auto {
   return [&traces](const auto &pointer, const auto &name, const auto &message,
-                   const auto &result) {
-    traces.emplace_back(pointer, name, message, result);
+                   const auto &description) {
+    traces.emplace_back(pointer, name, message, description);
   };
 }
 
@@ -151,19 +149,10 @@ TEST(JSONSchema_transformer, throw_on_rules_called_twice) {
     "foo": "bar"
   })JSON");
 
-  try {
-    bundle.apply(document, sourcemeta::core::schema_official_walker,
-                 sourcemeta::core::schema_official_resolver,
-                 transformer_callback_noop);
-    FAIL();
-  } catch (
-      const sourcemeta::core::SchemaTransformRuleProcessedTwiceError &error) {
-    EXPECT_EQ(error.name(), "example_rule_1");
-    EXPECT_EQ(sourcemeta::core::to_string(error.location()), "");
-    SUCCEED();
-  } catch (...) {
-    FAIL();
-  }
+  EXPECT_THROW(bundle.apply(document, sourcemeta::core::schema_official_walker,
+                            sourcemeta::core::schema_official_resolver,
+                            transformer_callback_noop),
+               std::runtime_error);
 }
 
 TEST(JSONSchema_transformer, top_level_rule) {
@@ -465,7 +454,7 @@ TEST(JSONSchema_transformer, dialect_specific_rules_without_ids) {
 
 TEST(JSONSchema_transformer, check_top_level) {
   sourcemeta::core::SchemaTransformer bundle;
-  bundle.add<ExampleRule1WithPointer>();
+  bundle.add<ExampleRule1WithDescription>();
   bundle.add<ExampleRule2>();
 
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
@@ -479,153 +468,24 @@ TEST(JSONSchema_transformer, check_top_level) {
   })JSON");
 
   TestTransformTraces entries;
-  const auto result =
+  const bool result =
       bundle.check(document, sourcemeta::core::schema_official_walker,
                    sourcemeta::core::schema_official_resolver,
                    transformer_callback_trace(entries));
 
-  EXPECT_FALSE(result.first);
-  EXPECT_EQ(result.second, 0);
-
+  EXPECT_FALSE(result);
   EXPECT_EQ(entries.size(), 2);
 
   EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
   EXPECT_EQ(std::get<1>(entries.at(0)), "example_rule_1");
   EXPECT_EQ(std::get<2>(entries.at(0)), "Keyword foo is not permitted");
-  EXPECT_EQ(std::get<3>(entries.at(0)).locations.size(), 1);
-  EXPECT_EQ(
-      sourcemeta::core::to_string(std::get<3>(entries.at(0)).locations.at(0)),
-      "/foo");
-  EXPECT_FALSE(std::get<3>(entries.at(0)).description.has_value());
+  EXPECT_EQ(std::get<3>(entries.at(0)), "This is a message from the rule");
 
   EXPECT_EQ(std::get<0>(entries.at(1)),
             sourcemeta::core::Pointer({"properties", "xxx"}));
   EXPECT_EQ(std::get<1>(entries.at(1)), "example_rule_2");
   EXPECT_EQ(std::get<2>(entries.at(1)), "Keyword bar is not permitted");
-  EXPECT_EQ(std::get<3>(entries.at(1)).locations.size(), 0);
-  EXPECT_FALSE(std::get<3>(entries.at(1)).description.has_value());
-}
-
-TEST(JSONSchema_transformer, check_top_level_with_id) {
-  sourcemeta::core::SchemaTransformer bundle;
-  bundle.add<ExampleRule1>();
-
-  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://example.com",
-    "foo": "bar"
-  })JSON");
-
-  TestTransformTraces entries;
-  const auto result =
-      bundle.check(document, sourcemeta::core::schema_official_walker,
-                   sourcemeta::core::schema_official_resolver,
-                   transformer_callback_trace(entries));
-
-  EXPECT_FALSE(result.first);
-  EXPECT_EQ(result.second, 0);
-
-  EXPECT_EQ(entries.size(), 1);
-
-  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
-  EXPECT_EQ(std::get<1>(entries.at(0)), "example_rule_1");
-  EXPECT_EQ(std::get<2>(entries.at(0)), "Keyword foo is not permitted");
-  EXPECT_EQ(std::get<3>(entries.at(0)).locations.size(), 0);
-  EXPECT_FALSE(std::get<3>(entries.at(0)).description.has_value());
-}
-
-TEST(JSONSchema_transformer, check_top_level_with_id_and_default_id) {
-  sourcemeta::core::SchemaTransformer bundle;
-  bundle.add<ExampleRule1>();
-
-  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://example.com",
-    "foo": "bar"
-  })JSON");
-
-  TestTransformTraces entries;
-  const auto result = bundle.check(
-      document, sourcemeta::core::schema_official_walker,
-      sourcemeta::core::schema_official_resolver,
-      transformer_callback_trace(entries), std::nullopt, "https://other.com");
-
-  EXPECT_FALSE(result.first);
-  EXPECT_EQ(result.second, 0);
-
-  EXPECT_EQ(entries.size(), 1);
-
-  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
-  EXPECT_EQ(std::get<1>(entries.at(0)), "example_rule_1");
-  EXPECT_EQ(std::get<2>(entries.at(0)), "Keyword foo is not permitted");
-  EXPECT_EQ(std::get<3>(entries.at(0)).locations.size(), 0);
-  EXPECT_FALSE(std::get<3>(entries.at(0)).description.has_value());
-}
-
-TEST(JSONSchema_transformer, check_multiple_pointers) {
-  sourcemeta::core::SchemaTransformer bundle;
-  bundle.add<ExampleRuleWithManyPointers>();
-
-  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "foo": "bar",
-    "bar": "baz"
-  })JSON");
-
-  TestTransformTraces entries;
-  const auto result =
-      bundle.check(document, sourcemeta::core::schema_official_walker,
-                   sourcemeta::core::schema_official_resolver,
-                   transformer_callback_trace(entries));
-
-  EXPECT_FALSE(result.first);
-  EXPECT_EQ(result.second, 0);
-
-  EXPECT_EQ(entries.size(), 1);
-
-  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
-  EXPECT_EQ(std::get<1>(entries.at(0)), "example_rule_with_many_pointers");
-  EXPECT_EQ(std::get<2>(entries.at(0)), "Foo Bar");
-  EXPECT_EQ(std::get<3>(entries.at(0)).locations.size(), 2);
-  EXPECT_EQ(
-      sourcemeta::core::to_string(std::get<3>(entries.at(0)).locations.at(0)),
-      "/foo");
-  EXPECT_EQ(
-      sourcemeta::core::to_string(std::get<3>(entries.at(0)).locations.at(1)),
-      "/bar");
-  EXPECT_FALSE(std::get<3>(entries.at(0)).description.has_value());
-}
-
-TEST(JSONSchema_transformer, check_with_description) {
-  sourcemeta::core::SchemaTransformer bundle;
-  bundle.add<ExampleRule1WithDescription>();
-
-  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "foo": "bar"
-  })JSON");
-
-  TestTransformTraces entries;
-  const auto result =
-      bundle.check(document, sourcemeta::core::schema_official_walker,
-                   sourcemeta::core::schema_official_resolver,
-                   transformer_callback_trace(entries));
-
-  EXPECT_FALSE(result.first);
-  EXPECT_EQ(result.second, 0);
-
-  EXPECT_EQ(entries.size(), 1);
-
-  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
-  EXPECT_EQ(std::get<1>(entries.at(0)), "example_rule_1");
-  EXPECT_EQ(std::get<2>(entries.at(0)), "Keyword foo is not permitted");
-  EXPECT_EQ(std::get<3>(entries.at(0)).locations.size(), 1);
-  EXPECT_EQ(
-      sourcemeta::core::to_string(std::get<3>(entries.at(0)).locations.at(0)),
-      "/foo");
-  EXPECT_TRUE(std::get<3>(entries.at(0)).description.has_value());
-  EXPECT_EQ(std::get<3>(entries.at(0)).description.value(),
-            "This is a message from the rule");
+  EXPECT_EQ(std::get<3>(entries.at(1)), "");
 }
 
 TEST(JSONSchema_transformer, check_no_match) {
@@ -643,54 +503,13 @@ TEST(JSONSchema_transformer, check_no_match) {
   })JSON");
 
   TestTransformTraces entries;
-  const auto result =
+  const bool result =
       bundle.check(document, sourcemeta::core::schema_official_walker,
                    sourcemeta::core::schema_official_resolver,
                    transformer_callback_trace(entries));
 
-  EXPECT_TRUE(result.first);
-  EXPECT_EQ(result.second, 100);
-
+  EXPECT_TRUE(result);
   EXPECT_TRUE(entries.empty());
-}
-
-TEST(JSONSchema_transformer, check_partial_match) {
-  sourcemeta::core::SchemaTransformer bundle;
-  bundle.add<ExampleRule1>();
-
-  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "properties": {
-      "foo": {
-        "type": "string"
-      },
-      "bar": {
-        "type": "string",
-        "foo": 1
-      },
-      "baz": {
-        "type": "string"
-      }
-    }
-  })JSON");
-
-  TestTransformTraces entries;
-  const auto result =
-      bundle.check(document, sourcemeta::core::schema_official_walker,
-                   sourcemeta::core::schema_official_resolver,
-                   transformer_callback_trace(entries));
-
-  EXPECT_FALSE(result.first);
-  EXPECT_EQ(result.second, 75);
-
-  EXPECT_EQ(entries.size(), 1);
-
-  EXPECT_EQ(std::get<0>(entries.at(0)),
-            sourcemeta::core::Pointer({"properties", "bar"}));
-  EXPECT_EQ(std::get<1>(entries.at(0)), "example_rule_1");
-  EXPECT_EQ(std::get<2>(entries.at(0)), "Keyword foo is not permitted");
-  EXPECT_EQ(std::get<3>(entries.at(0)).locations.size(), 0);
-  EXPECT_FALSE(std::get<3>(entries.at(0)).description.has_value());
 }
 
 TEST(JSONSchema_transformer, check_empty) {
@@ -701,14 +520,12 @@ TEST(JSONSchema_transformer, check_empty) {
   })JSON");
 
   TestTransformTraces entries;
-  const auto result =
+  const bool result =
       bundle.check(document, sourcemeta::core::schema_official_walker,
                    sourcemeta::core::schema_official_resolver,
                    transformer_callback_trace(entries));
 
-  EXPECT_TRUE(result.first);
-  EXPECT_EQ(result.second, 100);
-
+  EXPECT_TRUE(result);
   EXPECT_TRUE(entries.empty());
 }
 
@@ -723,10 +540,9 @@ TEST(JSONSchema_transformer, check_throw_if_no_dialect_invalid_default) {
     "qux": "xxx"
   })JSON");
 
-  EXPECT_THROW((void)bundle.check(document,
-                                  sourcemeta::core::schema_official_walker,
-                                  sourcemeta::core::schema_official_resolver,
-                                  nullptr, "https://example.com/invalid"),
+  EXPECT_THROW(bundle.check(document, sourcemeta::core::schema_official_walker,
+                            sourcemeta::core::schema_official_resolver, nullptr,
+                            "https://example.com/invalid"),
                sourcemeta::core::SchemaResolutionError);
 }
 
@@ -745,29 +561,25 @@ TEST(JSONSchema_transformer, check_with_default_dialect) {
   })JSON");
 
   TestTransformTraces entries;
-  const auto result =
+  const bool result =
       bundle.check(document, sourcemeta::core::schema_official_walker,
                    sourcemeta::core::schema_official_resolver,
                    transformer_callback_trace(entries),
                    "https://json-schema.org/draft/2020-12/schema");
 
-  EXPECT_FALSE(result.first);
-  EXPECT_EQ(result.second, 0);
-
+  EXPECT_FALSE(result);
   EXPECT_EQ(entries.size(), 2);
 
   EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
   EXPECT_EQ(std::get<1>(entries.at(0)), "example_rule_1");
   EXPECT_EQ(std::get<2>(entries.at(0)), "Keyword foo is not permitted");
-  EXPECT_EQ(std::get<3>(entries.at(0)).locations.size(), 0);
-  EXPECT_FALSE(std::get<3>(entries.at(0)).description.has_value());
+  EXPECT_EQ(std::get<3>(entries.at(0)), "");
 
   EXPECT_EQ(std::get<0>(entries.at(1)),
             sourcemeta::core::Pointer({"properties", "xxx"}));
   EXPECT_EQ(std::get<1>(entries.at(1)), "example_rule_2");
   EXPECT_EQ(std::get<2>(entries.at(1)), "Keyword bar is not permitted");
-  EXPECT_EQ(std::get<3>(entries.at(1)).locations.size(), 0);
-  EXPECT_FALSE(std::get<3>(entries.at(1)).description.has_value());
+  EXPECT_EQ(std::get<3>(entries.at(1)), "");
 }
 
 TEST(JSONSchema_transformer, remove_rule_by_name) {
@@ -804,7 +616,7 @@ TEST(JSONSchema_transformer, remove_rule_by_name) {
   EXPECT_EQ(document, expected);
 }
 
-TEST(JSONSchema_transformer, unfixable_apply) {
+TEST(JSONSchema_transformer, unfixable_apply_without_description) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRuleUnfixable1>();
 
@@ -827,8 +639,43 @@ TEST(JSONSchema_transformer, unfixable_apply) {
   EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
   EXPECT_EQ(std::get<1>(entries.at(0)), "example_rule_unfixable_1");
   EXPECT_EQ(std::get<2>(entries.at(0)), "An example rule that cannot be fixed");
-  EXPECT_EQ(std::get<3>(entries.at(0)).locations.size(), 0);
-  EXPECT_FALSE(std::get<3>(entries.at(0)).description.has_value());
+  EXPECT_EQ(std::get<3>(entries.at(0)), "");
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "foo": "bar",
+    "bar": "baz",
+    "qux": "xxx"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_transformer, unfixable_apply_with_description) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRuleUnfixableWithDescription1>();
+
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "foo": "bar",
+    "bar": "baz",
+    "qux": "xxx"
+  })JSON");
+
+  TestTransformTraces entries;
+  const bool result =
+      bundle.apply(document, sourcemeta::core::schema_official_walker,
+                   sourcemeta::core::schema_official_resolver,
+                   transformer_callback_trace(entries));
+
+  EXPECT_FALSE(result);
+
+  EXPECT_EQ(entries.size(), 1);
+  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
+  EXPECT_EQ(std::get<1>(entries.at(0)),
+            "example_rule_unfixable_with_description_1");
+  EXPECT_EQ(std::get<2>(entries.at(0)), "An example rule that cannot be fixed");
+  EXPECT_EQ(std::get<3>(entries.at(0)), "The subschema cannot define foo");
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -852,19 +699,18 @@ TEST(JSONSchema_transformer, unfixable_check) {
   })JSON");
 
   TestTransformTraces entries;
-  const auto result =
+  const bool result =
       bundle.check(document, sourcemeta::core::schema_official_walker,
                    sourcemeta::core::schema_official_resolver,
                    transformer_callback_trace(entries));
 
-  EXPECT_FALSE(result.first);
+  EXPECT_FALSE(result);
   EXPECT_EQ(entries.size(), 1);
 
   EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
   EXPECT_EQ(std::get<1>(entries.at(0)), "example_rule_unfixable_1");
   EXPECT_EQ(std::get<2>(entries.at(0)), "An example rule that cannot be fixed");
-  EXPECT_EQ(std::get<3>(entries.at(0)).locations.size(), 0);
-  EXPECT_FALSE(std::get<3>(entries.at(0)).description.has_value());
+  EXPECT_EQ(std::get<3>(entries.at(0)), "");
 }
 
 TEST(JSONSchema_transformer, rereference_not_hit) {
@@ -922,12 +768,10 @@ TEST(JSONSchema_transformer, rereference_not_fixed_ref) {
                  sourcemeta::core::schema_official_resolver,
                  transformer_callback_trace(entries));
     FAIL() << "The transformation was expected to throw";
-  } catch (const sourcemeta::core::SchemaBrokenReferenceError &error) {
+  } catch (const sourcemeta::core::SchemaReferenceError &error) {
     EXPECT_EQ(error.id(), "#/definitions/foo");
     EXPECT_EQ(sourcemeta::core::to_string(error.location()), "/$ref");
     SUCCEED();
-  } catch (const sourcemeta::core::SchemaReferenceError &) {
-    FAIL();
   }
 
   EXPECT_EQ(entries.size(), 0);
@@ -1343,20 +1187,118 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+TEST(JSONSchema_transformer, iterate_empty_transformer) {
+  sourcemeta::core::SchemaTransformer bundle;
 
-TEST(JSONSchema_transformer, iterators) {
+  EXPECT_TRUE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iterate_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 1);
+
+  auto it = bundle.begin();
+  EXPECT_NE(it, bundle.end());
+  EXPECT_EQ(it->name(), "example_rule_1");
+  EXPECT_EQ(it->message(), "Keyword foo is not permitted");
+
+  ++it;
+  EXPECT_EQ(it, bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterate_multiple_rules) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();
   bundle.add<ExampleRule2>();
   bundle.add<ExampleRule3>();
 
-  std::set<std::string> rules;
-  for (const auto &entry : bundle) {
-    rules.insert(entry.first);
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 3);
+
+  std::vector<std::string> rule_names;
+  std::vector<std::string> rule_messages;
+
+  for (const auto &rule : bundle) {
+    rule_names.push_back(rule.name());
+    rule_messages.push_back(rule.message());
   }
 
-  EXPECT_EQ(rules.size(), 3);
-  EXPECT_TRUE(rules.contains("example_rule_1"));
-  EXPECT_TRUE(rules.contains("example_rule_2"));
-  EXPECT_TRUE(rules.contains("example_rule_3"));
+  EXPECT_EQ(rule_names.size(), 3);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+  EXPECT_EQ(rule_names[2], "example_rule_3");
+
+  EXPECT_EQ(rule_messages[0], "Keyword foo is not permitted");
+  EXPECT_EQ(rule_messages[1], "Keyword bar is not permitted");
+  EXPECT_EQ(rule_messages[2], "Example rule 3");
+}
+
+TEST(JSONSchema_transformer, iterate_with_cbegin_cend) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_EQ(bundle.size(), 2);
+
+  std::vector<std::string> rule_names;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    rule_names.push_back(it->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_2");
+}
+
+TEST(JSONSchema_transformer, iterate_post_increment) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  auto it = bundle.begin();
+  auto prev = it++;
+  EXPECT_EQ(prev->name(), "example_rule_1");
+  EXPECT_EQ(it->name(), "example_rule_2");
+}
+
+TEST(JSONSchema_transformer, iterate_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_EQ(bundle.size(), 3);
+
+  bundle.remove("example_rule_2");
+
+  EXPECT_EQ(bundle.size(), 2);
+
+  std::vector<std::string> rule_names;
+  for (const auto &rule : bundle) {
+    rule_names.push_back(rule.name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_EQ(rule_names[0], "example_rule_1");
+  EXPECT_EQ(rule_names[1], "example_rule_3");
+}
+
+TEST(JSONSchema_transformer, iterate_read_only_access) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &const_bundle = bundle;
+
+  EXPECT_EQ(const_bundle.size(), 1);
+  EXPECT_FALSE(const_bundle.empty());
+
+  auto it = const_bundle.begin();
+  EXPECT_NE(it, const_bundle.end());
+  EXPECT_EQ(it->name(), "example_rule_1");
 }
