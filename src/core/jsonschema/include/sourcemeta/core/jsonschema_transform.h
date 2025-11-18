@@ -11,9 +11,21 @@
 #include <sourcemeta/core/jsonschema_resolver.h>
 
 #include <cassert>     // assert
+<<<<<<< HEAD
 #include <concepts>    // std::derived_from, std::same_as
+||||||| parent of 75baa4ce (Add read-only iterator interface to SchemaTransformer)
+#include <concepts>    // std::derived_from
+=======
+#include <concepts>    // std::derived_from
+#include <cstddef>     // std::ptrdiff_t, std::size_t
+>>>>>>> 75baa4ce (Add read-only iterator interface to SchemaTransformer)
 #include <functional>  // std::function
+<<<<<<< HEAD
 #include <iterator>    // std::make_move_iterator, std::begin, std::end
+||||||| parent of 75baa4ce (Add read-only iterator interface to SchemaTransformer)
+=======
+#include <iterator>    // std::forward_iterator_tag
+>>>>>>> 75baa4ce (Add read-only iterator interface to SchemaTransformer)
 #include <map>         // std::map
 #include <memory>      // std::make_unique, std::unique_ptr
 #include <optional>    // std::optional, std::nullopt
@@ -271,8 +283,68 @@ public:
       // by definition change the score
       -> std::pair<bool, std::uint8_t>;
 
-  [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
-  [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
+  /// Iterator type for read-only access to rules
+  class ConstIterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = const SchemaTransformRule;
+    using pointer = const SchemaTransformRule *;
+    using reference = const SchemaTransformRule &;
+
+    ConstIterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator iter)
+        : iter_(iter) {}
+
+    auto operator*() const -> reference { return *iter_->second; }
+    auto operator->() const -> pointer { return iter_->second.get(); }
+    auto operator++() -> ConstIterator & {
+      ++iter_;
+      return *this;
+    }
+    auto operator++(int) -> ConstIterator {
+      ConstIterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+    auto operator==(const ConstIterator &other) const -> bool {
+      return iter_ == other.iter_;
+    }
+    auto operator!=(const ConstIterator &other) const -> bool {
+      return iter_ != other.iter_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        iter_;
+  };
+
+  /// Get iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> ConstIterator {
+    return ConstIterator(this->rules.begin());
+  }
+
+  /// Get iterator to the end of the rules
+  [[nodiscard]] auto end() const -> ConstIterator {
+    return ConstIterator(this->rules.end());
+  }
+
+  /// Get iterator to the beginning of the rules (for range-based for loops)
+  [[nodiscard]] auto cbegin() const -> ConstIterator {
+    return ConstIterator(this->rules.cbegin());
+  }
+
+  /// Get iterator to the end of the rules (for range-based for loops)
+  [[nodiscard]] auto cend() const -> ConstIterator {
+    return ConstIterator(this->rules.cend());
+  }
+
+  /// Get the number of rules in the transformer
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
+
+  /// Check if the transformer has no rules
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
 
 private:
 // Exporting symbols that depends on the standard C++ library is considered
