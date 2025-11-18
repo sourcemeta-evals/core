@@ -43,13 +43,23 @@ public:
 
     // Check if that single branch contains only $ref (no other properties)
     const auto &branch = allof_array.front();
-    return branch.is_object() && branch.defines("$ref") && branch.size() == 1;
+    if (!branch.is_object() || !branch.defines("$ref") || branch.size() != 1) {
+      return false;
+    }
+
+    // Don't apply if there are any other keywords in the branch that could be
+    // extracted by UnnecessaryAllOfWrapperModern (i.e., keywords that don't
+    // exist at the parent level). Since we already checked branch.size() == 1,
+    // this means the branch contains ONLY $ref, so we're good.
+    return true;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     // Extract the $ref from the single allOf branch
     const auto &branch = schema.at("allOf").front();
-    schema.assign("$ref", branch.at("$ref"));
+
+    // Insert $ref before allOf to preserve keyword ordering
+    schema.try_assign_before("$ref", branch.at("$ref"), "allOf");
 
     // Remove the allOf wrapper entirely
     schema.erase("allOf");
