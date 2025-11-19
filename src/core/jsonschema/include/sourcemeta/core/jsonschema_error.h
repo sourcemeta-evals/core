@@ -116,7 +116,7 @@ private:
 };
 
 /// @ingroup jsonschema
-/// An error that represents a broken schema resolution event
+/// An error that represents a broken reference after schema transformation
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaBrokenReferenceError
     : public SchemaReferenceError {
   using SchemaReferenceError::SchemaReferenceError;
