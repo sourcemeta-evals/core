@@ -3,6 +3,8 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <algorithm>
+#include <map>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1186,4 +1188,173 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_transformer, empty_bundle_size) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_TRUE(bundle.empty());
+}
+
+TEST(JSONSchema_transformer, bundle_size_after_add) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  EXPECT_EQ(bundle.size(), 1);
+  EXPECT_FALSE(bundle.empty());
+
+  bundle.add<ExampleRule2>();
+  EXPECT_EQ(bundle.size(), 2);
+  EXPECT_FALSE(bundle.empty());
+}
+
+TEST(JSONSchema_transformer, bundle_size_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  EXPECT_EQ(bundle.size(), 2);
+
+  bundle.remove("example_rule_1");
+  EXPECT_EQ(bundle.size(), 1);
+  EXPECT_FALSE(bundle.empty());
+
+  bundle.remove("example_rule_2");
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_TRUE(bundle.empty());
+}
+
+TEST(JSONSchema_transformer, bundle_contains) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_TRUE(bundle.contains("example_rule_1"));
+  EXPECT_TRUE(bundle.contains("example_rule_2"));
+  EXPECT_FALSE(bundle.contains("example_rule_3"));
+  EXPECT_FALSE(bundle.contains("nonexistent"));
+}
+
+TEST(JSONSchema_transformer, bundle_contains_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_TRUE(bundle.contains("example_rule_1"));
+  bundle.remove("example_rule_1");
+  EXPECT_FALSE(bundle.contains("example_rule_1"));
+  EXPECT_TRUE(bundle.contains("example_rule_2"));
+}
+
+TEST(JSONSchema_transformer, iterate_empty_bundle) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  std::vector<std::string> names;
+  for (const auto &entry : bundle) {
+    names.push_back(entry.first);
+  }
+
+  EXPECT_TRUE(names.empty());
+}
+
+TEST(JSONSchema_transformer, iterate_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::vector<std::string> names;
+  for (const auto &entry : bundle) {
+    names.push_back(entry.first);
+  }
+
+  EXPECT_EQ(names.size(), 1);
+  EXPECT_EQ(names.at(0), "example_rule_1");
+}
+
+TEST(JSONSchema_transformer, iterate_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::vector<std::string> names;
+  for (const auto &entry : bundle) {
+    names.push_back(entry.first);
+  }
+
+  EXPECT_EQ(names.size(), 3);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_1") !=
+              names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_2") !=
+              names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_3") !=
+              names.end());
+}
+
+TEST(JSONSchema_transformer, iterate_access_rule_properties) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::map<std::string, std::string> rule_messages;
+  for (const auto &entry : bundle) {
+    rule_messages[entry.first] = entry.second->message();
+  }
+
+  EXPECT_EQ(rule_messages.size(), 2);
+  EXPECT_EQ(rule_messages.at("example_rule_1"), "Keyword foo is not permitted");
+  EXPECT_EQ(rule_messages.at("example_rule_2"), "Keyword bar is not permitted");
+}
+
+TEST(JSONSchema_transformer, cbegin_cend_iteration) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> names;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    names.push_back(it->first);
+  }
+
+  EXPECT_EQ(names.size(), 2);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_1") !=
+              names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_2") !=
+              names.end());
+}
+
+TEST(JSONSchema_transformer, begin_end_iteration) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> names;
+  for (auto it = bundle.begin(); it != bundle.end(); ++it) {
+    names.push_back(it->first);
+  }
+
+  EXPECT_EQ(names.size(), 2);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_1") !=
+              names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_2") !=
+              names.end());
+}
+
+TEST(JSONSchema_transformer, iterate_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  bundle.remove("example_rule_2");
+
+  std::vector<std::string> names;
+  for (const auto &entry : bundle) {
+    names.push_back(entry.first);
+  }
+
+  EXPECT_EQ(names.size(), 2);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_1") !=
+              names.end());
+  EXPECT_FALSE(std::find(names.begin(), names.end(), "example_rule_2") !=
+               names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_3") !=
+              names.end());
 }

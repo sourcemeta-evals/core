@@ -217,6 +217,34 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto size() const noexcept -> std::size_t;
+
+  /// Check if the bundle has no rules
+  [[nodiscard]] auto empty() const noexcept -> bool;
+
+  /// Check if a rule with the given name exists in the bundle
+  [[nodiscard]] auto contains(const std::string &name) const -> bool;
+
+// Not worth documenting these details
+#if !defined(DOXYGEN)
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+#endif
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto end() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto cend() const noexcept -> const_iterator;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
