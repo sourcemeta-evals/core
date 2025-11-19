@@ -190,7 +190,13 @@ private:
 /// Every registered rule is applied to every subschema of the passed schema
 /// until no longer of them applies.
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformer {
+private:
+  using internal = std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+
 public:
+  /// The const iterator type for iterating over rules
+  using const_iterator = typename internal::const_iterator;
+
   /// Create a transform bundle
   SchemaTransformer() = default;
 
@@ -204,6 +210,15 @@ public:
   SchemaTransformer(SchemaTransformer &&) = default;
   auto operator=(SchemaTransformer &&) -> SchemaTransformer & = default;
 #endif
+
+  /// Get a const iterator to the beginning of the rules
+  auto begin() const -> const_iterator;
+  /// Get a const iterator to the end of the rules
+  auto end() const -> const_iterator;
+  /// Get a const iterator to the beginning of the rules
+  auto cbegin() const -> const_iterator;
+  /// Get a const iterator to the end of the rules
+  auto cend() const -> const_iterator;
 
   /// Add a rule to the bundle
   template <std::derived_from<SchemaTransformRule> T, typename... Args>
@@ -249,7 +264,7 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(disable : 4251)
 #endif
-  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  internal rules;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif
