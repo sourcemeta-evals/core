@@ -64,13 +64,22 @@ public:
             {"$ref", "enum", "anyOf", "oneOf", "allOf", "not"}));
     ONLY_CONTINUE_IF(
         !vocabularies.contains("http://json-schema.org/draft-03/schema#") ||
-        !schema.defines_any({"$ref", "enum", "disallow", "extends"}))
+        !schema.defines_any({"$ref", "enum", "disallow", "extends"}));
     ONLY_CONTINUE_IF(
         !vocabularies.contains("http://json-schema.org/draft-02/schema#") ||
         !schema.defines_any({"enum", "disallow", "extends"}));
     ONLY_CONTINUE_IF(
         !vocabularies.contains("http://json-schema.org/draft-01/schema#") ||
         !schema.defines_any({"enum", "disallow", "extends"}));
+    ONLY_CONTINUE_IF(
+        !vocabularies.contains("http://json-schema.org/draft-00/schema#") ||
+        !schema.defines_any({"enum", "disallow", "extends"}));
+    ONLY_CONTINUE_IF(!vocabularies.contains(
+                         "http://json-schema.org/draft-02/hyper-schema#") ||
+                     !schema.defines_any({"enum", "disallow", "extends"}));
+    ONLY_CONTINUE_IF(!vocabularies.contains(
+                         "http://json-schema.org/draft-01/hyper-schema#") ||
+                     !schema.defines_any({"enum", "disallow", "extends"}));
     ONLY_CONTINUE_IF(!vocabularies.contains(
                          "http://json-schema.org/draft-00/hyper-schema#") ||
                      !schema.defines_any({"enum", "disallow", "extends"}));
