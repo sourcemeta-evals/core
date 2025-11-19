@@ -274,6 +274,82 @@ public:
   [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
   [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
 
+  /// A read-only view of a registered rule
+  class RuleView {
+  public:
+    RuleView(const SchemaTransformRule *rule = nullptr) : rule_(rule) {}
+
+    [[nodiscard]] auto name() const -> const std::string & {
+      return rule_->name();
+    }
+
+    [[nodiscard]] auto message() const -> const std::string & {
+      return rule_->message();
+    }
+
+  private:
+    const SchemaTransformRule *rule_;
+  };
+
+  /// An iterator for read-only iteration over registered rules
+  class Iterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = RuleView;
+    using pointer = const RuleView *;
+    using reference = RuleView;
+
+    Iterator(std::map<std::string,
+                      std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : it_(it), view_(nullptr) {}
+
+    auto operator*() const -> RuleView { return RuleView(it_->second.get()); }
+
+    auto operator->() const -> const RuleView * {
+      view_ = RuleView(it_->second.get());
+      return &view_;
+    }
+
+    auto operator++() -> Iterator & {
+      ++it_;
+      return *this;
+    }
+
+    auto operator++(int) -> Iterator {
+      Iterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    friend auto operator==(const Iterator &a, const Iterator &b) -> bool {
+      return a.it_ == b.it_;
+    }
+
+    friend auto operator!=(const Iterator &a, const Iterator &b) -> bool {
+      return a.it_ != b.it_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it_;
+    mutable RuleView view_;
+  };
+
+  /// Get an iterator to the beginning of the registered rules
+  [[nodiscard]] auto begin() const -> Iterator {
+    return Iterator(rules.begin());
+  }
+
+  /// Get an iterator to the end of the registered rules
+  [[nodiscard]] auto end() const -> Iterator { return Iterator(rules.end()); }
+
+  /// Get the number of registered rules
+  [[nodiscard]] auto size() const -> std::size_t { return rules.size(); }
+
+  /// Check if the transformer has no registered rules
+  [[nodiscard]] auto empty() const -> bool { return rules.empty(); }
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
