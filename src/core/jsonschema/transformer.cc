@@ -149,8 +149,11 @@ auto SchemaTransformer::apply(
 
   bool result{true};
   while (true) {
+    std::cerr << "DEBUG: Starting while loop iteration" << std::endl;
     SchemaFrame frame{SchemaFrame::Mode::References};
     frame.analyse(schema, walker, resolver, default_dialect, default_id);
+    std::cerr << "DEBUG: Frame analysis complete. References: "
+              << frame.references().size() << std::endl;
 
     bool applied{false};
     for (const auto &entry : frame.locations()) {
@@ -158,6 +161,9 @@ auto SchemaTransformer::apply(
           entry.second.type != SchemaFrame::LocationType::Subschema) {
         continue;
       }
+
+      // std::cerr << "DEBUG: Visiting location: " <<
+      // to_string(entry.second.pointer) << std::endl;
 
       auto &current{get(schema, entry.second.pointer)};
       const auto current_vocabularies{
@@ -168,6 +174,10 @@ auto SchemaTransformer::apply(
                                          entry.second)};
         // This means the rule is fixable
         if (subresult.first) {
+          if (subresult.second.applies) {
+            std::cerr << "DEBUG: Rule applied: " << name << " at "
+                      << to_string(entry.second.pointer) << std::endl;
+          }
           applied = subresult.second.applies || applied;
         } else {
           result = false;
@@ -179,6 +189,8 @@ auto SchemaTransformer::apply(
           continue;
         }
 
+        std::cerr << "DEBUG: Entering reference check block" << std::endl;
+
         std::pair<const JSON *, const JSON::String *> mark{&current, &name};
         if (processed_rules.contains(mark)) {
           // TODO: Throw a better custom error that also highlights the schema
@@ -189,22 +201,36 @@ auto SchemaTransformer::apply(
         }
 
         // Identify and try to address broken references, if any
+        // std::cerr << "Checking references, count: " <<
+        // frame.references().size() << std::endl;
         for (const auto &reference : frame.references()) {
           const auto destination{frame.traverse(reference.second.destination)};
+          std::cerr << "DEBUG: Ref dest: " << reference.second.destination
+                    << ", fragment: "
+                    << (reference.second.fragment.has_value()
+                            ? reference.second.fragment.value()
+                            : "null")
+                    << std::endl;
           if (!destination.has_value() ||
               // We only care about references with JSON Pointer fragments,
               // as these are the only cases, by definition, where the target
               // is location-dependent.
               !reference.second.fragment.has_value() ||
               !reference.second.fragment.value().starts_with('/')) {
+            std::cerr << "DEBUG: Skipping ref (no dest or invalid fragment)"
+                      << std::endl;
             continue;
           }
 
           const auto &target{destination.value().get().pointer};
+          std::cerr << "DEBUG: Target: " << to_string(target) << std::endl;
           // The destination still exists, so we don't have to do anything
           if (try_get(schema, target)) {
+            std::cerr << "DEBUG: Target exists" << std::endl;
             continue;
           }
+          std::cerr << "DEBUG: Target missing, calling rereference"
+                    << std::endl;
 
           const auto new_fragment{rule->rereference(
               reference.second.destination, reference.first.second, target,

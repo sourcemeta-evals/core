@@ -1293,3 +1293,22 @@ TEST(JSONSchema_transformer, iterators) {
   EXPECT_TRUE(rules.contains("example_rule_2"));
   EXPECT_TRUE(rules.contains("example_rule_3"));
 }
+
+TEST(JSONSchema_transformer, broken_reference_throws_specific_error) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRuleRemoveNot>();
+
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "not": { "type": "integer" },
+    "allOf": [
+        { "$ref": "#/not" }
+    ]
+  })JSON");
+
+  TestTransformTraces entries;
+  EXPECT_THROW(bundle.apply(document, sourcemeta::core::schema_official_walker,
+                            sourcemeta::core::schema_official_resolver,
+                            transformer_callback_trace(entries)),
+               sourcemeta::core::SchemaBrokenReferenceError);
+}

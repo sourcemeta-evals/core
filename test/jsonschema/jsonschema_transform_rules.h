@@ -401,4 +401,29 @@ public:
   }
 };
 
+class ExampleRuleRemoveNot final
+    : public sourcemeta::core::SchemaTransformRule {
+public:
+  ExampleRuleRemoveNot()
+      : sourcemeta::core::SchemaTransformRule(
+            "example_rule_remove_not", "Keyword not is not permitted") {};
+
+  [[nodiscard]] auto condition(const sourcemeta::core::JSON &schema,
+                               const sourcemeta::core::JSON &,
+                               const sourcemeta::core::Vocabularies &,
+                               const sourcemeta::core::SchemaFrame &,
+                               const sourcemeta::core::SchemaFrame::Location &,
+                               const sourcemeta::core::SchemaWalker &,
+                               const sourcemeta::core::SchemaResolver &) const
+      -> sourcemeta::core::SchemaTransformRule::Result override {
+    return schema.defines("not");
+  }
+
+  auto transform(sourcemeta::core::JSON &schema,
+                 const sourcemeta::core::SchemaTransformRule::Result &) const
+      -> void override {
+    schema.erase("not");
+  }
+};
+
 #endif
