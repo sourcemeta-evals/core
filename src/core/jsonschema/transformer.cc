@@ -242,4 +242,28 @@ auto SchemaTransformer::remove(const std::string &name) -> bool {
   return this->rules.erase(name) > 0;
 }
 
+auto SchemaTransformer::begin() const -> RuleIterator {
+  return RuleIterator(this->rules.begin());
+}
+
+auto SchemaTransformer::end() const -> RuleIterator {
+  return RuleIterator(this->rules.end());
+}
+
+auto SchemaTransformer::size() const -> std::size_t {
+  return this->rules.size();
+}
+
+auto SchemaTransformer::contains(const std::string &name) const -> bool {
+  return this->rules.contains(name);
+}
+
+auto SchemaTransformer::at(const std::string &name) const -> RuleView {
+  const auto it = this->rules.find(name);
+  if (it == this->rules.end()) {
+    throw std::out_of_range("Rule not found: " + name);
+  }
+  return RuleView{it->first, it->second->message()};
+}
+
 } // namespace sourcemeta::core

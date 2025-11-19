@@ -274,6 +274,77 @@ public:
   [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
   [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
 
+  /// A read-only view of a rule in the transformer
+  struct RuleView {
+    std::string_view name;
+    std::string_view message;
+  };
+
+  /// Iterator type for iterating over rules
+  class RuleIterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = RuleView;
+    using pointer = const RuleView *;
+    using reference = const RuleView &;
+
+    RuleIterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : it_(it) {}
+
+    auto operator*() const -> RuleView {
+      return RuleView{it_->first, it_->second->message()};
+    }
+
+    auto operator->() const -> const RuleView * {
+      view_ = RuleView{it_->first, it_->second->message()};
+      return &view_;
+    }
+
+    auto operator++() -> RuleIterator & {
+      ++it_;
+      return *this;
+    }
+
+    auto operator++(int) -> RuleIterator {
+      RuleIterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    friend auto operator==(const RuleIterator &a, const RuleIterator &b)
+        -> bool {
+      return a.it_ == b.it_;
+    }
+
+    friend auto operator!=(const RuleIterator &a, const RuleIterator &b)
+        -> bool {
+      return a.it_ != b.it_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it_;
+    mutable RuleView view_{"", ""};
+  };
+
+  /// Get an iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> RuleIterator;
+
+  /// Get an iterator to the end of the rules
+  [[nodiscard]] auto end() const -> RuleIterator;
+
+  /// Get the number of rules in the transformer
+  [[nodiscard]] auto size() const -> std::size_t;
+
+  /// Check if a rule with the given name exists
+  [[nodiscard]] auto contains(const std::string &name) const -> bool;
+
+  /// Get a view of a specific rule by name
+  [[nodiscard]] auto at(const std::string &name) const -> RuleView;
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.

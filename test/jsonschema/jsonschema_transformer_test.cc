@@ -1352,11 +1352,113 @@ TEST(JSONSchema_transformer, iterators) {
 
   std::set<std::string> rules;
   for (const auto &entry : bundle) {
-    rules.insert(entry.first);
+    rules.insert(std::string(entry.name));
   }
 
   EXPECT_EQ(rules.size(), 3);
   EXPECT_TRUE(rules.contains("example_rule_1"));
   EXPECT_TRUE(rules.contains("example_rule_2"));
   EXPECT_TRUE(rules.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, iterator_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_EQ(bundle.begin(), bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterator_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  EXPECT_EQ(bundle.size(), 1);
+  EXPECT_NE(bundle.begin(), bundle.end());
+
+  auto it = bundle.begin();
+  EXPECT_EQ(it->name, "example_rule_1");
+  EXPECT_EQ(it->message, "Keyword foo is not permitted");
+
+  ++it;
+  EXPECT_EQ(it, bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterator_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_EQ(bundle.size(), 3);
+
+  std::vector<std::string> names;
+  std::vector<std::string> messages;
+
+  for (const auto &rule : bundle) {
+    names.push_back(std::string(rule.name));
+    messages.push_back(std::string(rule.message));
+  }
+
+  EXPECT_EQ(names.size(), 3);
+  EXPECT_EQ(messages.size(), 3);
+
+  // Rules are stored in a map, so they should be sorted by name
+  EXPECT_EQ(names[0], "example_rule_1");
+  EXPECT_EQ(names[1], "example_rule_2");
+  EXPECT_EQ(names[2], "example_rule_3");
+
+  EXPECT_EQ(messages[0], "Keyword foo is not permitted");
+  EXPECT_EQ(messages[1], "Keyword bar is not permitted");
+  EXPECT_EQ(messages[2], "Example rule 3");
+}
+
+TEST(JSONSchema_transformer, contains_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  EXPECT_TRUE(bundle.contains("example_rule_1"));
+  EXPECT_TRUE(bundle.contains("example_rule_2"));
+  EXPECT_FALSE(bundle.contains("example_rule_3"));
+  EXPECT_FALSE(bundle.contains("nonexistent_rule"));
+}
+
+TEST(JSONSchema_transformer, at_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  auto rule1 = bundle.at("example_rule_1");
+  EXPECT_EQ(rule1.name, "example_rule_1");
+  EXPECT_EQ(rule1.message, "Keyword foo is not permitted");
+
+  auto rule2 = bundle.at("example_rule_2");
+  EXPECT_EQ(rule2.name, "example_rule_2");
+  EXPECT_EQ(rule2.message, "Keyword bar is not permitted");
+
+  EXPECT_THROW(bundle.at("nonexistent_rule"), std::out_of_range);
+}
+
+TEST(JSONSchema_transformer, iterator_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_EQ(bundle.size(), 3);
+  EXPECT_TRUE(bundle.contains("example_rule_2"));
+
+  bundle.remove("example_rule_2");
+
+  EXPECT_EQ(bundle.size(), 2);
+  EXPECT_FALSE(bundle.contains("example_rule_2"));
+
+  std::vector<std::string> names;
+  for (const auto &rule : bundle) {
+    names.push_back(std::string(rule.name));
+  }
+
+  EXPECT_EQ(names.size(), 2);
+  EXPECT_EQ(names[0], "example_rule_1");
+  EXPECT_EQ(names[1], "example_rule_3");
 }
