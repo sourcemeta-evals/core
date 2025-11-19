@@ -1277,6 +1277,33 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   EXPECT_EQ(document, expected);
 }
 
+TEST(JSONSchema_transformer, rereference_broken) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRuleDefinitionsToDefsNoRereference>();
+
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "foo": {
+        "$ref": "#/properties/definitions/definitions/helper"
+      },
+      "definitions": {
+        "definitions": {
+          "helper": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  })JSON");
+
+  TestTransformTraces entries;
+  EXPECT_THROW(bundle.apply(document, sourcemeta::core::schema_official_walker,
+                            sourcemeta::core::schema_official_resolver,
+                            transformer_callback_trace(entries)),
+               sourcemeta::core::SchemaBrokenReferenceError);
+}
+
 TEST(JSONSchema_transformer, iterators) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();
