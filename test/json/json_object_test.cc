@@ -11,8 +11,8 @@
 TEST(JSON_object, general_traits) {
   EXPECT_TRUE(
       std::is_default_constructible<sourcemeta::core::JSON::Object>::value);
-  EXPECT_FALSE(std::is_nothrow_default_constructible<
-               sourcemeta::core::JSON::Object>::value);
+  EXPECT_TRUE(std::is_nothrow_default_constructible<
+              sourcemeta::core::JSON::Object>::value);
   EXPECT_TRUE(std::is_destructible<sourcemeta::core::JSON::Object>::value);
   EXPECT_TRUE(
       std::is_nothrow_destructible<sourcemeta::core::JSON::Object>::value);
@@ -939,4 +939,24 @@ TEST(JSON_object, try_assign_before_empty) {
   EXPECT_EQ(properties.size(), 1);
   EXPECT_EQ(properties.at(0), "baz");
   EXPECT_EQ(document.at("baz").to_integer(), 99);
+}
+
+TEST(JSON_object, erase_must_not_affect_ordering) {
+  sourcemeta::core::JSON document{{"x", sourcemeta::core::JSON{1}},
+                                  {"y", sourcemeta::core::JSON{2}},
+                                  {"z", sourcemeta::core::JSON{2}}};
+
+  auto before_iterator = document.as_object().begin();
+  EXPECT_EQ(before_iterator->first, "x");
+  std::advance(before_iterator, 1);
+  EXPECT_EQ(before_iterator->first, "y");
+  std::advance(before_iterator, 1);
+  EXPECT_EQ(before_iterator->first, "z");
+
+  document.erase("x");
+
+  auto after_iterator = document.as_object().begin();
+  EXPECT_EQ(after_iterator->first, "y");
+  std::advance(after_iterator, 1);
+  EXPECT_EQ(after_iterator->first, "z");
 }
