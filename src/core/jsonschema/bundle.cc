@@ -248,6 +248,15 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const std::optional<std::string> &default_id,
             const std::optional<Pointer> &default_container,
             const SchemaFrame::Paths &paths) -> void {
+  if (default_id.has_value()) {
+    const auto current_id{identify(schema, resolver,
+                                   SchemaIdentificationStrategy::Strict,
+                                   default_dialect)};
+    if (!current_id.has_value()) {
+      reidentify(schema, default_id.value(), resolver, default_dialect);
+    }
+  }
+
   SchemaFrame frame{SchemaFrame::Mode::References};
 
   if (default_container.has_value()) {
