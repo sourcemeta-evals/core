@@ -652,4 +652,119 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+// Hash specializations for std::unordered_map and std::unordered_set support
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash specialization for Pointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is computed in O(1) time by sampling the
+/// first, last, and middle tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    const auto size = pointer.size();
+    std::size_t result = size;
+
+    // Sample first token
+    const auto &first = pointer.at(0);
+    if (first.is_property()) {
+      // Use the first member of the pre-computed property hash
+      const auto hash = first.property_hash();
+      result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    } else {
+      // For index tokens, use the index itself as the hash
+      result ^= first.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+    }
+
+    if (size > 1) {
+      // Sample last token
+      const auto &last = pointer.at(size - 1);
+      if (last.is_property()) {
+        const auto hash = last.property_hash();
+        result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^= last.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    if (size > 2) {
+      // Sample middle token
+      const auto &middle = pointer.at(size / 2);
+      if (middle.is_property()) {
+        const auto hash = middle.property_hash();
+        result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^=
+            middle.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash specialization for WeakPointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is computed in O(1) time by sampling the
+/// first, last, and middle tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    const auto size = pointer.size();
+    std::size_t result = size;
+
+    // Sample first token
+    const auto &first = pointer.at(0);
+    if (first.is_property()) {
+      // Use the first member of the pre-computed property hash
+      const auto hash = first.property_hash();
+      result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    } else {
+      // For index tokens, use the index itself as the hash
+      result ^= first.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+    }
+
+    if (size > 1) {
+      // Sample last token
+      const auto &last = pointer.at(size - 1);
+      if (last.is_property()) {
+        const auto hash = last.property_hash();
+        result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^= last.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    if (size > 2) {
+      // Sample middle token
+      const auto &middle = pointer.at(size / 2);
+      if (middle.is_property()) {
+        const auto hash = middle.property_hash();
+        result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^=
+            middle.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
