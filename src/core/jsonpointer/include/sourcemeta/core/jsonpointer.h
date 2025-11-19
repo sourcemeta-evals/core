@@ -652,4 +652,51 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+/// @ingroup jsonpointer
+/// Hash support for GenericPointer to enable use in std::unordered_map and
+/// std::unordered_set
+namespace std {
+
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    // O(1) hash by sampling first, last, and middle tokens
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    // Helper to get hash from a single token
+    auto token_hash = [](const auto &token) -> std::size_t {
+      if (token.is_property()) {
+        // Use the first member of the property hash for simplicity
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        // For index tokens, the index itself is the hash
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    std::size_t result = token_hash(pointer.at(0));
+
+    if (size > 1) {
+      // XOR with last token hash
+      result ^= token_hash(pointer.at(size - 1)) << 1;
+
+      if (size > 2) {
+        // XOR with middle token hash
+        result ^= token_hash(pointer.at(size / 2)) << 2;
+      }
+    }
+
+    // Mix in the size for better distribution
+    result ^= size << 3;
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
