@@ -260,6 +260,21 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
 
   const auto vocabularies{
       sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
+
+  // Add the implicit identifier to the schema if one was provided
+  // and the schema doesn't already have one
+  if (default_id.has_value()) {
+    const auto current_id =
+        identify(schema, resolver, SchemaIdentificationStrategy::Strict,
+                 default_dialect);
+    if (!current_id.has_value()) {
+      const auto base = base_dialect(schema, resolver, default_dialect);
+      if (base.has_value()) {
+        reidentify(schema, default_id.value(), base.value());
+      }
+    }
+  }
+
   if (vocabularies.contains(
           "https://json-schema.org/draft/2020-12/vocab/core") ||
       vocabularies.contains(
