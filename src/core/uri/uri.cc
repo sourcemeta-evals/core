@@ -786,4 +786,50 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+    std::string path_string;
+
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      std::istringstream host_input{std::string{uri_host.value()}};
+      std::ostringstream host_output;
+      uri_unescape(host_input, host_output);
+      path_string = "//" + host_output.str();
+
+      if (uri_path.has_value()) {
+        std::istringstream path_input{uri_path.value()};
+        std::ostringstream path_output;
+        uri_unescape(path_input, path_output);
+        path_string += path_output.str();
+      }
+    } else if (uri_path.has_value()) {
+      std::istringstream path_input{uri_path.value()};
+      std::ostringstream path_output;
+      uri_unescape(path_input, path_output);
+      path_string = path_output.str();
+
+      if (path_string.size() >= 3 && path_string[0] == '/' &&
+          path_string[2] == ':' &&
+          std::isalpha(static_cast<unsigned char>(path_string[1]))) {
+        path_string = path_string.substr(1);
+      }
+    }
+
+    return std::filesystem::path{path_string};
+  }
+
+  if (uri_path.has_value()) {
+    std::istringstream path_input{uri_path.value()};
+    std::ostringstream path_output;
+    uri_unescape(path_input, path_output);
+    return std::filesystem::path{path_output.str()};
+  }
+
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
