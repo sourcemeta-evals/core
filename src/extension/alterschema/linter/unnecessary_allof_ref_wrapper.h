@@ -49,15 +49,15 @@ public:
     return ref_only_count == 1;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     auto collection = schema.at("allOf");
 
     // Find and extract the branch with only $ref
     for (std::size_t i = 0; i < collection.size(); ++i) {
       const auto &branch = collection.at(i);
       if (branch.is_object() && branch.size() == 1 && branch.defines("$ref")) {
-        // Copy the $ref to the parent schema
-        schema.assign("$ref", branch.at("$ref"));
+        // Copy the $ref to the parent schema, placing it before allOf
+        schema.try_assign_before("$ref", branch.at("$ref"), "allOf");
 
         // Remove this branch from allOf
         collection.erase(collection.as_array().begin() +

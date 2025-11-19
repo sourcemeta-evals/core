@@ -2033,8 +2033,8 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_wrapper_4) {
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2019-09/schema",
     "$ref": "https://example.com",
-    "type": "number",
     "allOf": [
+      { "type": "number" },
       { "type": "integer" }
     ]
   })JSON");
@@ -3306,10 +3306,8 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_2) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$ref": "https://example.com",
-    "allOf": [
-      { "type": "object" }
-    ]
+    "type": "object",
+    "$ref": "https://example.com"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -3371,9 +3369,8 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_5) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "allOf": [
-      { "$ref": "https://example.com", "title": "Test" }
-    ]
+    "$ref": "https://example.com",
+    "title": "Test"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -3393,11 +3390,9 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_6) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$ref": "https://example.com",
-    "allOf": [
-      { "type": "object" },
-      { "minProperties": 1 }
-    ]
+    "type": "object",
+    "minProperties": 1,
+    "$ref": "https://example.com"
   })JSON");
 
   EXPECT_EQ(document, expected);
