@@ -6,6 +6,7 @@
 
 #include <algorithm>  // std::replace
 #include <cassert>    // assert
+#include <cctype>     // std::isalpha
 #include <cstdint>    // std::uint32_t
 #include <filesystem> // std::filesystem
 #include <optional>   // std::optional
@@ -784,6 +785,39 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   }
 
   return result;
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto p = this->path();
+  if (!p.has_value()) {
+    return std::filesystem::path{};
+  }
+
+  std::string path_str = p.value();
+  std::istringstream iss{path_str};
+  std::ostringstream oss;
+  uri_unescape(iss, oss);
+  path_str = oss.str();
+
+  if (this->scheme() == "file") {
+    const auto h = this->host();
+    if (h.has_value() && !h.value().empty() && h.value() != "localhost") {
+      std::string host_str{h.value()};
+      std::istringstream hiss{host_str};
+      std::ostringstream hoss;
+      uri_unescape(hiss, hoss);
+      host_str = hoss.str();
+      return std::filesystem::path("//" + host_str + path_str);
+    }
+
+    if (path_str.size() >= 3 && path_str[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(path_str[1])) &&
+        (path_str[2] == ':' || path_str[2] == '|')) {
+      return std::filesystem::path(path_str.substr(1));
+    }
+  }
+
+  return std::filesystem::path(path_str);
 }
 
 } // namespace sourcemeta::core
