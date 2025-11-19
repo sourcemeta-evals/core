@@ -786,4 +786,75 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+
+  // For non-file URIs, just return the path component
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (uri_path.has_value()) {
+      return std::filesystem::path{uri_path.value()};
+    }
+    return std::filesystem::path{};
+  }
+
+  // Handle file:// URIs
+  const auto uri_host{this->host()};
+
+  // Percent-decode the path
+  auto decode_percent = [](const std::string &input) -> std::string {
+    std::string result;
+    result.reserve(input.size());
+    for (std::size_t i = 0; i < input.size(); ++i) {
+      if (input[i] == '%' && i + 2 < input.size()) {
+        const auto hex1 = input[i + 1];
+        const auto hex2 = input[i + 2];
+        if (std::isxdigit(static_cast<unsigned char>(hex1)) &&
+            std::isxdigit(static_cast<unsigned char>(hex2))) {
+          const auto value = static_cast<char>(
+              std::stoul(input.substr(i + 1, 2), nullptr, 16));
+          result += value;
+          i += 2;
+          continue;
+        }
+      }
+      result += input[i];
+    }
+    return result;
+  };
+
+  std::string path_str;
+
+  // Check for UNC paths (file://server/share/...)
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    // UNC path: \\server\share\...
+    path_str = "\\\\" + std::string{uri_host.value()};
+    if (uri_path.has_value()) {
+      auto decoded_path = decode_percent(uri_path.value());
+      std::ranges::replace(decoded_path, '/', '\\');
+      path_str += decoded_path;
+    }
+    return std::filesystem::path{path_str};
+  }
+
+  if (!uri_path.has_value()) {
+    return std::filesystem::path{};
+  }
+
+  auto decoded_path = decode_percent(uri_path.value());
+
+  // Check for Windows drive letter (e.g., /C:/...)
+  if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+      std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+      decoded_path[2] == ':') {
+    // Windows path: remove leading slash and convert slashes
+    decoded_path = decoded_path.substr(1);
+    std::ranges::replace(decoded_path, '/', '\\');
+    return std::filesystem::path{decoded_path};
+  }
+
+  // UNIX path
+  return std::filesystem::path{decoded_path};
+}
+
 } // namespace sourcemeta::core
