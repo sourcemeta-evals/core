@@ -77,10 +77,9 @@ auto find_anchors(const sourcemeta::core::JSON &schema,
       if (identifier.is_fragment_only()) {
         result.insert(
             {sourcemeta::core::JSON::String{
-                 identifier.fragment()
-                     .value()}, // NOLINT(bugprone-unchecked-optional-access):
-                                // Check for optional is happening
-                                // inside is_fragment_only()
+                 // Check for optional is happening inside is_fragment_only()
+                 // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                 identifier.fragment().value()},
              AnchorType::Static});
       }
     }
@@ -96,10 +95,9 @@ auto find_anchors(const sourcemeta::core::JSON &schema,
       if (identifier.is_fragment_only()) {
         result.insert(
             {sourcemeta::core::JSON::String{
-                 identifier.fragment()
-                     .value()}, // NOLINT(bugprone-unchecked-optional-access):
-                                // Check for optional is happening
-                                // inside is_fragment_only()
+                 // Check for optional is happening inside is_fragment_only()
+                 // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                 identifier.fragment().value()},
              AnchorType::Static});
       }
     }
@@ -238,8 +236,8 @@ auto store(
 // Check misunderstood struct to be a function
 // NOLINTNEXTLINE(bugprone-exception-escape)
 struct InternalEntry {
-  const sourcemeta::core::SchemaIteratorEntry common;
-  const std::optional<sourcemeta::core::JSON::String> id;
+  sourcemeta::core::SchemaIteratorEntry common;
+  std::optional<sourcemeta::core::JSON::String> id;
 };
 
 auto traverse_origin_instance_locations(
@@ -275,10 +273,10 @@ auto traverse_origin_instance_locations(
 // Check misunderstood struct to be a function
 // NOLINTNEXTLINE(bugprone-exception-escape)
 struct CacheSubschema {
-  const sourcemeta::core::PointerTemplate instance_location{};
-  const sourcemeta::core::PointerTemplate relative_instance_location{};
-  const bool orphan{};
-  const std::optional<sourcemeta::core::Pointer> parent{};
+  sourcemeta::core::PointerTemplate instance_location{};
+  sourcemeta::core::PointerTemplate relative_instance_location{};
+  bool orphan{};
+  std::optional<sourcemeta::core::Pointer> parent{};
 };
 
 auto repopulate_instance_locations(
@@ -357,12 +355,11 @@ auto to_json(const SchemaFrame::LocationType value) -> JSON {
 auto SchemaFrame::to_json() const -> JSON {
   auto root{JSON::make_object()};
 
-  root.assign("locations", JSON::make_array());
+  root.assign("locations", JSON::make_object());
+  root.at("locations").assign("static", JSON::make_object());
+  root.at("locations").assign("dynamic", JSON::make_object());
   for (const auto &location : this->locations_) {
     auto entry{JSON::make_object()};
-    entry.assign("referenceType",
-                 sourcemeta::core::to_json(location.first.first));
-    entry.assign("uri", sourcemeta::core::to_json(location.first.second));
     entry.assign("parent", sourcemeta::core::to_json(location.second.parent));
     entry.assign("type", sourcemeta::core::to_json(location.second.type));
     entry.assign("root", sourcemeta::core::to_json(location.second.root));
@@ -373,7 +370,21 @@ auto SchemaFrame::to_json() const -> JSON {
     entry.assign("dialect", sourcemeta::core::to_json(location.second.dialect));
     entry.assign("baseDialect",
                  sourcemeta::core::to_json(location.second.base_dialect));
-    root.at("locations").push_back(std::move(entry));
+
+    switch (location.first.first) {
+      case SchemaReferenceType::Static:
+        root.at("locations")
+            .at("static")
+            .assign(location.first.second, std::move(entry));
+        break;
+      case SchemaReferenceType::Dynamic:
+        root.at("locations")
+            .at("dynamic")
+            .assign(location.first.second, std::move(entry));
+        break;
+      default:
+        assert(false);
+    }
   }
 
   root.assign("references", JSON::make_array());
@@ -525,6 +536,12 @@ auto SchemaFrame::analyse(const JSON &root, const SchemaWalker &walker,
           const auto bases{
               find_nearest_bases(base_uris, entry.common.pointer, entry.id)};
           for (const auto &base_string : bases.first) {
+            // Otherwise we end up pushing the top-level resource twice
+            if (entry_index == 0 && has_explicit_different_id &&
+                default_id.has_value() && default_id.value() == base_string) {
+              continue;
+            }
+
             const sourcemeta::core::URI base{base_string};
             sourcemeta::core::URI maybe_relative{entry.id.value()};
             const auto maybe_fragment{maybe_relative.fragment()};
@@ -1049,6 +1066,19 @@ auto SchemaFrame::traverse(const JSON::String &uri) const
       this->locations_.find({SchemaReferenceType::Dynamic, uri})};
   if (dynamic_result != this->locations_.cend()) {
     return dynamic_result->second;
+  }
+
+  return std::nullopt;
+}
+
+auto SchemaFrame::uri(const Pointer &pointer) const
+    -> std::optional<std::reference_wrapper<const JSON::String>> {
+  // TODO: This is potentially very slow. Traversing by pointer shouldn't
+  // require an O(N) operation
+  for (const auto &entry : this->locations_) {
+    if (entry.second.pointer == pointer) {
+      return entry.first.second;
+    }
   }
 
   return std::nullopt;
