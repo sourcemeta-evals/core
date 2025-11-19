@@ -27,7 +27,7 @@ public:
            schema.at("allOf").at(0).size() == 1;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     auto ref_value = schema.at("allOf").at(0).at("$ref");
     schema.erase("allOf");
     schema.assign("$ref", std::move(ref_value));
