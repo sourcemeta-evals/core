@@ -277,6 +277,20 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
           "https://json-schema.org/draft/2019-09/vocab/core")) {
     bundle_schema(schema, {"$defs"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
+
+    // Add the identifier if the schema doesn't have one and a default was
+    // provided
+    if (default_id.has_value() && schema.is_object()) {
+      const auto maybe_base_dialect{
+          sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+      if (maybe_base_dialect.has_value() &&
+          !sourcemeta::core::identify(schema, maybe_base_dialect.value())
+               .has_value()) {
+        sourcemeta::core::reidentify(schema, default_id.value(),
+                                     maybe_base_dialect.value());
+      }
+    }
+
     return;
   } else if (vocabularies.contains("http://json-schema.org/draft-07/schema#") ||
              vocabularies.contains(
@@ -289,6 +303,20 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
                  "http://json-schema.org/draft-04/hyper-schema#")) {
     bundle_schema(schema, {"definitions"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
+
+    // Add the identifier if the schema doesn't have one and a default was
+    // provided
+    if (default_id.has_value() && schema.is_object()) {
+      const auto maybe_base_dialect{
+          sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+      if (maybe_base_dialect.has_value() &&
+          !sourcemeta::core::identify(schema, maybe_base_dialect.value())
+               .has_value()) {
+        sourcemeta::core::reidentify(schema, default_id.value(),
+                                     maybe_base_dialect.value());
+      }
+    }
+
     return;
   } else if (vocabularies.contains(
                  "http://json-schema.org/draft-03/hyper-schema#") ||
