@@ -10,14 +10,14 @@ sourcemeta_googletest(NAMESPACE sourcemeta PROJECT core NAME json
     json_object_test.cc
     json_parse_callback_test.cc
     json_parse_error_test.cc
+    json_file_parse_error_optimization_test.cc
     json_parse_test.cc
     json_prettify_test.cc
     json_real_test.cc
     json_string_test.cc
     json_stringify_test.cc
     json_value_test.cc
-    json_type_test.cc
-    json_file_parse_error_optimization_test.cc)
+    json_type_test.cc)
 
 target_link_libraries(sourcemeta_core_json_unit
   PRIVATE sourcemeta::core::json)
