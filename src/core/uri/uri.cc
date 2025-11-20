@@ -786,4 +786,70 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+
+  // Handle file:// URIs
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+    const auto uri_path{this->path()};
+
+    // UNC path: file://server/share/path
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      std::ostringstream unc_path;
+      std::istringstream host_stream{std::string{uri_host.value()}};
+      std::ostringstream unescaped_host;
+      uri_unescape(host_stream, unescaped_host);
+
+      unc_path << "\\\\" << unescaped_host.str();
+
+      if (uri_path.has_value()) {
+        std::istringstream path_stream{uri_path.value()};
+        std::ostringstream unescaped_path;
+        uri_unescape(path_stream, unescaped_path);
+
+        auto path_str = unescaped_path.str();
+        std::ranges::replace(path_str, '/', '\\');
+        unc_path << path_str;
+      }
+
+      return std::filesystem::path{unc_path.str()};
+    }
+
+    // Regular file path: file:///path or file:///C:/path
+    if (uri_path.has_value()) {
+      std::istringstream path_stream{uri_path.value()};
+      std::ostringstream unescaped_path;
+      uri_unescape(path_stream, unescaped_path);
+
+      auto path_str = unescaped_path.str();
+
+      // Check if it's a Windows path (e.g., /C:/path)
+      if (path_str.size() >= 3 && path_str[0] == '/' &&
+          std::isalpha(static_cast<unsigned char>(path_str[1])) &&
+          path_str[2] == ':') {
+        // Remove leading slash for Windows paths
+        path_str = path_str.substr(1);
+        std::ranges::replace(path_str, '/', '\\');
+      }
+
+      return std::filesystem::path{path_str};
+    }
+
+    // Empty file URI
+    return std::filesystem::path{};
+  }
+
+  // For non-file URIs, return the path component
+  const auto uri_path{this->path()};
+  if (uri_path.has_value()) {
+    std::istringstream path_stream{uri_path.value()};
+    std::ostringstream unescaped_path;
+    uri_unescape(path_stream, unescaped_path);
+    return std::filesystem::path{unescaped_path.str()};
+  }
+
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
