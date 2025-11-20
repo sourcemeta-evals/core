@@ -25,6 +25,20 @@ static auto transformer_callback_trace(TestTransformTraces &traces) -> auto {
   };
 }
 
+TEST(JSONSchema_transformer, iterate_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const auto &rules = bundle.rules();
+  EXPECT_EQ(rules.size(), 2);
+  EXPECT_TRUE(rules.contains("example_rule_1"));
+  EXPECT_TRUE(rules.contains("example_rule_2"));
+
+  EXPECT_EQ(rules.at("example_rule_1")->message(),
+            "Keyword foo is not permitted");
+}
+
 TEST(JSONSchema_transformer, flat_document_no_applicators) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();

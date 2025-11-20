@@ -205,13 +205,19 @@ public:
   auto operator=(SchemaTransformer &&) -> SchemaTransformer & = default;
 #endif
 
+  /// The type of the container of rules
+  using Rules = std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+
+  /// Access the registered rules
+  [[nodiscard]] auto rules() const -> const Rules & { return this->rules_; }
+
   /// Add a rule to the bundle
   template <std::derived_from<SchemaTransformRule> T, typename... Args>
   auto add(Args &&...args) -> void {
     auto rule{std::make_unique<T>(std::forward<Args>(args)...)};
     // Rules must only be defined once
-    assert(!this->rules.contains(rule->name()));
-    this->rules.emplace(rule->name(), std::move(rule));
+    assert(!this->rules_.contains(rule->name()));
+    this->rules_.emplace(rule->name(), std::move(rule));
   }
 
   /// Remove a rule from the bundle
@@ -249,7 +255,7 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(disable : 4251)
 #endif
-  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules_;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif
