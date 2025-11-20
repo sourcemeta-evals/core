@@ -45,6 +45,56 @@ static auto test_resolver(std::string_view identifier)
   }
 }
 
+TEST(JSONSchema_bundle, multiple_refs) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$id": "https://www.example.com",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "foo": {
+        "$ref": "https://www.sourcemeta.com/test-3"
+      },
+      "bar": {
+        "$ref": "https://www.sourcemeta.com/test-1"
+      }
+    }
+  })JSON");
+
+  sourcemeta::core::bundle(document, sourcemeta::core::schema_official_walker,
+                           test_resolver);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$id": "https://www.example.com",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "foo": {
+        "$ref": "https://www.sourcemeta.com/test-3"
+      },
+      "bar": {
+        "$ref": "https://www.sourcemeta.com/test-1"
+      }
+    },
+    "$defs": {
+      "https://www.sourcemeta.com/test-4": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "id": "https://www.sourcemeta.com/test-4",
+        "type": "string"
+      },
+      "https://www.sourcemeta.com/test-3": {
+        "$schema": "http://json-schema.org/draft-06/schema#",
+        "$id": "https://www.sourcemeta.com/test-3",
+        "allOf": [ { "$ref": "test-4" } ]
+      },
+      "https://www.sourcemeta.com/test-1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://www.sourcemeta.com/test-1",
+        "type": "string"
+      }
+    }
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
 TEST(JSONSchema_bundle, across_dialects) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "$id": "https://www.example.com",
@@ -117,6 +167,42 @@ TEST(JSONSchema_bundle, across_dialects_const) {
   EXPECT_EQ(result, expected);
 }
 
+TEST(JSONSchema_bundle, with_default_id) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "items": { "$ref": "test-2" }
+  })JSON");
+
+  sourcemeta::core::bundle(document, sourcemeta::core::schema_official_walker,
+                           test_resolver, std::nullopt,
+                           "https://www.sourcemeta.com/default");
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/default",
+    "items": { "$ref": "test-2" },
+    "$defs": {
+      "https://www.sourcemeta.com/test-2": {
+        "$schema": "https://json-schema.org/draft/2019-09/schema",
+        "$id": "https://www.sourcemeta.com/test-2",
+        "$ref": "test-3"
+      },
+      "https://www.sourcemeta.com/test-3": {
+        "$schema": "http://json-schema.org/draft-06/schema#",
+        "$id": "https://www.sourcemeta.com/test-3",
+        "allOf": [ { "$ref": "test-4" } ]
+      },
+      "https://www.sourcemeta.com/test-4": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "id": "https://www.sourcemeta.com/test-4",
+        "type": "string"
+      }
+    }
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
 TEST(JSONSchema_bundle, with_default_dialect) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "properties": {
@@ -186,7 +272,7 @@ TEST(JSONSchema_bundle, target_array) {
 }
 
 TEST(JSONSchema_bundle, custom_paths_no_external) {
-  auto schema{sourcemeta::core::parse_json(R"JSON({
+  auto document{sourcemeta::core::parse_json(R"JSON({
     "wrapper": {
       "$ref": "#/common/test"
     },
@@ -202,15 +288,15 @@ TEST(JSONSchema_bundle, custom_paths_no_external) {
     }
   })JSON")};
 
-  sourcemeta::core::bundle(schema, sourcemeta::core::schema_official_walker,
-                           test_resolver,
-                           "https://json-schema.org/draft/2020-12/schema",
-                           sourcemeta::core::Pointer{"components"},
-                           {
-                               sourcemeta::core::Pointer{"wrapper"},
-                               sourcemeta::core::Pointer{"common", "test"},
-                               sourcemeta::core::Pointer{"common", "with-id"},
-                           });
+  sourcemeta::core::bundle(
+      document, sourcemeta::core::schema_official_walker, test_resolver,
+      "https://json-schema.org/draft/2020-12/schema", std::nullopt,
+      sourcemeta::core::Pointer{"components"},
+      {
+          sourcemeta::core::Pointer{"wrapper"},
+          sourcemeta::core::Pointer{"common", "test"},
+          sourcemeta::core::Pointer{"common", "with-id"},
+      });
 
   const auto expected{sourcemeta::core::parse_json(R"JSON({
     "wrapper": {
@@ -228,11 +314,11 @@ TEST(JSONSchema_bundle, custom_paths_no_external) {
     }
   })JSON")};
 
-  EXPECT_EQ(schema, expected);
+  EXPECT_EQ(document, expected);
 }
 
 TEST(JSONSchema_bundle, custom_paths_with_externals) {
-  auto schema{sourcemeta::core::parse_json(R"JSON({
+  auto document{sourcemeta::core::parse_json(R"JSON({
     "wrapper": {
       "$ref": "#/common/test"
     },
@@ -248,15 +334,15 @@ TEST(JSONSchema_bundle, custom_paths_with_externals) {
     }
   })JSON")};
 
-  sourcemeta::core::bundle(schema, sourcemeta::core::schema_official_walker,
-                           test_resolver,
-                           "https://json-schema.org/draft/2020-12/schema",
-                           sourcemeta::core::Pointer{"components"},
-                           {
-                               sourcemeta::core::Pointer{"wrapper"},
-                               sourcemeta::core::Pointer{"common", "test"},
-                               sourcemeta::core::Pointer{"common", "with-id"},
-                           });
+  sourcemeta::core::bundle(
+      document, sourcemeta::core::schema_official_walker, test_resolver,
+      "https://json-schema.org/draft/2020-12/schema", std::nullopt,
+      sourcemeta::core::Pointer{"components"},
+      {
+          sourcemeta::core::Pointer{"wrapper"},
+          sourcemeta::core::Pointer{"common", "test"},
+          sourcemeta::core::Pointer{"common", "with-id"},
+      });
 
   const auto expected{sourcemeta::core::parse_json(R"JSON({
     "wrapper": {
@@ -291,5 +377,5 @@ TEST(JSONSchema_bundle, custom_paths_with_externals) {
     }
   })JSON")};
 
-  EXPECT_EQ(schema, expected);
+  EXPECT_EQ(document, expected);
 }
