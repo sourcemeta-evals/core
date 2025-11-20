@@ -58,13 +58,13 @@ public:
     return true;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     // Extract the $ref from the allOf branch
     auto ref_value = schema.at("allOf").front().at("$ref");
-
+    
     // Remove the allOf keyword
     schema.erase("allOf");
-
+    
     // Add the $ref at the parent level
     schema.assign("$ref", std::move(ref_value));
   }
