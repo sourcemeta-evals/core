@@ -652,4 +652,110 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash specialization for Pointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling the first, last, and
+/// middle tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result = size;
+    const auto &first = pointer.at(0);
+    const auto &last = pointer.at(size - 1);
+
+    if (first.is_property()) {
+      const auto hash = first.property_hash();
+      result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    } else {
+      result ^= first.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+    }
+
+    if (size > 1) {
+      if (last.is_property()) {
+        const auto hash = last.property_hash();
+        result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^= last.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    if (size > 2) {
+      const auto middle_index = size / 2;
+      const auto &middle = pointer.at(middle_index);
+      if (middle.is_property()) {
+        const auto hash = middle.property_hash();
+        result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^=
+            middle.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash specialization for WeakPointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling the first, last, and
+/// middle tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result = size;
+    const auto &first = pointer.at(0);
+    const auto &last = pointer.at(size - 1);
+
+    if (first.is_property()) {
+      const auto hash = first.property_hash();
+      result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 + (result << 6) +
+                (result >> 2);
+    } else {
+      result ^= first.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+    }
+
+    if (size > 1) {
+      if (last.is_property()) {
+        const auto hash = last.property_hash();
+        result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^= last.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    if (size > 2) {
+      const auto middle_index = size / 2;
+      const auto &middle = pointer.at(middle_index);
+      if (middle.is_property()) {
+        const auto hash = middle.property_hash();
+        result ^= static_cast<std::size_t>(hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^=
+            middle.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
