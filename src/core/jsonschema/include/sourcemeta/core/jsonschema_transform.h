@@ -217,6 +217,11 @@ private:
 /// until no longer of them applies.
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformer {
 public:
+  using container_type =
+      std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+  using const_iterator = container_type::const_iterator;
+  using size_type = container_type::size_type;
+
   /// Create a transform bundle
   SchemaTransformer() = default;
 
@@ -242,6 +247,24 @@ public:
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto size() const noexcept -> size_type;
+
+  /// Check if the bundle has no rules
+  [[nodiscard]] auto empty() const noexcept -> bool;
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto end() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto cend() const noexcept -> const_iterator;
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
@@ -270,9 +293,6 @@ public:
       // Note that we only calculate a health score on "check", as "apply" would
       // by definition change the score
       -> std::pair<bool, std::uint8_t>;
-
-  [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
-  [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
 
 private:
 // Exporting symbols that depends on the standard C++ library is considered

@@ -3,6 +3,7 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <algorithm>
 #include <set>
 #include <string>
 #include <tuple>
@@ -1342,6 +1343,86 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_transformer, empty_bundle) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_TRUE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 0);
+}
+
+TEST(JSONSchema_transformer, size_after_add) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 1);
+
+  bundle.add<ExampleRule2>();
+  EXPECT_EQ(bundle.size(), 2);
+}
+
+TEST(JSONSchema_transformer, size_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  EXPECT_EQ(bundle.size(), 2);
+
+  bundle.remove("example_rule_1");
+  EXPECT_EQ(bundle.size(), 1);
+  EXPECT_FALSE(bundle.empty());
+
+  bundle.remove("example_rule_2");
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_TRUE(bundle.empty());
+}
+
+TEST(JSONSchema_transformer, iterate_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iterate_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> names;
+  for (const auto &entry : bundle) {
+    names.push_back(entry.first);
+    EXPECT_NE(entry.second, nullptr);
+  }
+
+  EXPECT_EQ(names.size(), 2);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_1") !=
+              names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_2") !=
+              names.end());
+}
+
+TEST(JSONSchema_transformer, iterate_rules_cbegin_cend) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> names;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    names.push_back(it->first);
+    EXPECT_NE(it->second, nullptr);
+  }
+
+  EXPECT_EQ(names.size(), 2);
+}
+
+TEST(JSONSchema_transformer, iterate_access_rule_properties) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  auto it = bundle.begin();
+  EXPECT_NE(it, bundle.end());
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
 }
 
 TEST(JSONSchema_transformer, iterators) {
