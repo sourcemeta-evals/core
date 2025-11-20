@@ -48,7 +48,7 @@ public:
     return true;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     // Extract the single allOf element
     const auto &allof_element = schema.at("allOf").at(0);
 
