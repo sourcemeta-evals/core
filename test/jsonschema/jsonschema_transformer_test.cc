@@ -1187,3 +1187,80 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, rules_iteration_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  const auto &rules = bundle.rules();
+  EXPECT_EQ(rules.size(), 0);
+  EXPECT_TRUE(rules.empty());
+}
+
+TEST(JSONSchema_transformer, rules_iteration_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  const auto &rules = bundle.rules();
+  EXPECT_EQ(rules.size(), 1);
+  EXPECT_FALSE(rules.empty());
+  EXPECT_TRUE(rules.contains("example_rule_1"));
+
+  const auto &rule = rules.at("example_rule_1");
+  EXPECT_EQ(rule->name(), "example_rule_1");
+  EXPECT_EQ(rule->message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, rules_iteration_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  const auto &rules = bundle.rules();
+  EXPECT_EQ(rules.size(), 3);
+  EXPECT_FALSE(rules.empty());
+
+  EXPECT_TRUE(rules.contains("example_rule_1"));
+  EXPECT_TRUE(rules.contains("example_rule_2"));
+  EXPECT_TRUE(rules.contains("example_rule_3"));
+
+  std::vector<std::string> rule_names;
+  for (const auto &[name, rule] : rules) {
+    rule_names.push_back(name);
+    EXPECT_EQ(name, rule->name());
+  }
+
+  EXPECT_EQ(rule_names.size(), 3);
+}
+
+TEST(JSONSchema_transformer, rules_iteration_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  EXPECT_EQ(bundle.rules().size(), 3);
+
+  bundle.remove("example_rule_2");
+
+  const auto &rules = bundle.rules();
+  EXPECT_EQ(rules.size(), 2);
+  EXPECT_TRUE(rules.contains("example_rule_1"));
+  EXPECT_FALSE(rules.contains("example_rule_2"));
+  EXPECT_TRUE(rules.contains("example_rule_3"));
+}
+
+TEST(JSONSchema_transformer, rules_iteration_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const auto &rules = bundle.rules();
+  EXPECT_EQ(rules.size(), 2);
+
+  for (const auto &[name, rule] : rules) {
+    EXPECT_FALSE(name.empty());
+    EXPECT_NE(rule, nullptr);
+    EXPECT_FALSE(rule->name().empty());
+    EXPECT_FALSE(rule->message().empty());
+  }
+}

@@ -115,7 +115,7 @@ auto SchemaTransformer::check(
     const auto &current{get(schema, entry.second.pointer)};
     const auto current_vocabularies{
         vocabularies(schema, resolver, entry.second.dialect)};
-    for (const auto &[name, rule] : this->rules) {
+    for (const auto &[name, rule] : this->rules_) {
       const auto outcome{rule->check(current, schema, current_vocabularies,
                                      walker, resolver, frame, entry.second)};
       switch (outcome.index()) {
@@ -146,7 +146,7 @@ auto SchemaTransformer::apply(
     const std::optional<JSON::String> &default_dialect,
     const std::optional<JSON::String> &default_id) const -> bool {
   // There is no point in applying an empty bundle
-  assert(!this->rules.empty());
+  assert(!this->rules_.empty());
   std::set<std::pair<Pointer, JSON::String>> processed_rules;
 
   bool result{true};
@@ -164,7 +164,7 @@ auto SchemaTransformer::apply(
       auto &current{get(schema, entry.second.pointer)};
       const auto current_vocabularies{
           vocabularies(schema, resolver, entry.second.dialect)};
-      for (const auto &[name, rule] : this->rules) {
+      for (const auto &[name, rule] : this->rules_) {
         const auto subresult{rule->apply(current, schema, current_vocabularies,
                                          walker, resolver, frame,
                                          entry.second)};
@@ -236,7 +236,12 @@ auto SchemaTransformer::apply(
 }
 
 auto SchemaTransformer::remove(const std::string &name) -> bool {
-  return this->rules.erase(name) > 0;
+  return this->rules_.erase(name) > 0;
+}
+
+auto SchemaTransformer::rules() const
+    -> const std::map<std::string, std::unique_ptr<SchemaTransformRule>> & {
+  return this->rules_;
 }
 
 } // namespace sourcemeta::core
