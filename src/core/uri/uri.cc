@@ -786,4 +786,56 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+
+  // For non file:// URIs, return the path component as-is
+  const auto uri_scheme{this->scheme()};
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (!uri_path.has_value()) {
+      return std::filesystem::path{};
+    }
+
+    // Decode percent-encoded characters
+    std::istringstream input{uri_path.value()};
+    std::ostringstream output;
+    input >> std::noskipws;
+    uri_unescape(input, output);
+    return std::filesystem::path{output.str()};
+  }
+
+  // Handle file:// URIs
+  std::string path_str;
+
+  // Check for UNC path (has host)
+  const auto uri_host{this->host()};
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    // UNC path: file://server/share/file -> \\server\share\file
+    path_str = "//";
+    path_str += uri_host.value();
+  }
+
+  if (uri_path.has_value()) {
+    const auto &raw_path = uri_path.value();
+
+    // Check if this is a Windows path with drive letter (e.g., /C:/foo)
+    if (raw_path.size() >= 3 && raw_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(raw_path[1])) &&
+        raw_path[2] == ':') {
+      // Windows path: skip the leading slash
+      path_str += raw_path.substr(1);
+    } else {
+      path_str += raw_path;
+    }
+  }
+
+  // Decode percent-encoded characters
+  std::istringstream input{path_str};
+  std::ostringstream output;
+  input >> std::noskipws;
+  uri_unescape(input, output);
+
+  return std::filesystem::path{output.str()};
+}
+
 } // namespace sourcemeta::core
