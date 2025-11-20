@@ -181,3 +181,34 @@ TEST(JSONSchema_SchemaMapResolver, embedded_resource_with_callback) {
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/test"));
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/string"));
 }
+
+TEST(JSONSchema_SchemaMapResolver, embedded_resource_draft04) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "http://example.com/root",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "definitions": {
+      "sub": {
+        "id": "http://example.com/sub",
+        "type": "string"
+      }
+    }
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  EXPECT_TRUE(resolver("http://example.com/root").has_value());
+  EXPECT_TRUE(resolver("http://example.com/sub").has_value());
+
+  auto sub = resolver("http://example.com/sub").value();
+  // Check that it has "id" and not "$id"
+  EXPECT_TRUE(sub.defines("id"));
+  EXPECT_FALSE(sub.defines("$id"));
+  EXPECT_EQ(sub.at("id").to_string(), "http://example.com/sub");
+  // Also check that $schema was assigned
+  EXPECT_TRUE(sub.defines("$schema"));
+  EXPECT_EQ(sub.at("$schema").to_string(),
+            "http://json-schema.org/draft-04/schema#");
+}
