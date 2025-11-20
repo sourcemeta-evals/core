@@ -652,4 +652,75 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// std::hash specialization for Pointer to enable use in unordered containers
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+    const auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    result ^= hash_token(pointer.at(0));
+    if (size > 1) {
+      result ^= (hash_token(pointer.at(size - 1)) << 1);
+    }
+    if (size > 2) {
+      result ^= (hash_token(pointer.at(size / 2)) << 2);
+    }
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// std::hash specialization for WeakPointer to enable use in unordered
+/// containers
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+    const auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        const auto prop_hash = token.property_hash();
+        return static_cast<std::size_t>(prop_hash.a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    result ^= hash_token(pointer.at(0));
+    if (size > 1) {
+      result ^= (hash_token(pointer.at(size - 1)) << 1);
+    }
+    if (size > 2) {
+      result ^= (hash_token(pointer.at(size / 2)) << 2);
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
