@@ -271,6 +271,32 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
 
   const auto vocabularies{
       sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
+
+  // If a default_id is provided and the schema doesn't have an identifier, add
+  // it
+  if (default_id.has_value() && schema.is_object()) {
+    const bool has_modern_id = schema.defines("$id");
+    const bool has_legacy_id = schema.defines("id");
+
+    if (!has_modern_id && !has_legacy_id) {
+      // Determine which identifier keyword to use based on the dialect
+      if (vocabularies.contains(
+              "https://json-schema.org/draft/2020-12/vocab/core") ||
+          vocabularies.contains(
+              "https://json-schema.org/draft/2019-09/vocab/core") ||
+          vocabularies.contains("http://json-schema.org/draft-07/schema#") ||
+          vocabularies.contains(
+              "http://json-schema.org/draft-07/hyper-schema#") ||
+          vocabularies.contains("http://json-schema.org/draft-06/schema#") ||
+          vocabularies.contains(
+              "http://json-schema.org/draft-06/hyper-schema#")) {
+        schema.assign("$id", JSON{default_id.value()});
+      } else {
+        schema.assign("id", JSON{default_id.value()});
+      }
+    }
+  }
+
   if (vocabularies.contains(
           "https://json-schema.org/draft/2020-12/vocab/core") ||
       vocabularies.contains(
