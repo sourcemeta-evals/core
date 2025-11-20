@@ -652,4 +652,102 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+// Specializations of std::hash for Pointer and WeakPointer to enable their use
+// in unordered containers like std::unordered_map and std::unordered_set
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash specialization for sourcemeta::core::Pointer
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+    const auto size = pointer.size();
+
+    // Sample first token (O(1))
+    const auto &first = pointer.at(0);
+    if (first.is_property()) {
+      // Use the first member of the pre-computed property hash
+      result ^= static_cast<std::size_t>(first.property_hash().a);
+    } else {
+      // For index tokens, use the index itself
+      result ^= static_cast<std::size_t>(first.to_index());
+    }
+
+    // Sample last token if different from first (O(1))
+    if (size > 1) {
+      const auto &last = pointer.back();
+      if (last.is_property()) {
+        result ^= static_cast<std::size_t>(last.property_hash().a) << 1;
+      } else {
+        result ^= static_cast<std::size_t>(last.to_index()) << 1;
+      }
+    }
+
+    // Sample middle token if there are at least 3 tokens (O(1))
+    if (size > 2) {
+      const auto &middle = pointer.at(size / 2);
+      if (middle.is_property()) {
+        result ^= static_cast<std::size_t>(middle.property_hash().a) << 2;
+      } else {
+        result ^= static_cast<std::size_t>(middle.to_index()) << 2;
+      }
+    }
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash specialization for sourcemeta::core::WeakPointer
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    if (pointer.empty()) {
+      return 0;
+    }
+
+    std::size_t result = 0;
+    const auto size = pointer.size();
+
+    // Sample first token (O(1))
+    const auto &first = pointer.at(0);
+    if (first.is_property()) {
+      // Use the first member of the pre-computed property hash
+      result ^= static_cast<std::size_t>(first.property_hash().a);
+    } else {
+      // For index tokens, use the index itself
+      result ^= static_cast<std::size_t>(first.to_index());
+    }
+
+    // Sample last token if different from first (O(1))
+    if (size > 1) {
+      const auto &last = pointer.back();
+      if (last.is_property()) {
+        result ^= static_cast<std::size_t>(last.property_hash().a) << 1;
+      } else {
+        result ^= static_cast<std::size_t>(last.to_index()) << 1;
+      }
+    }
+
+    // Sample middle token if there are at least 3 tokens (O(1))
+    if (size > 2) {
+      const auto &middle = pointer.at(size / 2);
+      if (middle.is_property()) {
+        result ^= static_cast<std::size_t>(middle.property_hash().a) << 2;
+      } else {
+        result ^= static_cast<std::size_t>(middle.to_index()) << 2;
+      }
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
