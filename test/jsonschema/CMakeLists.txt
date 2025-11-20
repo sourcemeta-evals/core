@@ -12,6 +12,7 @@ sourcemeta_googletest(NAMESPACE sourcemeta PROJECT core NAME jsonschema
     jsonschema_identify_draft0_test.cc
     jsonschema_identify_test.cc
     jsonschema_is_schema_test.cc
+    jsonschema_is_empty_schema_test.cc
     jsonschema_frame_2020_12_test.cc
     jsonschema_frame_2019_09_test.cc
     jsonschema_frame_draft7_test.cc
@@ -32,7 +33,7 @@ sourcemeta_googletest(NAMESPACE sourcemeta PROJECT core NAME jsonschema
     jsonschema_bundle_draft1_test.cc
     jsonschema_bundle_draft0_test.cc
     jsonschema_bundle_test.cc
-    jsonschema_unidentify_test.cc
+    jsonschema_dependencies_test.cc
     jsonschema_metaschema_test.cc
     jsonschema_transform_rules.h
     jsonschema_transform_rule_test.cc
@@ -80,7 +81,7 @@ sourcemeta_googletest(NAMESPACE sourcemeta PROJECT core NAME jsonschema
     jsonschema_error_test.cc
     jsonschema_keyword_iterator_test.cc
     jsonschema_official_resolver_test.cc
-    jsonschema_relativize_test.cc
+    jsonschema_parse_type_test.cc
     jsonschema_map_resolver_test.cc
     jsonschema_format_test.cc
     jsonschema_wrap_test.cc)

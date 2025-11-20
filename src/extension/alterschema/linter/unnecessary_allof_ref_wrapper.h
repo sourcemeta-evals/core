@@ -27,43 +27,20 @@ public:
     }
 
     const auto &all_of = schema.at("allOf");
-    std::size_t ref_branch_count = 0;
-    bool has_pure_ref_branch = false;
 
-    for (const auto &branch : all_of.as_array()) {
-      if (branch.is_object() && branch.defines("$ref")) {
-        ref_branch_count++;
-        if (branch.size() == 1) {
-          has_pure_ref_branch = true;
-        }
-      }
+    // Only apply when allOf has exactly one branch that is a pure $ref
+    // Let UnnecessaryAllOfWrapperModern handle multi-branch cases
+    if (all_of.size() != 1) {
+      return false;
     }
 
-    return ref_branch_count == 1 && has_pure_ref_branch;
+    const auto &branch = all_of.at(0);
+    return branch.is_object() && branch.defines("$ref") && branch.size() == 1;
   }
 
-  auto transform(JSON &schema) const -> void override {
-    auto all_of = schema.at("allOf");
-    std::size_t ref_index = 0;
-
-    for (std::size_t i = 0; i < all_of.size(); ++i) {
-      const auto &branch = all_of.at(i);
-      if (branch.is_object() && branch.defines("$ref") && branch.size() == 1) {
-        ref_index = i;
-        break;
-      }
-    }
-
-    auto ref_value = all_of.at(ref_index).at("$ref");
-    schema.assign("$ref", std::move(ref_value));
-
-    all_of.erase(all_of.as_array().begin() +
-                 static_cast<std::ptrdiff_t>(ref_index));
-
-    if (all_of.empty()) {
-      schema.erase("allOf");
-    } else {
-      schema.at("allOf").into(std::move(all_of));
-    }
+  auto transform(JSON &schema, const Result &) const -> void override {
+    auto ref_value = schema.at("allOf").at(0).at("$ref");
+    schema.try_assign_before("$ref", std::move(ref_value), "allOf");
+    schema.erase("allOf");
   }
 };
