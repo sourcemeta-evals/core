@@ -786,4 +786,61 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+
+  // For file:// URIs, handle them specially
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+
+    // Build the path string by unescaping
+    std::string path_string;
+
+    // If there's a host, this is a UNC path (Windows network path)
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      // UNC path: \\host\path
+      path_string = "\\\\";
+      std::istringstream host_input{std::string{uri_host.value()}};
+      std::ostringstream host_output;
+      uri_unescape(host_input, host_output);
+      path_string += host_output.str();
+    }
+
+    // Add the path component if it exists
+    if (uri_path.has_value()) {
+      std::istringstream path_input{uri_path.value()};
+      std::ostringstream path_output;
+      uri_unescape(path_input, path_output);
+      std::string unescaped_path = path_output.str();
+
+      // Check if this is a Windows absolute path (e.g., /C:/foo)
+      // Windows paths in file URIs have the format file:///C:/foo
+      if (unescaped_path.size() >= 3 && unescaped_path[0] == '/' &&
+          std::isalpha(static_cast<unsigned char>(unescaped_path[1])) &&
+          unescaped_path[2] == ':') {
+        // Remove the leading slash for Windows drive letter
+        unescaped_path = unescaped_path.substr(1);
+      }
+
+      path_string += unescaped_path;
+    }
+
+    // Convert forward slashes to backslashes on Windows
+#ifdef _WIN32
+    std::ranges::replace(path_string, '/', '\\');
+#endif
+
+    return std::filesystem::path{path_string};
+  }
+
+  // For non-file:// URIs, just return the path component
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  // If there's no path, return empty path
+  return std::filesystem::path{};
+}
+
 } // namespace sourcemeta::core
