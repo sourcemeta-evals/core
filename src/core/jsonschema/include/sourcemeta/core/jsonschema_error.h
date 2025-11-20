@@ -55,6 +55,19 @@ private:
 };
 
 /// @ingroup jsonschema
+/// An error that represents a relative meta-schema resolution failure event
+/// Relative references to meta-schemas are invalid as per the specification
+/// See https://json-schema.org/draft/2020-12/json-schema-core#section-8.1.1-2
+class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaRelativeMetaschemaResolutionError
+    : public SchemaResolutionError {
+public:
+  SchemaRelativeMetaschemaResolutionError(std::string identifier)
+      : SchemaResolutionError{std::move(identifier),
+                              "Relative meta-schema URIs are not valid "
+                              "according to the JSON Schema specification"} {}
+};
+
+/// @ingroup jsonschema
 /// An error that represents a schema vocabulary error
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaVocabularyError
     : public std::exception {
@@ -103,6 +116,13 @@ private:
 };
 
 /// @ingroup jsonschema
+/// An error that represents a broken schema resolution event
+class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaBrokenReferenceError
+    : public SchemaReferenceError {
+  using SchemaReferenceError::SchemaReferenceError;
+};
+
+/// @ingroup jsonschema
 /// An error that represents that a schema operation cannot continue
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaAbortError
     : public std::exception {
@@ -137,6 +157,31 @@ public:
   [[nodiscard]] auto what() const noexcept -> const char * override {
     return "Could not determine the base dialect of the schema";
   }
+};
+
+/// @ingroup jsonschema
+/// An error that signifies that a transform rule was applied more than once
+class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformRuleProcessedTwiceError
+    : public std::exception {
+public:
+  SchemaTransformRuleProcessedTwiceError(std::string name, Pointer location)
+      : name_{std::move(name)}, location_{std::move(location)} {}
+
+  [[nodiscard]] auto what() const noexcept -> const char * override {
+    return "Transformation rules must only be processed once";
+  }
+
+  [[nodiscard]] auto name() const noexcept -> const auto & {
+    return this->name_;
+  }
+
+  [[nodiscard]] auto location() const noexcept -> const auto & {
+    return this->location_;
+  }
+
+private:
+  std::string name_;
+  Pointer location_;
 };
 
 #if defined(_MSC_VER)
