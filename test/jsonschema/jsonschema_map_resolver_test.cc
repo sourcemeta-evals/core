@@ -181,3 +181,47 @@ TEST(JSONSchema_SchemaMapResolver, embedded_resource_with_callback) {
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/test"));
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/string"));
 }
+
+TEST(JSONSchema_SchemaMapResolver, draft4_uses_id_keyword) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#"
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/test").has_value());
+  EXPECT_EQ(resolver("https://www.sourcemeta.com/test").value(), document);
+}
+
+TEST(JSONSchema_SchemaMapResolver, draft4_embedded_resource_uses_id) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "definitions": {
+      "string": {
+        "id": "string",
+        "type": "string"
+      }
+    }
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  const sourcemeta::core::JSON embedded = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/string",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "string"
+  })JSON");
+
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/test").has_value());
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/string").has_value());
+  EXPECT_EQ(resolver("https://www.sourcemeta.com/test").value(), document);
+  EXPECT_EQ(resolver("https://www.sourcemeta.com/string").value(), embedded);
+}
