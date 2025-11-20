@@ -453,6 +453,19 @@ public:
   /// ```
   static auto from_path(const std::filesystem::path &path) -> URI;
 
+  /// Convert a URI to a file system path. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/uri.h>
+  /// #include <cassert>
+  /// #include <filesystem>
+  ///
+  /// const sourcemeta::core::URI uri{"file:///foo/bar"};
+  /// const std::filesystem::path path{uri.to_path()};
+  /// assert(path == "/foo/bar");
+  /// ```
+  [[nodiscard]] auto to_path() const -> std::filesystem::path;
+
   /// A convenient method to canonicalize and recompose a URI from a string. For
   /// example:
   ///
@@ -486,6 +499,7 @@ private:
   std::optional<std::string> fragment_{};
   std::optional<std::string> query_{};
   bool is_ipv6_ = false;
+  bool windows_backslash_hint_ = false;
 
   // Use PIMPL idiom to hide `uriparser`
   struct Internal;

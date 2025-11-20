@@ -748,6 +748,7 @@ auto URI::canonicalize(const std::string &input) -> std::string {
 
 auto URI::from_path(const std::filesystem::path &path) -> URI {
   auto normalized{path.lexically_normal().string()};
+  const auto has_backslashes{normalized.find('\\') != std::string::npos};
   const auto is_unc{normalized.starts_with("\\\\")};
   const auto is_windows_absolute{normalized.size() >= 2 &&
                                  normalized[1] == ':'};
@@ -783,7 +784,66 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
     }
   }
 
+  // Set the hint if the original path had backslashes and was a Windows path
+  if (has_backslashes && (is_windows_absolute || is_unc)) {
+    result.windows_backslash_hint_ = true;
+  }
+
   return result;
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+    const auto uri_path{this->path()};
+
+    if (!uri_path.has_value()) {
+      throw URIError{"file:// URI must have a path component"};
+    }
+
+    std::istringstream input{uri_path.value()};
+    std::ostringstream output;
+    uri_unescape(input, output);
+    std::string unescaped_path{output.str()};
+
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      std::string path_part = unescaped_path;
+      if (this->windows_backslash_hint_) {
+        std::ranges::replace(path_part, '/', '\\');
+      }
+      return std::filesystem::path{"\\\\" + std::string{uri_host.value()} +
+                                   path_part};
+    }
+
+    if (unescaped_path.size() >= 3 && unescaped_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(unescaped_path[1])) &&
+        unescaped_path[2] == ':') {
+      std::string drive_path = unescaped_path.substr(1);
+      if (this->windows_backslash_hint_) {
+        std::ranges::replace(drive_path, '/', '\\');
+      }
+      return std::filesystem::path{drive_path};
+    }
+
+    return std::filesystem::path{unescaped_path};
+  }
+
+  if (this->is_fragment_only()) {
+    return std::filesystem::path{};
+  }
+
+  if (this->is_relative() && !this->data.empty()) {
+    return std::filesystem::path{this->data};
+  }
+
+  const auto uri_path{this->path()};
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  return std::filesystem::path{};
 }
 
 } // namespace sourcemeta::core
