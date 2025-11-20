@@ -271,8 +271,68 @@ public:
       // by definition change the score
       -> std::pair<bool, std::uint8_t>;
 
-  [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
-  [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
+  /// A read-only view of a rule for iteration purposes
+  struct RuleView {
+    const std::string &name;
+    const std::string &message;
+  };
+
+  /// Iterator for read-only access to registered rules
+  class Iterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = RuleView;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const RuleView *;
+    using reference = const RuleView &;
+
+    Iterator(std::map<std::string,
+                      std::unique_ptr<SchemaTransformRule>>::const_iterator it)
+        : it_(it) {}
+
+    auto operator*() const -> RuleView {
+      return RuleView{it_->first, it_->second->message()};
+    }
+
+    auto operator++() -> Iterator & {
+      ++it_;
+      return *this;
+    }
+
+    auto operator++(int) -> Iterator {
+      Iterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    auto operator==(const Iterator &other) const -> bool {
+      return it_ == other.it_;
+    }
+
+    auto operator!=(const Iterator &other) const -> bool {
+      return it_ != other.it_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        it_;
+  };
+
+  /// Get an iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> Iterator {
+    return Iterator(this->rules.begin());
+  }
+
+  /// Get an iterator to the end of the rules
+  [[nodiscard]] auto end() const -> Iterator {
+    return Iterator(this->rules.end());
+  }
+
+  /// Get the number of registered rules
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
+
+  /// Check if the transformer has no rules
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
 
 private:
 // Exporting symbols that depends on the standard C++ library is considered
