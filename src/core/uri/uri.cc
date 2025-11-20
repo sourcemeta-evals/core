@@ -786,4 +786,64 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+
+  // For non-file URIs, just return the path component
+  if (!this->scheme_.has_value() || this->scheme_.value() != "file") {
+    if (!uri_path.has_value()) {
+      return std::filesystem::path{};
+    }
+
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  // Handle file:// URIs
+  std::string result;
+
+  // Check if this is a UNC path (has host component)
+  if (this->host_.has_value() && !this->host_.value().empty()) {
+    // UNC path: file://server/share/file -> \\server\share\file
+    result = "\\\\" + std::string{this->host_.value()};
+    if (uri_path.has_value()) {
+      auto path_str = uri_path.value();
+      std::ranges::replace(path_str, '/', '\\');
+      result += path_str;
+    }
+  } else if (uri_path.has_value()) {
+    auto path_str = uri_path.value();
+
+    // Check if this looks like a Windows path (e.g., /C:/foo/bar)
+    if (path_str.size() >= 3 && path_str[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(path_str[1])) &&
+        path_str[2] == ':') {
+      // Windows path: remove leading slash and convert slashes
+      path_str = path_str.substr(1);
+      std::ranges::replace(path_str, '/', '\\');
+      result = path_str;
+    } else {
+      // UNIX path: keep as-is
+      result = path_str;
+    }
+  }
+
+  // Decode percent-encoded characters
+  std::string decoded;
+  decoded.reserve(result.size());
+  for (std::size_t i = 0; i < result.size(); ++i) {
+    if (result[i] == '%' && i + 2 < result.size() &&
+        std::isxdigit(static_cast<unsigned char>(result[i + 1])) &&
+        std::isxdigit(static_cast<unsigned char>(result[i + 2]))) {
+      const auto hex = result.substr(i + 1, 2);
+      const auto ch = static_cast<char>(std::stoul(hex, nullptr, 16));
+      decoded += ch;
+      i += 2;
+    } else {
+      decoded += result[i];
+    }
+  }
+
+  return std::filesystem::path{decoded};
+}
+
 } // namespace sourcemeta::core
