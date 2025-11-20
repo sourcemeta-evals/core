@@ -34,9 +34,11 @@ public:
       return false;
     }
 
-    // Check if the single element has a $ref
+    // Check if the single element has ONLY a $ref (no other properties)
+    // This makes the rule more specific and avoids overlap with
+    // UnnecessaryAllOfWrapperModern which handles more general cases
     const auto &element = allof.at(0);
-    if (!element.is_object() || !element.defines("$ref")) {
+    if (!element.is_object() || !element.defines("$ref") || element.size() != 1) {
       return false;
     }
 
