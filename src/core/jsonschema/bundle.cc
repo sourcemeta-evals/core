@@ -258,6 +258,21 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
     return;
   }
 
+  // If a default_id is provided and the schema doesn't have an identifier,
+  // add it to make the bundled schema easier to process for consumers
+  if (default_id.has_value() && schema.is_object()) {
+    const auto current_id =
+        identify(schema, resolver, SchemaIdentificationStrategy::Strict,
+                 default_dialect, std::nullopt);
+    if (!current_id.has_value()) {
+      const auto maybe_base_dialect =
+          base_dialect(schema, resolver, default_dialect);
+      if (maybe_base_dialect.has_value()) {
+        reidentify(schema, default_id.value(), maybe_base_dialect.value());
+      }
+    }
+  }
+
   const auto vocabularies{
       sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
   if (vocabularies.contains(
