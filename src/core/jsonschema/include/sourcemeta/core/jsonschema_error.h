@@ -116,14 +116,10 @@ private:
 };
 
 /// @ingroup jsonschema
-/// An error that represents a broken schema reference after transformation
+/// An error that represents a broken schema resolution event
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaBrokenReferenceError
     : public SchemaReferenceError {
-public:
-  SchemaBrokenReferenceError(std::string identifier, Pointer schema_location,
-                             std::string message)
-      : SchemaReferenceError{std::move(identifier), std::move(schema_location),
-                             std::move(message)} {}
+  using SchemaReferenceError::SchemaReferenceError;
 };
 
 /// @ingroup jsonschema
@@ -161,6 +157,31 @@ public:
   [[nodiscard]] auto what() const noexcept -> const char * override {
     return "Could not determine the base dialect of the schema";
   }
+};
+
+/// @ingroup jsonschema
+/// An error that signifies that a transform rule was applied more than once
+class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformRuleProcessedTwiceError
+    : public std::exception {
+public:
+  SchemaTransformRuleProcessedTwiceError(std::string name, Pointer location)
+      : name_{std::move(name)}, location_{std::move(location)} {}
+
+  [[nodiscard]] auto what() const noexcept -> const char * override {
+    return "Transformation rules must only be processed once";
+  }
+
+  [[nodiscard]] auto name() const noexcept -> const auto & {
+    return this->name_;
+  }
+
+  [[nodiscard]] auto location() const noexcept -> const auto & {
+    return this->location_;
+  }
+
+private:
+  std::string name_;
+  Pointer location_;
 };
 
 #if defined(_MSC_VER)

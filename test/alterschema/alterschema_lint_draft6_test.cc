@@ -623,8 +623,7 @@ TEST(AlterSchema_lint_draft6, duplicate_allof_branches_1) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-06/schema#",
-    "type": "integer",
-    "allOf": [ { "type": "string" } ]
+    "allOf": [ { "type": "integer" }, { "type": "string" } ]
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -1508,7 +1507,7 @@ TEST(AlterSchema_lint_draft6, unnecessary_allof_wrapper_2) {
   EXPECT_EQ(traces.size(), 1);
   EXPECT_LINT_TRACE(
       traces, 0, "", "unnecessary_allof_wrapper_draft",
-      "Wrapping any keyword other than `$ref` in `allOf` is unnecessary and "
+      "Wrapping keywords other than `$ref` in `allOf` is often unnecessary and "
       "may even introduce a minor evaluation performance overhead");
 }
 
@@ -1831,7 +1830,8 @@ TEST(AlterSchema_lint_draft6, draft_ref_siblings_2) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-06/schema#",
-    "$ref": "#/definitions/foo"
+    "$ref": "#/definitions/foo",
+    "description": "A string field"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -1852,7 +1852,8 @@ TEST(AlterSchema_lint_draft6, draft_ref_siblings_3) {
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-06/schema#",
     "$id": "http://example.com/schema",
-    "$ref": "#/definitions/foo"
+    "$ref": "#/definitions/foo",
+    "description": "Documentation"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -1869,7 +1870,8 @@ TEST(AlterSchema_lint_draft6, draft_ref_siblings_4) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-06/schema#",
-    "$ref": "#/definitions/foo"
+    "$ref": "#/definitions/foo",
+    "description": "Documentation only"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -1909,7 +1911,8 @@ TEST(AlterSchema_lint_draft6, draft_ref_siblings_6) {
     "$schema": "http://json-schema.org/draft-06/schema#",
     "properties": {
       "nested": {
-        "$ref": "#/definitions/bar"
+        "$ref": "#/definitions/bar",
+        "description": "Nested schema with $ref"
       }
     }
   })JSON");
