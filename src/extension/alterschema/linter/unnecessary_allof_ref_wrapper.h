@@ -38,7 +38,8 @@ public:
     // This makes the rule more specific and avoids overlap with
     // UnnecessaryAllOfWrapperModern which handles more general cases
     const auto &element = allof.at(0);
-    if (!element.is_object() || !element.defines("$ref") || element.size() != 1) {
+    if (!element.is_object() || !element.defines("$ref") ||
+        element.size() != 1) {
       return false;
     }
 
@@ -55,8 +56,9 @@ public:
     const auto &allof_element = schema.at("allOf").at(0);
 
     // Copy all properties from the allOf element to the parent schema
+    // Use try_assign_before to place keywords where allOf was (maintain ordering)
     for (const auto &entry : allof_element.as_object()) {
-      schema.assign(entry.first, entry.second);
+      schema.try_assign_before(entry.first, entry.second, "allOf");
     }
 
     // Remove the allOf keyword
