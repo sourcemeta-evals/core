@@ -786,4 +786,66 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+
+  // For non-file:// URIs, return the path component as-is
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (uri_path.has_value()) {
+      return std::filesystem::path{uri_path.value()};
+    }
+    return std::filesystem::path{};
+  }
+
+  // Handle file:// URIs
+  const auto uri_host{this->host()};
+  std::string path_string;
+
+  if (!uri_path.has_value() || uri_path.value().empty()) {
+    // Empty path for file:// URI
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      // UNC path with just a server name: \\server
+      path_string = "\\\\" + std::string{uri_host.value()};
+    } else {
+      return std::filesystem::path{};
+    }
+  } else {
+    // Unescape the path
+    std::istringstream input{uri_path.value()};
+    std::ostringstream unescaped;
+    uri_unescape(input, unescaped);
+    path_string = unescaped.str();
+
+    // Handle UNC paths (Windows network paths)
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      // UNC path: file://server/share/file -> \\server\share\file
+      std::string result = "\\\\" + std::string{uri_host.value()};
+      // path_string should start with /, so we can append it directly
+      result += path_string;
+      // Convert forward slashes to backslashes for Windows
+      std::ranges::replace(result, '/', '\\');
+      return std::filesystem::path{result};
+    }
+
+    // Check if this is a Windows absolute path (e.g., /C:/foo/bar)
+    // The path starts with / followed by a drive letter and colon
+    if (path_string.size() >= 3 && path_string[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(path_string[1])) &&
+        path_string[2] == ':') {
+      // Windows path: file:///C:/foo/bar -> C:\foo\bar
+      // Remove the leading slash
+      path_string = path_string.substr(1);
+      // Convert forward slashes to backslashes
+      std::ranges::replace(path_string, '/', '\\');
+      return std::filesystem::path{path_string};
+    }
+
+    // Unix absolute path: file:///foo/bar -> /foo/bar
+    // Path is already in the correct format
+  }
+
+  return std::filesystem::path{path_string};
+}
+
 } // namespace sourcemeta::core
