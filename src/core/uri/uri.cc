@@ -130,6 +130,13 @@ auto uri_escape_for_path(const std::string &value) -> std::string {
   return result;
 }
 
+auto unescape_string(const std::string &input) -> std::string {
+  std::istringstream input_stream{input};
+  std::ostringstream output_stream;
+  sourcemeta::core::uri_unescape(input_stream, output_stream);
+  return output_stream.str();
+}
+
 } // namespace
 
 namespace sourcemeta::core {
@@ -744,6 +751,36 @@ auto URI::operator<(const URI &other) const noexcept -> bool {
 
 auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  if (this->scheme().has_value() && this->scheme().value() != "file") {
+    if (this->path().has_value()) {
+      return std::filesystem::path{this->path().value()};
+    }
+    return std::filesystem::path{};
+  }
+
+  std::string result_path_string;
+
+  if (this->host().has_value() && !this->host().value().empty() &&
+      this->host().value() != "localhost") {
+    result_path_string += "//";
+    result_path_string += unescape_string(std::string{this->host().value()});
+  }
+
+  if (this->path().has_value()) {
+    const std::string unescaped_path = unescape_string(this->path().value());
+    if (unescaped_path.size() >= 3 && unescaped_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(unescaped_path[1])) &&
+        unescaped_path[2] == ':') {
+      result_path_string += unescaped_path.substr(1);
+    } else {
+      result_path_string += unescaped_path;
+    }
+  }
+
+  return std::filesystem::path{result_path_string};
 }
 
 auto URI::from_path(const std::filesystem::path &path) -> URI {
