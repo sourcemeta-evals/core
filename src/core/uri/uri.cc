@@ -786,4 +786,47 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (uri_path.has_value()) {
+      return std::filesystem::path{uri_path.value()};
+    }
+    return std::filesystem::path{};
+  }
+
+  std::string path_str;
+  if (uri_path.has_value()) {
+    std::istringstream input{uri_path.value()};
+    std::ostringstream output;
+    input >> std::noskipws;
+    uri_unescape(input, output);
+    path_str = output.str();
+  }
+
+  const auto uri_host{this->host()};
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    std::istringstream host_input{std::string{uri_host.value()}};
+    std::ostringstream host_output;
+    host_input >> std::noskipws;
+    uri_unescape(host_input, host_output);
+    std::string result = "\\\\" + host_output.str();
+    std::ranges::replace(path_str, '/', '\\');
+    result += path_str;
+    return std::filesystem::path{result};
+  }
+
+  if (path_str.size() >= 3 && path_str[0] == '/' &&
+      std::isalpha(static_cast<unsigned char>(path_str[1])) &&
+      path_str[2] == ':') {
+    path_str.erase(0, 1);
+    std::ranges::replace(path_str, '/', '\\');
+    return std::filesystem::path{path_str};
+  }
+
+  return std::filesystem::path{path_str};
+}
+
 } // namespace sourcemeta::core
