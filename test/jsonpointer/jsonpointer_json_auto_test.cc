@@ -14,6 +14,17 @@ TEST(JSONPointer_json_auto, foo_bar_baz) {
   EXPECT_EQ(pointer, back.value());
 }
 
+TEST(JSONPointer_json_auto, from_json_with_special_chars) {
+  // Test case for patternProperties with special characters like [\\-]
+  const sourcemeta::core::JSON input{"/patternProperties/[\\\\-]"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value().size(), 2);
+  EXPECT_EQ(result.value().at(0).to_property(), "patternProperties");
+  EXPECT_EQ(result.value().at(1).to_property(), "[\\\\-]");
+}
+
 TEST(JSONPointer_json_auto, from_json_invalid_string) {
   const sourcemeta::core::JSON input{"x"};
   const auto result{
