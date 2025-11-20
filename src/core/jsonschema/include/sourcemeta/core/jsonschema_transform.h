@@ -8,7 +8,9 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonpointer.h>
 
+#include <sourcemeta/core/jsonschema_frame.h>
 #include <sourcemeta/core/jsonschema_resolver.h>
+#include <sourcemeta/core/jsonschema_walker.h>
 
 #include <cassert>     // assert
 #include <concepts>    // std::derived_from
@@ -210,12 +212,18 @@ public:
   auto add(Args &&...args) -> void {
     auto rule{std::make_unique<T>(std::forward<Args>(args)...)};
     // Rules must only be defined once
-    assert(!this->rules.contains(rule->name()));
-    this->rules.emplace(rule->name(), std::move(rule));
+    assert(!this->rules_.contains(rule->name()));
+    this->rules_.emplace(rule->name(), std::move(rule));
   }
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// Read-only access to the registered rules
+  [[nodiscard]] auto rules() const
+      -> const std::map<std::string, std::unique_ptr<SchemaTransformRule>> & {
+    return this->rules_;
+  }
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
@@ -249,7 +257,7 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(disable : 4251)
 #endif
-  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules_;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif
