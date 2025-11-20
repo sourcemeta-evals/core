@@ -27,6 +27,52 @@ static auto transformer_callback_trace(TestTransformTraces &traces) -> auto {
   };
 }
 
+TEST(JSONSchema_transformer, broken_reference_throws_broken_reference_error) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRuleDefinitionsToDefsNoRereference>();
+
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "#/definitions/foo",
+    "definitions": {
+      "foo": { "type": "string" }
+    }
+  })JSON");
+
+  EXPECT_THROW(bundle.apply(document, sourcemeta::core::schema_official_walker,
+                            sourcemeta::core::schema_official_resolver,
+                            transformer_callback_noop),
+               sourcemeta::core::SchemaBrokenReferenceError);
+}
+
+TEST(JSONSchema_transformer,
+     broken_reference_throws_broken_reference_error_check_message) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRuleDefinitionsToDefsNoRereference>();
+
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "#/definitions/foo",
+    "definitions": {
+      "foo": { "type": "string" }
+    }
+  })JSON");
+
+  try {
+    bundle.apply(document, sourcemeta::core::schema_official_walker,
+                 sourcemeta::core::schema_official_resolver,
+                 transformer_callback_noop);
+    FAIL() << "Expected SchemaBrokenReferenceError";
+  } catch (const sourcemeta::core::SchemaBrokenReferenceError &e) {
+    EXPECT_STREQ(e.what(), "The reference broke after transformation");
+    // Verify it is also a SchemaReferenceError
+    const sourcemeta::core::SchemaReferenceError &ref_error = e;
+    EXPECT_STREQ(ref_error.what(), "The reference broke after transformation");
+  } catch (...) {
+    FAIL() << "Expected SchemaBrokenReferenceError";
+  }
+}
+
 TEST(JSONSchema_transformer, flat_document_no_applicators) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();
