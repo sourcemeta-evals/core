@@ -28,6 +28,29 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_with_special_chars) {
+  // Test case for patternProperties with special characters like hyphens
+  // This tests the fix for the separate compilation issue where JSON-encoded
+  // strings were being double-encoded
+  const sourcemeta::core::Pointer pointer{"patternProperties", "[\\-]"};
+  const auto json_result{sourcemeta::core::to_json(pointer)};
+
+  // Verify round-trip: to_json -> from_json should give us back the same
+  // pointer
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(json_result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+
+  // Also test with a pre-serialized JSON string (simulating loaded compiled
+  // schema)
+  const sourcemeta::core::JSON preloaded{"/patternProperties/[\\-]"};
+  const auto from_preloaded{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(preloaded)};
+  EXPECT_TRUE(from_preloaded.has_value());
+  EXPECT_EQ(pointer, from_preloaded.value());
+}
+
 TEST(JSONPointer_json_auto, from_json_regex_backslash_value) {
   const auto input{sourcemeta::core::parse_json(R"JSON({
     "value": "/[\\-]/type"
