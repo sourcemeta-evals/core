@@ -52,6 +52,15 @@ public:
       return false;
     }
 
+    // Only apply if the schema has no other keywords besides allOf and $schema
+    // This prevents conflicts with UnnecessaryAllOfWrapperModern which handles
+    // the case where there are other keywords in the parent schema
+    for (const auto &entry : schema.as_object()) {
+      if (entry.first != "allOf" && entry.first != "$schema") {
+        return false;
+      }
+    }
+
     return true;
   }
 
