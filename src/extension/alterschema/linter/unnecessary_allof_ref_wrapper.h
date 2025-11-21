@@ -55,7 +55,7 @@ public:
     return true;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     // Extract the $ref from the single allOf branch
     auto ref_value = schema.at("allOf").front().at("$ref");
 
