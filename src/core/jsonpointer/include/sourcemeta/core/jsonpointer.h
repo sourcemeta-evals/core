@@ -652,4 +652,125 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+// std::hash specializations for Pointer and WeakPointer
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash specialization for sourcemeta::core::Pointer to enable use in
+/// std::unordered_map and std::unordered_set
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    // Empty pointer has hash 0
+    if (size == 0) {
+      return 0;
+    }
+
+    // For O(1) performance, we sample at most 3 tokens:
+    // first, middle, and last
+    std::size_t result = size;
+
+    // Hash the first token
+    const auto &first = pointer.at(0);
+    if (first.is_property()) {
+      // Use the first member of the pre-computed property hash
+      const auto prop_hash = first.property_hash();
+      result ^= static_cast<std::size_t>(prop_hash.a) + 0x9e3779b9 +
+                (result << 6) + (result >> 2);
+    } else {
+      // For index tokens, use the index itself
+      result ^= first.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+    }
+
+    // If we have more than 2 tokens, hash the middle token
+    if (size > 2) {
+      const auto &middle = pointer.at(size / 2);
+      if (middle.is_property()) {
+        const auto prop_hash = middle.property_hash();
+        result ^= static_cast<std::size_t>(prop_hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^=
+            middle.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    // If we have more than 1 token, hash the last token
+    if (size > 1) {
+      const auto &last = pointer.back();
+      if (last.is_property()) {
+        const auto prop_hash = last.property_hash();
+        result ^= static_cast<std::size_t>(prop_hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^= last.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash specialization for sourcemeta::core::WeakPointer to enable use in
+/// std::unordered_map and std::unordered_set
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+
+    // Empty pointer has hash 0
+    if (size == 0) {
+      return 0;
+    }
+
+    // For O(1) performance, we sample at most 3 tokens:
+    // first, middle, and last
+    std::size_t result = size;
+
+    // Hash the first token
+    const auto &first = pointer.at(0);
+    if (first.is_property()) {
+      // Use the first member of the pre-computed property hash
+      const auto prop_hash = first.property_hash();
+      result ^= static_cast<std::size_t>(prop_hash.a) + 0x9e3779b9 +
+                (result << 6) + (result >> 2);
+    } else {
+      // For index tokens, use the index itself
+      result ^= first.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+    }
+
+    // If we have more than 2 tokens, hash the middle token
+    if (size > 2) {
+      const auto &middle = pointer.at(size / 2);
+      if (middle.is_property()) {
+        const auto prop_hash = middle.property_hash();
+        result ^= static_cast<std::size_t>(prop_hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^=
+            middle.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    // If we have more than 1 token, hash the last token
+    if (size > 1) {
+      const auto &last = pointer.back();
+      if (last.is_property()) {
+        const auto prop_hash = last.property_hash();
+        result ^= static_cast<std::size_t>(prop_hash.a) + 0x9e3779b9 +
+                  (result << 6) + (result >> 2);
+      } else {
+        result ^= last.to_index() + 0x9e3779b9 + (result << 6) + (result >> 2);
+      }
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
