@@ -255,6 +255,21 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
     assert(!default_container.value().empty());
     bundle_schema(schema, default_container.value(), schema, frame, walker,
                   resolver, default_dialect, default_id, paths);
+    // Add the default identifier if provided and schema doesn't have one
+    if (default_id.has_value() && schema.is_object()) {
+      const auto current_id{sourcemeta::core::identify(
+          schema, resolver,
+          sourcemeta::core::SchemaIdentificationStrategy::Strict,
+          default_dialect, std::nullopt)};
+      if (!current_id.has_value()) {
+        const auto base_dialect{
+            sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+        if (base_dialect.has_value()) {
+          sourcemeta::core::reidentify(schema, default_id.value(),
+                                       base_dialect.value());
+        }
+      }
+    }
     return;
   }
 
@@ -277,6 +292,21 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
           "https://json-schema.org/draft/2019-09/vocab/core")) {
     bundle_schema(schema, {"$defs"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
+    // Add the default identifier if provided and schema doesn't have one
+    if (default_id.has_value() && schema.is_object()) {
+      const auto current_id{sourcemeta::core::identify(
+          schema, resolver,
+          sourcemeta::core::SchemaIdentificationStrategy::Strict,
+          default_dialect, std::nullopt)};
+      if (!current_id.has_value()) {
+        const auto base_dialect{
+            sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+        if (base_dialect.has_value()) {
+          sourcemeta::core::reidentify(schema, default_id.value(),
+                                       base_dialect.value());
+        }
+      }
+    }
     return;
   } else if (vocabularies.contains("http://json-schema.org/draft-07/schema#") ||
              vocabularies.contains(
@@ -289,6 +319,21 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
                  "http://json-schema.org/draft-04/hyper-schema#")) {
     bundle_schema(schema, {"definitions"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
+    // Add the default identifier if provided and schema doesn't have one
+    if (default_id.has_value() && schema.is_object()) {
+      const auto current_id{sourcemeta::core::identify(
+          schema, resolver,
+          sourcemeta::core::SchemaIdentificationStrategy::Strict,
+          default_dialect, std::nullopt)};
+      if (!current_id.has_value()) {
+        const auto base_dialect{
+            sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+        if (base_dialect.has_value()) {
+          sourcemeta::core::reidentify(schema, default_id.value(),
+                                       base_dialect.value());
+        }
+      }
+    }
     return;
   } else if (vocabularies.contains(
                  "http://json-schema.org/draft-03/hyper-schema#") ||
@@ -304,6 +349,21 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
              vocabularies.contains("http://json-schema.org/draft-00/schema#")) {
     frame.analyse(schema, walker, resolver, default_dialect, default_id);
     if (frame.standalone()) {
+      // Add the default identifier if provided and schema doesn't have one
+      if (default_id.has_value() && schema.is_object()) {
+        const auto current_id{sourcemeta::core::identify(
+            schema, resolver,
+            sourcemeta::core::SchemaIdentificationStrategy::Strict,
+            default_dialect, std::nullopt)};
+        if (!current_id.has_value()) {
+          const auto base_dialect{sourcemeta::core::base_dialect(
+              schema, resolver, default_dialect)};
+          if (base_dialect.has_value()) {
+            sourcemeta::core::reidentify(schema, default_id.value(),
+                                         base_dialect.value());
+          }
+        }
+      }
       return;
     }
   }
