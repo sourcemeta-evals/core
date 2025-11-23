@@ -242,6 +242,54 @@ public:
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
 
+  class ConstIterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = const SchemaTransformRule;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const SchemaTransformRule *;
+    using reference = const SchemaTransformRule &;
+
+    ConstIterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator iter)
+        : iter_{iter} {}
+
+    auto operator*() const -> reference { return *iter_->second; }
+    auto operator->() const -> pointer { return iter_->second.get(); }
+    auto operator++() -> ConstIterator & {
+      ++iter_;
+      return *this;
+    }
+    auto operator++(int) -> ConstIterator {
+      ConstIterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+    auto operator==(const ConstIterator &other) const -> bool {
+      return iter_ == other.iter_;
+    }
+    auto operator!=(const ConstIterator &other) const -> bool {
+      return iter_ != other.iter_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        iter_;
+  };
+
+  [[nodiscard]] auto begin() const -> ConstIterator {
+    return ConstIterator(this->rules.begin());
+  }
+
+  [[nodiscard]] auto end() const -> ConstIterator {
+    return ConstIterator(this->rules.end());
+  }
+
+  [[nodiscard]] auto size() const -> std::size_t { return this->rules.size(); }
+
+  [[nodiscard]] auto empty() const -> bool { return this->rules.empty(); }
+
 private:
 // Exporting symbols that depends on the standard C++ library is considered
 // safe.
