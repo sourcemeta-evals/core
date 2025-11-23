@@ -55,11 +55,11 @@ public:
   auto transform(JSON &schema, const Result &) const -> void override {
     // Extract the $ref from the allOf branch
     auto ref_value = schema.at("allOf").at(0).at("$ref");
-
+    
+    // Add the $ref to the parent schema before allOf (to preserve ordering)
+    schema.try_assign_before("$ref", std::move(ref_value), "allOf");
+    
     // Remove the allOf keyword
     schema.erase("allOf");
-
-    // Add the $ref to the parent schema
-    schema.assign("$ref", std::move(ref_value));
   }
 };
