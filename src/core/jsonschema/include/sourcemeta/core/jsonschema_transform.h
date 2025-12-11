@@ -217,6 +217,27 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// The type of the underlying rules container for iteration
+  using Container = std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+
+  /// A const iterator over the rules
+  using const_iterator = Container::const_iterator;
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto end() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto cend() const noexcept -> const_iterator;
+
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto size() const noexcept -> std::size_t;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
