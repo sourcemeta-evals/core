@@ -786,4 +786,57 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto uri_unescape_path(const std::string &value) -> std::string {
+  std::istringstream input{value};
+  input >> std::noskipws;
+  std::ostringstream output;
+  uri_unescape(input, output);
+  return output.str();
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+
+  // For non-file:// URIs, just return the path component
+  if (!this->scheme_.has_value() || this->scheme_.value() != "file") {
+    if (uri_path.has_value()) {
+      return std::filesystem::path{uri_unescape_path(uri_path.value())};
+    }
+    return std::filesystem::path{};
+  }
+
+  // Handle file:// URIs
+  std::string result;
+
+  // Check for UNC paths (file://server/share/...)
+  if (this->host_.has_value() && !this->host_.value().empty()) {
+    result = "\\\\" + this->host_.value();
+  }
+
+  if (uri_path.has_value()) {
+    auto decoded_path = uri_unescape_path(uri_path.value());
+
+    // Check for Windows drive letter (e.g., /C:/...)
+    if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+        decoded_path[2] == ':') {
+      // Windows absolute path - remove leading slash
+      decoded_path = decoded_path.substr(1);
+    }
+
+    result += decoded_path;
+  }
+
+  // Convert forward slashes to backslashes for Windows paths
+  if (!result.empty() &&
+      (result.starts_with("\\\\") ||
+       (result.size() >= 2 &&
+        std::isalpha(static_cast<unsigned char>(result[0])) &&
+        result[1] == ':'))) {
+    std::ranges::replace(result, '/', '\\');
+  }
+
+  return std::filesystem::path{result};
+}
+
 } // namespace sourcemeta::core
