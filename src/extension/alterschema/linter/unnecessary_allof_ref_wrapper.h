@@ -32,49 +32,31 @@ public:
     }
 
     const auto &all_of = schema.at("allOf");
-    std::size_t ref_branch_count = 0;
-    std::size_t ref_branch_index = 0;
 
-    for (std::size_t i = 0; i < all_of.size(); ++i) {
-      const auto &branch = all_of.at(i);
-      if (branch.is_object() && branch.defines("$ref")) {
-        ++ref_branch_count;
-        ref_branch_index = i;
-      }
-    }
-
-    if (ref_branch_count != 1) {
+    // Only apply when allOf has exactly one branch containing only $ref
+    // For multi-branch allOf, let unnecessary_allof_wrapper_modern handle it
+    if (all_of.size() != 1) {
       return false;
     }
 
-    const auto &ref_branch = all_of.at(ref_branch_index);
-    return ref_branch.size() == 1;
+    const auto &branch = all_of.at(0);
+    if (!branch.is_object() || !branch.defines("$ref")) {
+      return false;
+    }
+
+    // The branch must contain ONLY $ref (no other keywords)
+    return branch.size() == 1;
   }
 
-  auto transform(JSON &schema) const -> void override {
-    auto all_of = schema.at("allOf");
+  auto transform(JSON &schema, const Result &) const -> void override {
+    // We only handle single-branch allOf with only $ref
+    auto ref_value = schema.at("allOf").at(0).at("$ref");
 
-    std::size_t ref_branch_index = 0;
-    for (std::size_t i = 0; i < all_of.size(); ++i) {
-      const auto &branch = all_of.at(i);
-      if (branch.is_object() && branch.defines("$ref")) {
-        ref_branch_index = i;
-        break;
-      }
-    }
+    // Use try_assign_before to place $ref before allOf in keyword order
+    // (consistent with unnecessary_allof_wrapper_modern)
+    schema.try_assign_before("$ref", std::move(ref_value), "allOf");
 
-    auto ref_value = all_of.at(ref_branch_index).at("$ref");
-
-    if (all_of.size() == 1) {
-      schema.erase("allOf");
-    } else {
-      all_of.erase(all_of.as_array().begin() +
-                       static_cast<std::ptrdiff_t>(ref_branch_index),
-                   all_of.as_array().begin() +
-                       static_cast<std::ptrdiff_t>(ref_branch_index) + 1);
-      schema.at("allOf").into(std::move(all_of));
-    }
-
-    schema.assign("$ref", std::move(ref_value));
+    // Remove the allOf entirely since it only had one branch
+    schema.erase("allOf");
   }
 };
