@@ -3304,12 +3304,11 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_2) {
 
   LINT_AND_FIX_FOR_READABILITY(document);
 
+  // Both $ref and type are extracted by the combined rules
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "$ref": "https://example.com",
-    "allOf": [
-      { "type": "object" }
-    ]
+    "type": "object",
+    "$ref": "https://example.com"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -3369,11 +3368,11 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_5) {
 
   LINT_AND_FIX_FOR_READABILITY(document);
 
+  // UnnecessaryAllOfWrapperModern extracts both $ref and description
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2019-09/schema",
-    "allOf": [
-      { "$ref": "https://example.com", "description": "foo" }
-    ]
+    "$ref": "https://example.com",
+    "description": "foo"
   })JSON");
 
   EXPECT_EQ(document, expected);
