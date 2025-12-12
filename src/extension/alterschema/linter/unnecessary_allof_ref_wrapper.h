@@ -31,52 +31,27 @@ public:
       return false;
     }
 
-    std::size_t ref_branch_count = 0;
-    for (const auto &branch : schema.at("allOf").as_array()) {
-      if (branch.is_object() && branch.defines("$ref")) {
-        ref_branch_count++;
-      }
+    const auto &allof = schema.at("allOf");
+
+    // Only apply when there's exactly one branch in allOf
+    // and that branch contains ONLY $ref
+    if (allof.size() != 1) {
+      return false;
     }
 
-    if (ref_branch_count != 1) {
+    const auto &branch = allof.at(0);
+    if (!branch.is_object() || !branch.defines("$ref") || branch.size() != 1) {
       return false;
     }
 
     return true;
   }
 
-  auto transform(JSON &schema) const -> void override {
-    auto allof = schema.at("allOf");
-
-    std::size_t ref_branch_index = 0;
-    std::size_t index = 0;
-    for (const auto &branch : allof.as_array()) {
-      if (branch.is_object() && branch.defines("$ref")) {
-        ref_branch_index = index;
-        break;
-      }
-      index++;
-    }
-
-    auto it = allof.as_array().begin();
-    std::advance(it, static_cast<std::ptrdiff_t>(ref_branch_index));
-    auto ref_value = it->at("$ref");
-
-    if (it->size() == 1) {
-      if (allof.size() == 1) {
-        schema.assign("$ref", std::move(ref_value));
-        schema.erase("allOf");
-      } else {
-        schema.assign("$ref", std::move(ref_value));
-        allof.erase(it, std::next(it));
-        schema.at("allOf").into(std::move(allof));
-      }
-    } else {
-      schema.assign("$ref", std::move(ref_value));
-      auto modified_branch = *it;
-      modified_branch.erase("$ref");
-      *it = std::move(modified_branch);
-      schema.at("allOf").into(std::move(allof));
-    }
+  auto transform(JSON &schema, const Result &) const -> void override {
+    // We only apply when there's exactly one branch with only $ref
+    auto ref_value = schema.at("allOf").at(0).at("$ref");
+    // Use try_assign_before to place $ref where allOf was for proper ordering
+    schema.try_assign_before("$ref", std::move(ref_value), "allOf");
+    schema.erase("allOf");
   }
 };
