@@ -194,6 +194,58 @@ public:
   /// Create a transform bundle
   SchemaTransformer() = default;
 
+  /// A read-only iterator over the registered rules
+  class const_iterator {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = const SchemaTransformRule;
+    using pointer = const SchemaTransformRule *;
+    using reference = const SchemaTransformRule &;
+
+    const_iterator(
+        std::map<std::string,
+                 std::unique_ptr<SchemaTransformRule>>::const_iterator iter)
+        : iter_(iter) {}
+
+    auto operator*() const -> reference { return *(iter_->second); }
+    auto operator->() const -> pointer { return iter_->second.get(); }
+    auto operator++() -> const_iterator & {
+      ++iter_;
+      return *this;
+    }
+    auto operator++(int) -> const_iterator {
+      const_iterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+    auto operator==(const const_iterator &other) const -> bool {
+      return iter_ == other.iter_;
+    }
+    auto operator!=(const const_iterator &other) const -> bool {
+      return iter_ != other.iter_;
+    }
+
+  private:
+    std::map<std::string, std::unique_ptr<SchemaTransformRule>>::const_iterator
+        iter_;
+  };
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto end() const -> const_iterator;
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto cend() const -> const_iterator;
+
+  /// Get the number of registered rules
+  [[nodiscard]] auto size() const -> std::size_t;
+
   // Not worth documenting these details
 #if !defined(DOXYGEN)
   // Explicitly disallow copying, as this class makes use of unique pointers,
