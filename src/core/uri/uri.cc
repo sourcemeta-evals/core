@@ -746,6 +746,55 @@ auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
 }
 
+auto uri_unescape_path(const std::string &value) -> std::string {
+  std::istringstream input{value};
+  input >> std::noskipws;
+  std::ostringstream output;
+  uri_unescape(input, output);
+  return output.str();
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  if (!uri_path.has_value()) {
+    return std::filesystem::path{};
+  }
+
+  const auto scheme{this->scheme()};
+  const bool is_file{scheme.has_value() && scheme.value() == "file"};
+
+  if (!is_file) {
+    return std::filesystem::path{uri_unescape_path(uri_path.value())};
+  }
+
+  const auto host{this->host()};
+  std::string result;
+
+  // Handle UNC paths (file://server/share/path)
+  if (host.has_value() && !host.value().empty()) {
+    result = "\\\\" + std::string{host.value()};
+  }
+
+  auto decoded_path{uri_unescape_path(uri_path.value())};
+
+  // Check for Windows drive letter (e.g., /C:/path)
+  if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+      std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+      decoded_path[2] == ':') {
+    // Remove leading slash for Windows paths
+    decoded_path = decoded_path.substr(1);
+  }
+
+  result += decoded_path;
+
+#ifdef _WIN32
+  // Convert forward slashes to backslashes on Windows
+  std::ranges::replace(result, '/', '\\');
+#endif
+
+  return std::filesystem::path{result};
+}
+
 auto URI::from_path(const std::filesystem::path &path) -> URI {
   auto normalized{path.lexically_normal().string()};
   const auto is_unc{normalized.starts_with("\\\\")};
