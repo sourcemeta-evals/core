@@ -58,6 +58,9 @@ public:
 
     auto ref_value{all_of.at(ref_branch_index).at("$ref")};
 
+    // Insert $ref before allOf to preserve keyword ordering
+    schema.try_assign_before("$ref", std::move(ref_value), "allOf");
+
     if (all_of.size() == 1) {
       schema.erase("allOf");
     } else {
@@ -65,7 +68,5 @@ public:
                    static_cast<std::ptrdiff_t>(ref_branch_index));
       schema.at("allOf").into(std::move(all_of));
     }
-
-    schema.assign("$ref", std::move(ref_value));
   }
 };
