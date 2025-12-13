@@ -250,6 +250,17 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  // If a default identifier is provided and the schema doesn't have one,
+  // add it to make the bundled schema easier for consumers to process
+  if (default_id.has_value() && schema.is_object()) {
+    const auto current_id{identify(schema, resolver,
+                                   SchemaIdentificationStrategy::Strict,
+                                   default_dialect, std::nullopt)};
+    if (!current_id.has_value()) {
+      reidentify(schema, default_id.value(), resolver, default_dialect);
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
