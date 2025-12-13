@@ -44,7 +44,7 @@ public:
     return ref_branch_count == 1;
   }
 
-  auto transform(JSON &schema) const -> void override {
+  auto transform(JSON &schema, const Result &) const -> void override {
     auto all_of{schema.at("allOf")};
     std::size_t ref_branch_index = 0;
 
