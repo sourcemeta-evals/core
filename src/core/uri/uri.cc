@@ -746,6 +746,41 @@ auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  if (!uri_path.has_value()) {
+    return std::filesystem::path{};
+  }
+
+  std::istringstream input{uri_path.value()};
+  input >> std::noskipws;
+  std::ostringstream output;
+  uri_unescape(input, output);
+  auto decoded_path{output.str()};
+
+  const auto uri_scheme{this->scheme()};
+  const auto is_file_uri{uri_scheme.has_value() &&
+                         uri_scheme.value() == "file"};
+
+  if (is_file_uri) {
+    const auto uri_host{this->host()};
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      std::string unc_path{"\\\\"};
+      unc_path += uri_host.value();
+      std::ranges::replace(decoded_path, '/', '\\');
+      unc_path += decoded_path;
+      return std::filesystem::path{unc_path};
+    }
+
+    if (decoded_path.size() >= 3 && std::isalpha(decoded_path[1]) &&
+        decoded_path[2] == ':') {
+      decoded_path.erase(0, 1);
+    }
+  }
+
+  return std::filesystem::path{decoded_path};
+}
+
 auto URI::from_path(const std::filesystem::path &path) -> URI {
   auto normalized{path.lexically_normal().string()};
   const auto is_unc{normalized.starts_with("\\\\")};
