@@ -16,10 +16,13 @@ sourcemeta_googletest(NAMESPACE sourcemeta PROJECT core NAME json
     json_string_test.cc
     json_stringify_test.cc
     json_value_test.cc
-    json_type_test.cc)
+    json_type_test.cc
+    json_auto_test.cc)
 
 target_link_libraries(sourcemeta_core_json_unit
   PRIVATE sourcemeta::core::json)
+target_link_libraries(sourcemeta_core_json_unit
+  PRIVATE sourcemeta::core::io)
 target_compile_definitions(sourcemeta_core_json_unit
   PRIVATE TEST_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}")
 
