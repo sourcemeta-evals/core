@@ -12,6 +12,7 @@
 
 #include <cassert>     // assert
 #include <concepts>    // std::derived_from
+#include <cstddef>     // std::size_t
 #include <functional>  // std::function
 #include <map>         // std::map
 #include <memory>      // std::make_unique, std::unique_ptr
@@ -194,6 +195,11 @@ public:
   /// Create a transform bundle
   SchemaTransformer() = default;
 
+  /// The underlying container type for rules
+  using Container = std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+  /// The const iterator type for iterating over rules
+  using const_iterator = Container::const_iterator;
+
   // Not worth documenting these details
 #if !defined(DOXYGEN)
   // Explicitly disallow copying, as this class makes use of unique pointers,
@@ -216,6 +222,24 @@ public:
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto end() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const noexcept -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto cend() const noexcept -> const_iterator;
+
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto size() const noexcept -> std::size_t;
+
+  /// Check if the bundle has no rules
+  [[nodiscard]] auto empty() const noexcept -> bool;
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
