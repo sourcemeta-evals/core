@@ -3845,12 +3845,11 @@ TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_2) {
 
   LINT_AND_FIX_FOR_READABILITY(document);
 
+  // The UnnecessaryAllOfWrapperModern rule extracts all keywords
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$ref": "https://example.com",
-    "allOf": [
-      { "type": "object" }
-    ]
+    "type": "object"
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -3910,11 +3909,11 @@ TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_5) {
 
   LINT_AND_FIX_FOR_READABILITY(document);
 
+  // The UnnecessaryAllOfWrapperModern rule extracts all keywords
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "allOf": [
-      { "$ref": "https://example.com", "title": "My schema" }
-    ]
+    "$ref": "https://example.com",
+    "title": "My schema"
   })JSON");
 
   EXPECT_EQ(document, expected);
