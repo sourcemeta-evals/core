@@ -8,6 +8,8 @@ extern "C" {
 #include <cstring> // std::memset
 #include <sstream> // std::ostringstream
 
+static constexpr auto BUFFER_SIZE{4096};
+
 namespace sourcemeta::core {
 
 auto gzip(std::string_view input) -> std::optional<std::string> {
@@ -43,6 +45,50 @@ auto gzip(std::string_view input) -> std::optional<std::string> {
   }
 
   return compressed.str();
+}
+
+auto gunzip(std::istream &stream) -> std::optional<std::string> {
+  z_stream zstream;
+  std::memset(&zstream, 0, sizeof(zstream));
+  int code = inflateInit2(&zstream, 16 + MAX_WBITS);
+  if (code != Z_OK) {
+    return std::nullopt;
+  }
+
+  std::array<char, BUFFER_SIZE> input_buffer;
+  std::array<char, BUFFER_SIZE> output_buffer;
+  std::ostringstream decompressed;
+
+  do {
+    stream.read(input_buffer.data(), BUFFER_SIZE);
+    const auto bytes_read{stream.gcount()};
+    if (bytes_read == 0) {
+      break;
+    }
+
+    zstream.next_in = reinterpret_cast<Bytef *>(input_buffer.data());
+    zstream.avail_in = static_cast<uInt>(bytes_read);
+
+    do {
+      zstream.next_out = reinterpret_cast<Bytef *>(output_buffer.data());
+      zstream.avail_out = BUFFER_SIZE;
+      code = inflate(&zstream, Z_NO_FLUSH);
+      if (code != Z_OK && code != Z_STREAM_END) {
+        inflateEnd(&zstream);
+        return std::nullopt;
+      }
+
+      decompressed.write(output_buffer.data(),
+                         BUFFER_SIZE - static_cast<long>(zstream.avail_out));
+    } while (zstream.avail_out == 0);
+  } while (code != Z_STREAM_END);
+
+  code = inflateEnd(&zstream);
+  if (code != Z_OK) {
+    return std::nullopt;
+  }
+
+  return decompressed.str();
 }
 
 } // namespace sourcemeta::core
