@@ -746,6 +746,50 @@ auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  const auto uri_scheme{this->scheme()};
+
+  // For non-file:// URIs, just return the path component
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (!uri_path.has_value()) {
+      return std::filesystem::path{};
+    }
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  // Handle file:// URIs
+  std::string result_path;
+
+  // Check for UNC paths (file://server/share/...)
+  const auto uri_host{this->host()};
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    // UNC path: //server/share/...
+    result_path = "//" + std::string{uri_host.value()};
+  }
+
+  if (uri_path.has_value()) {
+    // URL-decode the path
+    std::istringstream input{uri_path.value()};
+    std::ostringstream output;
+    // Disable whitespace skipping for proper decoding
+    input >> std::noskipws;
+    uri_unescape(input, output);
+    std::string decoded_path{output.str()};
+
+    // Handle Windows drive letters: /C:/... -> C:/...
+    if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+        decoded_path[2] == ':') {
+      decoded_path.erase(0, 1);
+    }
+
+    result_path += decoded_path;
+  }
+
+  return std::filesystem::path{result_path};
+}
+
 auto URI::from_path(const std::filesystem::path &path) -> URI {
   auto normalized{path.lexically_normal().string()};
   const auto is_unc{normalized.starts_with("\\\\")};
