@@ -652,4 +652,102 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Specialization of `std::hash` for `sourcemeta::core::Pointer` to enable use
+/// with `std::unordered_map` and `std::unordered_set`.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    // Hash first token
+    const auto &first{pointer.at(0)};
+    std::size_t result{first.is_property()
+                           ? static_cast<std::size_t>(first.property_hash().a)
+                           : first.to_index()};
+
+    if (size == 1) {
+      return result;
+    }
+
+    // Hash last token
+    const auto &last{pointer.back()};
+    const std::size_t last_hash{
+        last.is_property() ? static_cast<std::size_t>(last.property_hash().a)
+                           : last.to_index()};
+
+    // Combine with XOR and bit shift
+    result ^= last_hash << 1;
+
+    if (size >= 3) {
+      // Hash middle token
+      const auto &middle{pointer.at(size / 2)};
+      const std::size_t middle_hash{
+          middle.is_property()
+              ? static_cast<std::size_t>(middle.property_hash().a)
+              : middle.to_index()};
+      result ^= middle_hash << 2;
+    }
+
+    // Incorporate size for better distribution
+    result ^= size;
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Specialization of `std::hash` for `sourcemeta::core::WeakPointer` to enable
+/// use with `std::unordered_map` and `std::unordered_set`.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    // Hash first token
+    const auto &first{pointer.at(0)};
+    std::size_t result{first.is_property()
+                           ? static_cast<std::size_t>(first.property_hash().a)
+                           : first.to_index()};
+
+    if (size == 1) {
+      return result;
+    }
+
+    // Hash last token
+    const auto &last{pointer.back()};
+    const std::size_t last_hash{
+        last.is_property() ? static_cast<std::size_t>(last.property_hash().a)
+                           : last.to_index()};
+
+    // Combine with XOR and bit shift
+    result ^= last_hash << 1;
+
+    if (size >= 3) {
+      // Hash middle token
+      const auto &middle{pointer.at(size / 2)};
+      const std::size_t middle_hash{
+          middle.is_property()
+              ? static_cast<std::size_t>(middle.property_hash().a)
+              : middle.to_index()};
+      result ^= middle_hash << 2;
+    }
+
+    // Incorporate size for better distribution
+    result ^= size;
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
