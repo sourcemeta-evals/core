@@ -71,9 +71,9 @@ public:
     ONLY_CONTINUE_IF(
         !vocabularies.contains("http://json-schema.org/draft-01/schema#") ||
         !schema.defines_any({"enum", "disallow", "extends"}));
-    ONLY_CONTINUE_IF(!vocabularies.contains(
-                         "http://json-schema.org/draft-00/schema#") ||
-                     !schema.defines_any({"enum", "disallow", "extends"}));
+    ONLY_CONTINUE_IF(
+        !vocabularies.contains("http://json-schema.org/draft-00/schema#") ||
+        !schema.defines_any({"enum", "disallow", "extends"}));
     return true;
   }
 
