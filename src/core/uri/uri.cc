@@ -786,4 +786,64 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  const auto uri_scheme{this->scheme()};
+  const auto uri_host{this->host()};
+
+  // For non-file:// URIs, just return the path component
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (!uri_path.has_value()) {
+      return std::filesystem::path{};
+    }
+
+    // Percent-decode the path
+    std::istringstream input{uri_path.value()};
+    input >> std::noskipws;
+    std::ostringstream output;
+    uri_unescape(input, output);
+    return std::filesystem::path{output.str()};
+  }
+
+  // Handle file:// URIs
+  std::string result;
+
+  // Check for UNC path (file://server/share/...)
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    // UNC path: file://server/share -> \\server\share
+    result = "\\\\";
+    result += uri_host.value();
+  }
+
+  if (uri_path.has_value()) {
+    // Percent-decode the path
+    std::istringstream input{uri_path.value()};
+    input >> std::noskipws;
+    std::ostringstream output;
+    uri_unescape(input, output);
+    auto decoded_path = output.str();
+
+    // Check for Windows drive letter (e.g., /C:/foo -> C:\foo)
+    // The path starts with / followed by a drive letter and colon
+    if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+        decoded_path[2] == ':') {
+      // Remove the leading slash for Windows paths
+      decoded_path = decoded_path.substr(1);
+    }
+
+    result += decoded_path;
+  }
+
+  // Convert forward slashes to backslashes for Windows paths
+  // Only if it looks like a Windows path (has drive letter or is UNC)
+  const bool is_windows_path =
+      (result.size() >= 2 && result[1] == ':') || result.starts_with("\\\\");
+  if (is_windows_path) {
+    std::ranges::replace(result, '/', '\\');
+  }
+
+  return std::filesystem::path{result};
+}
+
 } // namespace sourcemeta::core
