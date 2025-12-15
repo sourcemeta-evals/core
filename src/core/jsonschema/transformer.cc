@@ -239,4 +239,16 @@ auto SchemaTransformer::remove(const std::string &name) -> bool {
   return this->rules.erase(name) > 0;
 }
 
+auto SchemaTransformer::cbegin() const -> SchemaTransformer::const_iterator {
+  return this->rules.cbegin();
+}
+
+auto SchemaTransformer::cend() const -> SchemaTransformer::const_iterator {
+  return this->rules.cend();
+}
+
+auto SchemaTransformer::size() const -> SchemaTransformer::size_type {
+  return this->rules.size();
+}
+
 } // namespace sourcemeta::core

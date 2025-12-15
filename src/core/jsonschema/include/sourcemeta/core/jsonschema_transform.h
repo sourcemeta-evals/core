@@ -191,6 +191,13 @@ private:
 /// until no longer of them applies.
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformer {
 public:
+  /// The underlying container type for rules
+  using Container = std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+  /// The const iterator type for iterating over rules
+  using const_iterator = Container::const_iterator;
+  /// The size type for the number of rules
+  using size_type = Container::size_type;
+
   /// Create a transform bundle
   SchemaTransformer() = default;
 
@@ -241,6 +248,15 @@ public:
              const std::optional<JSON::String> &default_dialect = std::nullopt,
              const std::optional<JSON::String> &default_id = std::nullopt) const
       -> bool;
+
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const -> const_iterator;
+
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto cend() const -> const_iterator;
+
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto size() const -> size_type;
 
 private:
 // Exporting symbols that depends on the standard C++ library is considered
