@@ -786,4 +786,54 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+
+  // For non-file:// URIs, just return the path component
+  if (!this->scheme_.has_value() || this->scheme_.value() != "file") {
+    if (!uri_path.has_value()) {
+      return std::filesystem::path{};
+    }
+    // Unescape the path
+    std::istringstream input{uri_path.value()};
+    std::ostringstream output;
+    input >> std::noskipws;
+    uri_unescape(input, output);
+    return std::filesystem::path{output.str()};
+  }
+
+  // For file:// URIs, handle Windows and UNIX paths
+  std::string result;
+
+  // Handle UNC paths (file://server/share/...)
+  if (this->host_.has_value() && !this->host_.value().empty()) {
+    result = "\\\\";
+    std::istringstream host_input{std::string{this->host_.value()}};
+    std::ostringstream host_output;
+    host_input >> std::noskipws;
+    uri_unescape(host_input, host_output);
+    result += host_output.str();
+  }
+
+  if (uri_path.has_value()) {
+    std::istringstream path_input{uri_path.value()};
+    std::ostringstream path_output;
+    path_input >> std::noskipws;
+    uri_unescape(path_input, path_output);
+    auto decoded_path = path_output.str();
+
+    // Check if this is a Windows drive path (e.g., /C:/...)
+    if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+        decoded_path[2] == ':') {
+      // Remove the leading slash for Windows paths
+      decoded_path = decoded_path.substr(1);
+    }
+
+    result += decoded_path;
+  }
+
+  return std::filesystem::path{result};
+}
+
 } // namespace sourcemeta::core
