@@ -28,6 +28,16 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, roundtrip_with_backslash) {
+  // This test covers the case where a JSON Pointer contains a backslash,
+  // such as in patternProperties regex patterns like "[\-]"
+  const sourcemeta::core::Pointer pointer{"patternProperties", "[\\-]"};
+  const auto json{sourcemeta::core::to_json(pointer)};
+  const auto back{sourcemeta::core::from_json<sourcemeta::core::Pointer>(json)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};
