@@ -729,3 +729,16 @@ TEST(JSON_parse_error, read_json_non_existent) {
     FAIL() << "The parse function was expected to throw a filesystem error";
   }
 }
+
+TEST(JSON_parse_error, file_parse_error_path_returns_reference) {
+  try {
+    sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
+                                "stub_invalid_1.json");
+  } catch (const sourcemeta::core::JSONFileParseError &error) {
+    const std::filesystem::path &first_call = error.path();
+    const std::filesystem::path &second_call = error.path();
+    EXPECT_EQ(&first_call, &second_call);
+  } catch (...) {
+    FAIL() << "The parse function was expected to throw a file parse error";
+  }
+}
