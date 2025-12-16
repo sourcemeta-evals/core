@@ -14,6 +14,17 @@ TEST(JSONPointer_json_auto, foo_bar_baz) {
   EXPECT_EQ(pointer, back.value());
 }
 
+TEST(JSONPointer_json_auto, with_escape_characters) {
+  const sourcemeta::core::Pointer pointer{"patternProperties", "[\\-]"};
+  const auto result{sourcemeta::core::to_json(pointer)};
+  const sourcemeta::core::JSON expected{"/patternProperties/[\\-]"};
+  EXPECT_EQ(result, expected);
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(result)};
+  EXPECT_TRUE(back.has_value());
+  EXPECT_EQ(pointer, back.value());
+}
+
 TEST(JSONPointer_json_auto, from_json_invalid_string) {
   const sourcemeta::core::JSON input{"x"};
   const auto result{
