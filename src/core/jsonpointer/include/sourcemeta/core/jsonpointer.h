@@ -652,4 +652,90 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash support for JSON Pointers to enable use with std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling first, last, and middle
+/// tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    // Hash a single token: use property_hash().a for properties, index for
+    // indices
+    const auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, last, and middle tokens for O(1) hashing
+    std::size_t result{hash_token(pointer.at(0))};
+    if (size > 1) {
+      // XOR with last token hash
+      result ^= hash_token(pointer.at(size - 1)) << 1;
+    }
+    if (size > 2) {
+      // XOR with middle token hash
+      result ^= hash_token(pointer.at(size / 2)) << 2;
+    }
+
+    // Mix in the size for better distribution
+    result ^= size;
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash support for JSON WeakPointers to enable use with std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling first, last, and middle
+/// tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    // Hash a single token: use property_hash().a for properties, index for
+    // indices
+    const auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, last, and middle tokens for O(1) hashing
+    std::size_t result{hash_token(pointer.at(0))};
+    if (size > 1) {
+      // XOR with last token hash
+      result ^= hash_token(pointer.at(size - 1)) << 1;
+    }
+    if (size > 2) {
+      // XOR with middle token hash
+      result ^= hash_token(pointer.at(size / 2)) << 2;
+    }
+
+    // Mix in the size for better distribution
+    result ^= size;
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
