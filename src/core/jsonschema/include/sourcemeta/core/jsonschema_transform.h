@@ -12,6 +12,7 @@
 
 #include <cassert>     // assert
 #include <concepts>    // std::derived_from
+#include <cstddef>     // std::size_t
 #include <functional>  // std::function
 #include <map>         // std::map
 #include <memory>      // std::make_unique, std::unique_ptr
@@ -217,6 +218,39 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto size() const noexcept -> std::size_t;
+
+  /// Check if the bundle is empty
+  [[nodiscard]] auto empty() const noexcept -> bool;
+
+// Exporting symbols that depends on the standard C++ library is considered
+// safe.
+// https://learn.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-level-2-c4275?view=msvc-170&redirectedfrom=MSDN
+#if defined(_MSC_VER)
+#pragma warning(disable : 4251)
+#endif
+  /// The type of the internal rules container
+  using Container = std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+#if defined(_MSC_VER)
+#pragma warning(default : 4251)
+#endif
+
+  /// A constant iterator over the rules
+  using const_iterator = Container::const_iterator;
+
+  /// Get a constant iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const noexcept -> const_iterator;
+
+  /// Get a constant iterator to the end of the rules
+  [[nodiscard]] auto end() const noexcept -> const_iterator;
+
+  /// Get a constant iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const noexcept -> const_iterator;
+
+  /// Get a constant iterator to the end of the rules
+  [[nodiscard]] auto cend() const noexcept -> const_iterator;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
@@ -249,7 +283,7 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(disable : 4251)
 #endif
-  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  Container rules;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif

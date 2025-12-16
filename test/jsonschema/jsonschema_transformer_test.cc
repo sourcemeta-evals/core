@@ -3,6 +3,8 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1186,4 +1188,83 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_transformer, empty_bundle_is_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_TRUE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 0);
+}
+
+TEST(JSONSchema_transformer, bundle_with_rules_is_not_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  EXPECT_FALSE(bundle.empty());
+  EXPECT_EQ(bundle.size(), 2);
+}
+
+TEST(JSONSchema_transformer, iterate_empty_bundle) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iterate_bundle_with_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> rule_names;
+  for (const auto &entry : bundle) {
+    rule_names.push_back(entry.first);
+    EXPECT_NE(entry.second, nullptr);
+  }
+
+  EXPECT_EQ(rule_names.size(), 2);
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_1") != rule_names.end());
+  EXPECT_TRUE(std::find(rule_names.begin(), rule_names.end(),
+                        "example_rule_2") != rule_names.end());
+}
+
+TEST(JSONSchema_transformer, iterate_bundle_cbegin_cend) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::size_t count = 0;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    EXPECT_EQ(it->first, "example_rule_1");
+    EXPECT_EQ(it->second->name(), "example_rule_1");
+    EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+    ++count;
+  }
+
+  EXPECT_EQ(count, 1);
+}
+
+TEST(JSONSchema_transformer, iterate_bundle_introspect_rule_properties) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  for (const auto &entry : bundle) {
+    EXPECT_EQ(entry.first, entry.second->name());
+    EXPECT_FALSE(entry.second->message().empty());
+  }
+}
+
+TEST(JSONSchema_transformer, size_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  EXPECT_EQ(bundle.size(), 2);
+
+  bundle.remove("example_rule_1");
+  EXPECT_EQ(bundle.size(), 1);
+  EXPECT_FALSE(bundle.empty());
+
+  bundle.remove("example_rule_2");
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_TRUE(bundle.empty());
 }
