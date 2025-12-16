@@ -260,6 +260,22 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
 
   const auto vocabularies{
       sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
+
+  // If a default identifier was provided and the schema doesn't have one,
+  // add it to make the bundled schema easier for consumers to process
+  if (default_id.has_value() && schema.is_object()) {
+    const auto maybe_base_dialect{
+        sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+    if (maybe_base_dialect.has_value()) {
+      const auto current_id{sourcemeta::core::identify(
+          schema, maybe_base_dialect.value(), std::nullopt)};
+      if (!current_id.has_value()) {
+        sourcemeta::core::reidentify(schema, default_id.value(),
+                                     maybe_base_dialect.value());
+      }
+    }
+  }
+
   if (vocabularies.contains(
           "https://json-schema.org/draft/2020-12/vocab/core") ||
       vocabularies.contains(
