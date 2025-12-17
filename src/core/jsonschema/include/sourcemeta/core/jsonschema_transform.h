@@ -243,6 +243,13 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// The underlying container type for rules
+  using container_type =
+      std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+
+  /// A read-only iterator over the registered rules
+  using const_iterator = container_type::const_iterator;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
@@ -271,8 +278,14 @@ public:
       // by definition change the score
       -> std::pair<bool, std::uint8_t>;
 
+  /// Get a const iterator to the beginning of the rules
   [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
+  /// Get a const iterator to the end of the rules
   [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const -> auto { return this->rules.cbegin(); }
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto cend() const -> auto { return this->rules.cend(); }
 
 private:
 // Exporting symbols that depends on the standard C++ library is considered
@@ -281,7 +294,7 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(disable : 4251)
 #endif
-  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  container_type rules;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif
