@@ -786,4 +786,58 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  const auto uri_scheme{this->scheme()};
+  const auto uri_host{this->host()};
+
+  // For non-file:// URIs, just return the path component
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (!uri_path.has_value()) {
+      return std::filesystem::path{};
+    }
+
+    // Unescape percent-encoded characters
+    std::istringstream input{uri_path.value()};
+    input >> std::noskipws;
+    std::ostringstream output;
+    uri_unescape(input, output);
+    return std::filesystem::path{output.str()};
+  }
+
+  // Handle file:// URIs
+  std::string result_path;
+
+  // Handle UNC paths (file://server/share/...)
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    result_path = "//";
+    result_path += uri_host.value();
+  }
+
+  if (uri_path.has_value()) {
+    const auto &path_str{uri_path.value()};
+
+    // Check for Windows drive letter (e.g., /C:/...)
+    if (path_str.size() >= 3 && path_str[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(path_str[1])) &&
+        path_str[2] == ':') {
+      // Windows path: skip the leading slash
+      std::istringstream input{path_str.substr(1)};
+      input >> std::noskipws;
+      std::ostringstream output;
+      uri_unescape(input, output);
+      result_path += output.str();
+    } else {
+      // UNIX path or UNC continuation
+      std::istringstream input{path_str};
+      input >> std::noskipws;
+      std::ostringstream output;
+      uri_unescape(input, output);
+      result_path += output.str();
+    }
+  }
+
+  return std::filesystem::path{result_path};
+}
+
 } // namespace sourcemeta::core
