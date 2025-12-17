@@ -11,12 +11,11 @@
 
 #include "jsonschema_transform_rules.h"
 
-    static auto
-    transformer_callback_noop(
-        const sourcemeta::core::Pointer &, const std::string_view,
-        const std::string_view,
-        const sourcemeta::core::SchemaTransformRule::Result &) -> void {
-}
+static auto
+transformer_callback_noop(const sourcemeta::core::Pointer &,
+                          const std::string_view, const std::string_view,
+                          const sourcemeta::core::SchemaTransformRule::Result &)
+    -> void {}
 
 using TestTransformTraces =
     std::vector<std::tuple<sourcemeta::core::Pointer, std::string, std::string,
