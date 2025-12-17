@@ -16,70 +16,39 @@ public:
             const sourcemeta::core::SchemaWalker &,
             const sourcemeta::core::SchemaResolver &) const
       -> sourcemeta::core::SchemaTransformRule::Result override {
-    if (!contains_any(
-            vocabularies,
-            {"https://json-schema.org/draft/2020-12/vocab/applicator",
-             "https://json-schema.org/draft/2019-09/vocab/applicator"})) {
-      return false;
-    }
+    ONLY_CONTINUE_IF(contains_any(
+        vocabularies,
+        {"https://json-schema.org/draft/2020-12/vocab/applicator",
+         "https://json-schema.org/draft/2019-09/vocab/applicator"}));
+    ONLY_CONTINUE_IF(schema.is_object() && schema.defines("allOf") &&
+                     schema.at("allOf").is_array());
 
-    if (!schema.is_object() || !schema.defines("allOf") ||
-        !schema.at("allOf").is_array()) {
-      return false;
-    }
-
-    if (schema.defines("$ref")) {
-      return false;
-    }
+    // Don't apply if there's already a $ref at the parent level
+    ONLY_CONTINUE_IF(!schema.defines("$ref"));
 
     const auto &all_of = schema.at("allOf");
 
-    std::size_t ref_branch_count = 0;
-    for (const auto &branch : all_of.as_array()) {
-      if (branch.is_object() && branch.defines("$ref")) {
-        ref_branch_count++;
-      }
-    }
+    // Only apply when allOf has exactly one branch that contains ONLY $ref
+    // This is a specific case not handled by UnnecessaryAllOfWrapperModern
+    // which extracts keywords but doesn't handle the case of a single $ref
+    // branch that should completely replace the allOf
+    ONLY_CONTINUE_IF(all_of.size() == 1);
 
-    if (ref_branch_count != 1) {
-      return false;
-    }
+    const auto &branch = all_of.at(0);
+    ONLY_CONTINUE_IF(branch.is_object() && branch.defines("$ref") &&
+                     branch.size() == 1);
 
-    for (const auto &branch : all_of.as_array()) {
-      if (branch.is_object() && branch.defines("$ref") && branch.size() == 1) {
-        return true;
-      }
-    }
-
-    return false;
+    return APPLIES_TO_KEYWORDS("allOf");
   }
 
-  auto transform(JSON &schema) const -> void override {
-    auto &all_of = schema.at("allOf");
+  auto transform(JSON &schema, const Result &) const -> void override {
+    const auto &all_of = schema.at("allOf");
+    const auto &branch = all_of.at(0);
+    const auto ref_value = branch.at("$ref").to_string();
 
-    std::optional<std::string> ref_value;
-    std::size_t ref_index = 0;
-
-    for (std::size_t i = 0; i < all_of.size(); ++i) {
-      const auto &branch = all_of.at(i);
-      if (branch.is_object() && branch.defines("$ref") && branch.size() == 1) {
-        ref_value = branch.at("$ref").to_string();
-        ref_index = i;
-        break;
-      }
-    }
-
-    if (!ref_value.has_value()) {
-      return;
-    }
-
-    all_of.erase(std::next(all_of.as_array().cbegin(),
-                           static_cast<std::ptrdiff_t>(ref_index)));
-
-    if (all_of.empty()) {
-      schema.erase("allOf");
-    }
-
-    schema.assign("$ref", JSON{*ref_value});
+    // Use try_assign_before to maintain proper keyword ordering
+    // (place $ref where allOf was in the keyword order)
+    schema.try_assign_before("$ref", JSON{ref_value}, "allOf");
+    schema.erase("allOf");
   }
 };
