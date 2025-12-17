@@ -216,7 +216,12 @@ private:
 /// Every registered rule is applied to every subschema of the passed schema
 /// until no longer of them applies.
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformer {
+private:
+  using internal = std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+
 public:
+  using const_iterator = typename internal::const_iterator;
+
   /// Create a transform bundle
   SchemaTransformer() = default;
 
@@ -271,8 +276,22 @@ public:
       // by definition change the score
       -> std::pair<bool, std::uint8_t>;
 
-  [[nodiscard]] auto begin() const -> auto { return this->rules.cbegin(); }
-  [[nodiscard]] auto end() const -> auto { return this->rules.cend(); }
+  /// Get an iterator to the beginning of the rules
+  [[nodiscard]] auto begin() const -> const_iterator {
+    return this->rules.cbegin();
+  }
+  /// Get an iterator to the end of the rules
+  [[nodiscard]] auto end() const -> const_iterator {
+    return this->rules.cend();
+  }
+  /// Get a const iterator to the beginning of the rules
+  [[nodiscard]] auto cbegin() const -> const_iterator {
+    return this->rules.cbegin();
+  }
+  /// Get a const iterator to the end of the rules
+  [[nodiscard]] auto cend() const -> const_iterator {
+    return this->rules.cend();
+  }
 
 private:
 // Exporting symbols that depends on the standard C++ library is considered
