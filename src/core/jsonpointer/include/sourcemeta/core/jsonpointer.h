@@ -652,4 +652,88 @@ auto from_json(const JSON &value) -> std::optional<T> {
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash support for Pointer to enable use with std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling first, last, and middle
+/// tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    // Helper to get hash from a single token
+    const auto token_hash =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        // Use the first member of the property hash for simplicity
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        // For index tokens, use the index itself as the hash
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, last, and middle tokens for O(1) hashing
+    const auto first_hash{token_hash(pointer.at(0))};
+    if (size == 1) {
+      return first_hash;
+    }
+
+    const auto last_hash{token_hash(pointer.back())};
+    if (size == 2) {
+      return first_hash ^ (last_hash << 1);
+    }
+
+    const auto middle_hash{token_hash(pointer.at(size / 2))};
+    return first_hash ^ (middle_hash << 1) ^ (last_hash << 2);
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash support for WeakPointer to enable use with std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling first, last, and middle
+/// tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    // Helper to get hash from a single token
+    const auto token_hash =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        // Use the first member of the property hash for simplicity
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        // For index tokens, use the index itself as the hash
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, last, and middle tokens for O(1) hashing
+    const auto first_hash{token_hash(pointer.at(0))};
+    if (size == 1) {
+      return first_hash;
+    }
+
+    const auto last_hash{token_hash(pointer.back())};
+    if (size == 2) {
+      return first_hash ^ (last_hash << 1);
+    }
+
+    const auto middle_hash{token_hash(pointer.at(size / 2))};
+    return first_hash ^ (middle_hash << 1) ^ (last_hash << 2);
+  }
+};
+
+} // namespace std
+
 #endif
