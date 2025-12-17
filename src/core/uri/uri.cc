@@ -786,4 +786,48 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto uri_unescape_path(const std::string &value) -> std::string {
+  std::istringstream input{value};
+  std::ostringstream output;
+  input >> std::noskipws;
+  uri_unescape(input, output);
+  return output.str();
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+
+  // For non-file:// URIs, return the path component directly
+  if (!this->scheme_.has_value() || this->scheme_.value() != "file") {
+    if (!uri_path.has_value()) {
+      return std::filesystem::path{};
+    }
+    return std::filesystem::path{uri_unescape_path(uri_path.value())};
+  }
+
+  // Handle file:// URIs
+  std::string result;
+
+  // Handle UNC paths (file://server/share/...)
+  if (this->host_.has_value() && !this->host_.value().empty()) {
+    result = "\\\\" + uri_unescape_path(this->host_.value());
+  }
+
+  if (uri_path.has_value()) {
+    auto path_str{uri_unescape_path(uri_path.value())};
+
+    // Check if this is a Windows drive path (e.g., /C:/...)
+    if (path_str.size() >= 3 && path_str[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(path_str[1])) &&
+        path_str[2] == ':') {
+      // Remove leading slash for Windows paths
+      path_str = path_str.substr(1);
+    }
+
+    result += path_str;
+  }
+
+  return std::filesystem::path{result};
+}
+
 } // namespace sourcemeta::core
