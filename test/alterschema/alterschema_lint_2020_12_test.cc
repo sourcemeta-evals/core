@@ -756,8 +756,7 @@ TEST(AlterSchema_lint_2020_12, duplicate_allof_branches_1) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "integer",
-    "allOf": [ { "type": "string" } ]
+    "allOf": [ { "type": "integer" }, { "type": "string" } ]
   })JSON");
 
   EXPECT_EQ(document, expected);
@@ -2138,8 +2137,53 @@ TEST(AlterSchema_lint_2020_12, unnecessary_allof_wrapper_9) {
   EXPECT_FALSE(result.first);
   EXPECT_EQ(traces.size(), 1);
   EXPECT_LINT_TRACE(traces, 0, "", "unnecessary_allof_wrapper_modern",
-                    "Wrapping any keyword in `allOf` is unnecessary and may "
+                    "Wrapping keywords in `allOf` is often unnecessary and may "
                     "even introduce a minor evaluation performance overhead");
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_wrapper_10) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "type": "number", "$ref": "https://example.com" },
+      { "type": "integer" }
+    ]
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "number",
+    "$ref": "https://example.com",
+    "allOf": [
+      { "type": "integer" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_wrapper_11) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "if": { "type": "string" }, "then": { "minLength": 1 } },
+      { "if": { "type": "integer" }, "then": { "minimum": 1 } }
+    ]
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "if": { "type": "string" }, "then": { "minLength": 1 } },
+      { "if": { "type": "integer" }, "then": { "minimum": 1 } }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
 }
 
 TEST(AlterSchema_lint_2020_12, multiple_of_default_1) {
@@ -3130,8 +3174,8 @@ TEST(AlterSchema_lint_2020_12, required_properties_in_properties_10) {
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": { "foo": true, "bar": true },
-    "required": [ "foo" ],
     "allOf": [
+      { "required": [ "foo" ] },
       { "required": [ "bar" ] }
     ]
   })JSON");
@@ -3154,8 +3198,8 @@ TEST(AlterSchema_lint_2020_12, required_properties_in_properties_11) {
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": { "foo": true, "bar": true, "baz": true },
-    "required": [ "foo" ],
     "allOf": [
+      { "required": [ "foo" ] },
       { "required": [ "bar", "baz" ] }
     ]
   })JSON");
@@ -3483,6 +3527,290 @@ TEST(AlterSchema_lint_2020_12, unknown_keywords_prefix_11) {
     },
     "unevaluatedProperties": false,
     "x-customKeyword": "should be prefixed"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_1) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 1, 2, 3 ],
+    "minLength": 3,
+    "pattern": "^[a-z]+$"
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 1, 2, 3 ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_2) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ "one", "two" ],
+    "minimum": 0,
+    "maximum": 100,
+    "multipleOf": 5
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ "one", "two" ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_3) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ true, false ],
+    "minLength": 1,
+    "minimum": 0,
+    "minItems": 1,
+    "minProperties": 1
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ true, false ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_4) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 1, "foo" ],
+    "minLength": 2
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 1, "foo" ],
+    "minLength": 2
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_5) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 1, "foo" ],
+    "minLength": 2,
+    "minimum": 0,
+    "minItems": 1
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 1, "foo" ],
+    "minLength": 2,
+    "minimum": 0
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_6) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ { "name": "alice" }, { "age": 25 } ],
+    "properties": {
+      "name": { "type": "string" },
+      "age": { "type": "number" }
+    },
+    "minLength": 5,
+    "minimum": 10
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ { "name": "alice" }, { "age": 25 } ],
+    "properties": {
+      "name": { "type": "string" },
+      "age": { "type": "number" }
+    }
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_7) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ "small", "medium", "large" ],
+    "title": "Size Options",
+    "minLength": 3,
+    "minItems": 2
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ "small", "medium", "large" ],
+    "title": "Size Options",
+    "minLength": 3
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_8) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 42, "hello", true, null, { "key": "value" }, [1, 2, 3] ],
+    "minimum": 10,
+    "minLength": 2,
+    "minItems": 1,
+    "minProperties": 1,
+    "maxLength": 100,
+    "maxItems": 10,
+    "maxProperties": 5
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 42, "hello", true, null, { "key": "value" }, [1, 2, 3] ],
+    "minimum": 10,
+    "minLength": 2,
+    "minItems": 1,
+    "minProperties": 1,
+    "maxLength": 100,
+    "maxItems": 10,
+    "maxProperties": 5
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_9) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schema",
+    "$anchor": "color-enum",
+    "title": "My Enum Schema",
+    "description": "A schema with enum and annotations",
+    "$comment": "This schema uses enum with various annotation keywords",
+    "examples": [ "red", "blue" ],
+    "enum": [ "red", "green", "blue" ],
+    "minimum": 5,
+    "minLength": 10,
+    "minItems": 2,
+    "minProperties": 1,
+    "maxProperties": 5
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schema",
+    "$anchor": "color-enum",
+    "title": "My Enum Schema",
+    "description": "A schema with enum and annotations",
+    "$comment": "This schema uses enum with various annotation keywords",
+    "examples": [ "red", "blue" ],
+    "enum": [ "red", "green", "blue" ],
+    "minLength": 10
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, non_applicable_enum_validation_keywords_10) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 1, 2, 3 ],
+    "minLength": 2,
+    "maxLength": 10,
+    "pattern": "^[a-z]+$"
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ 1, 2, 3 ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12,
+     non_applicable_enum_validation_keywords_with_ref) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "#/$defs/myType",
+    "enum": [ "foo", "bar" ],
+    "minimum": 10,
+    "maxItems": 5,
+    "$defs": {
+      "myType": {
+        "type": "string"
+      }
+    }
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "#/$defs/myType",
+    "enum": [ "foo", "bar" ],
+    "$defs": {
+      "myType": {
+        "type": "string"
+      }
+    }
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12,
+     non_applicable_enum_validation_keywords_universal_keywords) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ "foo", "bar" ],
+    "title": "My enum",
+    "description": "A test enum",
+    "default": "foo",
+    "examples": [ "foo" ],
+    "minimum": 10,
+    "maxItems": 5
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [ "foo", "bar" ],
+    "title": "My enum",
+    "description": "A test enum",
+    "default": "foo",
+    "examples": [ "foo" ]
   })JSON");
 
   EXPECT_EQ(document, expected);
