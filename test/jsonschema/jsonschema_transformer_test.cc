@@ -1187,3 +1187,86 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterate_empty_bundle) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  std::vector<std::string> names;
+  for (const auto &rule : bundle) {
+    names.push_back(rule.name());
+  }
+
+  EXPECT_TRUE(names.empty());
+}
+
+TEST(JSONSchema_transformer, iterate_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::vector<std::string> names;
+  for (const auto &rule : bundle) {
+    names.push_back(rule.name());
+  }
+
+  EXPECT_EQ(names.size(), 1);
+  EXPECT_EQ(names.at(0), "example_rule_1");
+}
+
+TEST(JSONSchema_transformer, iterate_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::vector<std::string> names;
+  for (const auto &rule : bundle) {
+    names.push_back(rule.name());
+  }
+
+  EXPECT_EQ(names.size(), 3);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_1") !=
+              names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_2") !=
+              names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_3") !=
+              names.end());
+}
+
+TEST(JSONSchema_transformer, iterate_cbegin_cend) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> names;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    names.push_back(it->name());
+  }
+
+  EXPECT_EQ(names.size(), 2);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_1") !=
+              names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "example_rule_2") !=
+              names.end());
+}
+
+TEST(JSONSchema_transformer, iterate_access_message) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  auto it = bundle.begin();
+  EXPECT_EQ(it->name(), "example_rule_1");
+  EXPECT_EQ(it->message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, iterate_post_increment) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  auto it = bundle.begin();
+  auto old_it = it++;
+
+  EXPECT_NE(old_it, it);
+  EXPECT_NE(old_it, bundle.end());
+  EXPECT_NE(it, bundle.end());
+}
