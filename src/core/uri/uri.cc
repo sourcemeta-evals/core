@@ -746,6 +746,55 @@ auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
 }
 
+auto uri_unescape_path(const std::string &value) -> std::string {
+  std::istringstream input{value};
+  input >> std::noskipws;
+  std::ostringstream output;
+  uri_unescape(input, output);
+  return output.str();
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  if (!uri_path.has_value()) {
+    return std::filesystem::path{};
+  }
+
+  const auto uri_scheme{this->scheme()};
+  const auto is_file_uri{uri_scheme.has_value() &&
+                         uri_scheme.value() == "file"};
+
+  if (!is_file_uri) {
+    return std::filesystem::path{uri_unescape_path(uri_path.value())};
+  }
+
+  const auto uri_host{this->host()};
+  std::string result;
+
+  // Handle Windows UNC paths (file://server/share/...)
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    result = "\\\\" + std::string{uri_host.value()};
+  }
+
+  auto decoded_path{uri_unescape_path(uri_path.value())};
+
+  // Handle Windows drive letters (file:///C:/...)
+  // The path will be like /C:/... so we need to remove the leading slash
+  if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+      std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+      decoded_path[2] == ':') {
+    decoded_path = decoded_path.substr(1);
+  }
+
+  result += decoded_path;
+
+#ifdef _WIN32
+  std::ranges::replace(result, '/', '\\');
+#endif
+
+  return std::filesystem::path{result};
+}
+
 auto URI::from_path(const std::filesystem::path &path) -> URI {
   auto normalized{path.lexically_normal().string()};
   const auto is_unc{normalized.starts_with("\\\\")};
