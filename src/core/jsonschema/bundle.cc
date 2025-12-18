@@ -250,6 +250,21 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
 
+  const auto vocabularies{
+      sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
+  const auto dialect{
+      sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+
+  // If the schema doesn't have an identifier but a default one was provided,
+  // add it to make the bundled schema easier for consumers to process
+  if (default_id.has_value() && dialect.has_value() && schema.is_object()) {
+    const auto existing_id{
+        sourcemeta::core::identify(schema, dialect.value(), std::nullopt)};
+    if (!existing_id.has_value()) {
+      sourcemeta::core::reidentify(schema, default_id.value(), dialect.value());
+    }
+  }
+
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
@@ -257,20 +272,6 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
                   resolver, default_dialect, default_id, paths);
     return;
   }
-
-  // If the schema identifier is implicit, add it to the top-level of the
-  // bundled schema. Otherwise, potential relative references based on this
-  // implicit base URI will likely not resolve unless end users happen to
-  // know that this implicit base URI is.
-  if (default_id.has_value() &&
-      !identify(schema, resolver, SchemaIdentificationStrategy::Strict,
-                default_dialect)
-           .has_value()) {
-    reidentify(schema, default_id.value(), resolver, default_dialect);
-  }
-
-  const auto vocabularies{
-      sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
   if (vocabularies.contains(
           "https://json-schema.org/draft/2020-12/vocab/core") ||
       vocabularies.contains(
