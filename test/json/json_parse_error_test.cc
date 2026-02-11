@@ -4,6 +4,7 @@
 
 #include <exception>
 #include <sstream>
+#include <type_traits>
 
 #define __EXPECT_PARSE_ERROR(input, expected_line, expected_column,            \
                              expected_error, expected_message)                 \
@@ -714,6 +715,21 @@ TEST(JSON_parse_error, read_json_directory) {
     EXPECT_EQ(error.path1(), std::filesystem::path{TEST_DIRECTORY});
   } catch (...) {
     FAIL() << "The parse function was expected to throw a filesystem error";
+  }
+}
+
+TEST(JSON_parse_error, file_error_path_returns_const_ref) {
+  try {
+    sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
+                                "stub_invalid_1.json");
+  } catch (const sourcemeta::core::JSONFileParseError &error) {
+    using path_return_type = decltype(error.path());
+    static_assert(std::is_reference_v<path_return_type>);
+    static_assert(std::is_const_v<std::remove_reference_t<path_return_type>>);
+    EXPECT_EQ(error.path(),
+              std::filesystem::path{TEST_DIRECTORY} / "stub_invalid_1.json");
+  } catch (...) {
+    FAIL() << "The parse function was expected to throw a file parse error";
   }
 }
 
