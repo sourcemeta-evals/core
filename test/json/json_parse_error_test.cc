@@ -706,6 +706,17 @@ TEST(JSON_parse_error, read_json_invalid_bigint) {
   }
 }
 
+TEST(JSON_parse_error, file_parse_error_path_returns_const_reference) {
+  try {
+    sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
+                                "stub_invalid_1.json");
+  } catch (const sourcemeta::core::JSONFileParseError &error) {
+    EXPECT_EQ(&error.path(), &error.path());
+  } catch (...) {
+    FAIL() << "The parse function was expected to throw a file parse error";
+  }
+}
+
 TEST(JSON_parse_error, read_json_directory) {
   try {
     sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY});
