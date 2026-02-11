@@ -746,6 +746,33 @@ auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  if (!uri_path.has_value()) {
+    return {};
+  }
+
+  const auto uri_scheme{this->scheme()};
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  std::istringstream input{uri_path.value()};
+  std::ostringstream output;
+  uri_unescape(input, output);
+  auto decoded{output.str()};
+
+  const auto uri_host{this->host()};
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    std::istringstream host_input{std::string{uri_host.value()}};
+    std::ostringstream host_output;
+    uri_unescape(host_input, host_output);
+    return std::filesystem::path{"//" + host_output.str() + decoded};
+  }
+
+  return std::filesystem::path{decoded};
+}
+
 auto URI::from_path(const std::filesystem::path &path) -> URI {
   auto normalized{path.lexically_normal().string()};
   const auto is_unc{normalized.starts_with("\\\\")};

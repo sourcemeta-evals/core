@@ -440,6 +440,20 @@ public:
   /// ```
   static auto from_fragment(std::string_view fragment) -> URI;
 
+  /// Attempt to convert the URI into a filesystem path. For `file://` URIs,
+  /// this correctly reconstructs the path (both UNIX and Windows). For non
+  /// `file://` URIs, the URI path component is returned. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/uri.h>
+  /// #include <cassert>
+  /// #include <filesystem>
+  ///
+  /// const sourcemeta::core::URI uri{"file:///foo/bar"};
+  /// assert(uri.to_path() == std::filesystem::path{"/foo/bar"});
+  /// ```
+  [[nodiscard]] auto to_path() const -> std::filesystem::path;
+
   /// Create a URI from a file system path. For example:
   ///
   /// ```cpp
