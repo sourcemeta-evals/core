@@ -1187,3 +1187,88 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterate_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  std::vector<std::string> names;
+  for (const auto &[name, rule] : bundle) {
+    names.push_back(name);
+  }
+
+  EXPECT_TRUE(names.empty());
+}
+
+TEST(JSONSchema_transformer, iterate_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  std::vector<std::string> names;
+  for (const auto &[name, rule] : bundle) {
+    names.push_back(name);
+  }
+
+  EXPECT_EQ(names.size(), 1);
+  EXPECT_EQ(names.at(0), "example_rule_1");
+}
+
+TEST(JSONSchema_transformer, iterate_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  std::vector<std::string> names;
+  for (const auto &[name, rule] : bundle) {
+    names.push_back(name);
+  }
+
+  EXPECT_EQ(names.size(), 3);
+  EXPECT_EQ(names.at(0), "example_rule_1");
+  EXPECT_EQ(names.at(1), "example_rule_2");
+  EXPECT_EQ(names.at(2), "example_rule_3");
+}
+
+TEST(JSONSchema_transformer, iterate_cbegin_cend) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> names;
+  for (auto it = bundle.cbegin(); it != bundle.cend(); ++it) {
+    names.push_back(it->first);
+  }
+
+  EXPECT_EQ(names.size(), 2);
+  EXPECT_EQ(names.at(0), "example_rule_1");
+  EXPECT_EQ(names.at(1), "example_rule_2");
+}
+
+TEST(JSONSchema_transformer, iterate_rule_introspection) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+
+  auto it = bundle.begin();
+  EXPECT_NE(it, bundle.end());
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+}
+
+TEST(JSONSchema_transformer, iterate_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule3>();
+
+  bundle.remove("example_rule_2");
+
+  std::vector<std::string> names;
+  for (const auto &[name, rule] : bundle) {
+    names.push_back(name);
+  }
+
+  EXPECT_EQ(names.size(), 2);
+  EXPECT_EQ(names.at(0), "example_rule_1");
+  EXPECT_EQ(names.at(1), "example_rule_3");
+}
