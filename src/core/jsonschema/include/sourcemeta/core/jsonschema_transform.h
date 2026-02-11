@@ -12,6 +12,7 @@
 
 #include <cassert>     // assert
 #include <concepts>    // std::derived_from
+#include <cstdint>     // std::uint64_t
 #include <functional>  // std::function
 #include <map>         // std::map
 #include <memory>      // std::make_unique, std::unique_ptr
@@ -190,7 +191,12 @@ private:
 /// Every registered rule is applied to every subschema of the passed schema
 /// until no longer of them applies.
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformer {
+private:
+  using internal = std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+
 public:
+  using const_iterator = typename internal::const_iterator;
+
   /// Create a transform bundle
   SchemaTransformer() = default;
 
@@ -216,6 +222,18 @@ public:
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// Get a read-only iterator to the beginning of the rules
+  auto begin() const -> const_iterator;
+  /// Get a read-only iterator to the end of the rules
+  auto end() const -> const_iterator;
+  /// Get a read-only iterator to the beginning of the rules
+  auto cbegin() const -> const_iterator;
+  /// Get a read-only iterator to the end of the rules
+  auto cend() const -> const_iterator;
+
+  /// Get the number of rules in the bundle
+  auto size() const -> std::uint64_t;
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
@@ -249,7 +267,7 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(disable : 4251)
 #endif
-  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  internal rules;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif
