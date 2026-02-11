@@ -468,7 +468,7 @@ public:
   /// ```
   [[nodiscard]] auto to_path() const -> std::filesystem::path;
 
-  /// A convenient methodto canonicalize and recompose a URI from a string. For
+  /// A convenient method to canonicalize and recompose a URI from a string. For
   /// example:
   ///
   /// ```cpp
