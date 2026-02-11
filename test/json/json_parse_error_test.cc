@@ -659,6 +659,15 @@ TEST(JSON_parse_error, backspace_is_not_whitespace) {
   EXPECT_PARSE_ERROR(input, 1, 1);
 }
 
+TEST(JSON_parse_error, file_error_path_returns_const_reference) {
+  const sourcemeta::core::JSONFileParseError error{
+      std::filesystem::path{"/tmp/test.json"}, 1, 1,
+      "Failed to parse the JSON document"};
+  const std::filesystem::path &first{error.path()};
+  const std::filesystem::path &second{error.path()};
+  EXPECT_EQ(&first, &second);
+}
+
 TEST(JSON_parse_error, read_json_invalid_1) {
   try {
     sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
