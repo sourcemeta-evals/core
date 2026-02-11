@@ -6,7 +6,7 @@
 #include <algorithm>        // std::copy, std::equal
 #include <cassert>          // assert
 #include <cstddef>          // std::size_t
-#include <functional>       // std::reference_wrapper
+#include <functional>       // std::reference_wrapper, std::hash
 #include <initializer_list> // std::initializer_list
 #include <iterator>         // std::advance, std::back_inserter
 #include <type_traits>      // std::enable_if_t, std::is_same_v, std::false_type
@@ -611,5 +611,38 @@ private:
 };
 
 } // namespace sourcemeta::core
+
+namespace std {
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    auto token_hash = [](const typename sourcemeta::core::GenericPointer<
+                          PropertyT, Hash>::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    if (size == 1) {
+      return token_hash(pointer.at(0));
+    } else if (size == 2) {
+      return token_hash(pointer.at(0)) ^
+             (token_hash(pointer.at(size - 1)) << 1);
+    } else {
+      return token_hash(pointer.at(0)) ^
+             (token_hash(pointer.at(size / 2)) << 1) ^
+             (token_hash(pointer.at(size - 1)) << 2);
+    }
+  }
+};
+} // namespace std
 
 #endif
