@@ -5,7 +5,7 @@
 
 #include <algorithm>        // std::copy, std::equal
 #include <cassert>          // assert
-#include <cstddef>          // std::size_t, std::hash
+#include <cstddef>          // std::size_t
 #include <functional>       // std::reference_wrapper
 #include <initializer_list> // std::initializer_list
 #include <iterator>         // std::advance, std::back_inserter
