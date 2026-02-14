@@ -34,7 +34,7 @@ public:
 
     std::size_t ref_branch_count = 0;
     for (const auto &branch : schema.at("allOf").as_array()) {
-      if (branch.is_object() && branch.defines("$ref")) {
+      if (branch.is_object() && branch.defines("$ref") && branch.size() == 1) {
         ref_branch_count++;
       }
     }
