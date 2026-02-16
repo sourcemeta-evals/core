@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
 #include <unordered_set>
@@ -180,4 +181,43 @@ TEST(JSONSchema_SchemaMapResolver, embedded_resource_with_callback) {
   EXPECT_EQ(identifiers.size(), 2);
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/test"));
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/string"));
+}
+
+TEST(JSONSchema_SchemaMapResolver, single_schema_draft4) {
+  sourcemeta::core::SchemaMapResolver resolver{
+      sourcemeta::core::schema_official_resolver};
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#"
+  })JSON");
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#"
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/test").has_value());
+  EXPECT_EQ(resolver("https://www.sourcemeta.com/test").value(), expected);
+}
+
+TEST(JSONSchema_SchemaMapResolver,
+     single_schema_draft4_does_not_use_dollar_id) {
+  sourcemeta::core::SchemaMapResolver resolver{
+      sourcemeta::core::schema_official_resolver};
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#"
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/test").has_value());
+  EXPECT_FALSE(
+      resolver("https://www.sourcemeta.com/test").value().defines("$id"));
 }
