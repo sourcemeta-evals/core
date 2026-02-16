@@ -1187,3 +1187,74 @@ TEST(JSONSchema_transformer, rereference_fixed_7) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(JSONSchema_transformer, iterate_empty) {
+  const sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_EQ(bundle.size(), 0);
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iterate_single_rule) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  EXPECT_EQ(bundle.size(), 1);
+
+  auto it = bundle.begin();
+  EXPECT_NE(it, bundle.end());
+  EXPECT_EQ(it->first, "example_rule_1");
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+  ++it;
+  EXPECT_EQ(it, bundle.end());
+}
+
+TEST(JSONSchema_transformer, iterate_multiple_rules) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule4>();
+  EXPECT_EQ(bundle.size(), 3);
+
+  std::vector<std::string> names;
+  for (const auto &[name, rule] : bundle) {
+    names.push_back(name);
+    EXPECT_EQ(name, rule->name());
+  }
+
+  EXPECT_EQ(names.size(), 3);
+  EXPECT_EQ(names.at(0), "example_rule_1");
+  EXPECT_EQ(names.at(1), "example_rule_2");
+  EXPECT_EQ(names.at(2), "example_rule_4");
+}
+
+TEST(JSONSchema_transformer, iterate_after_remove) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+  EXPECT_EQ(bundle.size(), 2);
+
+  bundle.remove("example_rule_1");
+  EXPECT_EQ(bundle.size(), 1);
+
+  auto it = bundle.cbegin();
+  EXPECT_NE(it, bundle.cend());
+  EXPECT_EQ(it->first, "example_rule_2");
+  ++it;
+  EXPECT_EQ(it, bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iterate_range_for) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::size_t count = 0;
+  for (const auto &entry : bundle) {
+    EXPECT_FALSE(entry.first.empty());
+    EXPECT_EQ(entry.first, entry.second->name());
+    count++;
+  }
+
+  EXPECT_EQ(count, 2);
+}
