@@ -32,7 +32,7 @@ public:
                      schema.defines("minimum") &&
                      (schema.at("minimum").is_real() ||
                       (schema.at("minimum").is_decimal() &&
-                       !schema.at("minimum").to_decimal().is_integer())));
+                       !schema.at("minimum").to_decimal().is_integral())));
     return APPLIES_TO_KEYWORDS("minimum");
   }
 
