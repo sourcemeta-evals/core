@@ -746,7 +746,24 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
 
   if (this->is_integer() && divisor.is_integer()) {
     const auto divisor_value{divisor.to_integer()};
-    return divisor_value != 0 && this->to_integer() % divisor_value == 0;
+    if (divisor_value == 0) {
+      return false;
+    }
+    if (divisor_value == 1 || divisor_value == -1) {
+      return true;
+    }
+    return this->to_integer() % divisor_value == 0;
+  }
+
+  if (this->is_integer() && divisor.is_real()) {
+    const Decimal dividend_decimal{this->to_integer()};
+    return dividend_decimal.divisible_by(
+        Decimal::strict_from(divisor.to_real()));
+  }
+
+  if (this->is_real() && divisor.is_integer()) {
+    const Decimal divisor_decimal{divisor.to_integer()};
+    return Decimal::strict_from(this->to_real()).divisible_by(divisor_decimal);
   }
 
   if (!this->is_decimal() && !divisor.is_decimal()) {
@@ -764,10 +781,8 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
       return true;
     }
 
-    const auto division{dividend_value / divisor_value};
-    Real integral = 0;
-    return !std::isinf(division) && !std::isnan(division) &&
-           std::modf(division, &integral) == 0.0;
+    return Decimal::strict_from(dividend_value)
+        .divisible_by(Decimal::strict_from(divisor_value));
   }
 
   if (this->is_decimal() && divisor.is_decimal()) {
@@ -780,8 +795,8 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
       return this->to_decimal().divisible_by(divisor_decimal);
     }
 
-    const Decimal divisor_decimal{divisor.to_real()};
-    return this->to_decimal().divisible_by(divisor_decimal);
+    return this->to_decimal().divisible_by(
+        Decimal::strict_from(divisor.to_real()));
   }
 
   if (this->is_integer()) {
@@ -789,8 +804,8 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
     return dividend_decimal.divisible_by(divisor.to_decimal());
   }
 
-  const Decimal dividend_decimal{this->to_real()};
-  return dividend_decimal.divisible_by(divisor.to_decimal());
+  return Decimal::strict_from(this->to_real())
+      .divisible_by(divisor.to_decimal());
 }
 
 [[nodiscard]] auto JSON::empty() const -> bool {

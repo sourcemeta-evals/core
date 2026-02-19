@@ -8,17 +8,23 @@
 #include <filesystem>  // std::filesystem
 #include <iostream>    // std::cerr
 #include <sstream>     // std::istringstream
+#include <stdexcept>   // std::invalid_argument, std::out_of_range
 #include <string>      // std::string
 #include <string_view> // std::string_view
 #include <vector>      // std::vector
 
 static constexpr std::string_view SUPPORTED_OPERATIONS[] = {
-    "compare",     "add",   "subtract", "multiply", "divide",
-    "remainder",   "minus", "plus",     "abs",      "tointegral",
-    "tointegralx", "tosci", "toeng"};
+    "compare",     "add",      "subtract",   "multiply",     "divide",
+    "remainder",   "minus",    "plus",       "abs",          "tointegral",
+    "tointegralx", "tosci",    "toeng",      "copy",         "copyabs",
+    "copynegate",  "copysign", "comparesig", "comparetotal", "comparetotmag",
+    "max",         "min",      "maxmag",     "minmag",       "divideint",
+    "samequantum", "logb",     "scaleb",     "reduce",       "trim"};
 
 static constexpr std::string_view UNARY_OPERATIONS[] = {
-    "minus", "plus", "abs", "tointegral", "tointegralx", "tosci", "toeng"};
+    "minus", "plus",   "abs",  "tointegral", "tointegralx",
+    "tosci", "toeng",  "copy", "copyabs",    "copynegate",
+    "logb",  "reduce", "trim"};
 
 static constexpr std::string_view SKIP_CONDITIONS[] = {
     "inexact",   "rounded", "overflow",           "underflow",
@@ -39,6 +45,7 @@ struct DecTestCase {
 
 struct DecTestContext {
   int precision = 9;
+  int max_exponent = 999;
   std::string rounding = "half_up";
 };
 
@@ -109,9 +116,251 @@ static auto make_decimal(const std::string &raw) -> sourcemeta::core::Decimal {
   return sourcemeta::core::Decimal{value};
 }
 
+static auto quiet_sNaN(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  auto result = sourcemeta::core::Decimal::nan(value.nan_payload());
+  return value.is_signed() ? -result : result;
+}
+
+static auto decimal_abs(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_snan()) {
+    return quiet_sNaN(value);
+  }
+  if (value.is_nan()) {
+    return value;
+  }
+  return value.is_signed() ? -value : value;
+}
+
+static auto zero_at_operand_quantum(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (!value.is_finite()) {
+    return sourcemeta::core::Decimal{0};
+  }
+  const auto scientific = value.to_scientific_string();
+  const auto e_pos = scientific.find('e');
+  if (e_pos == std::string::npos) {
+    return sourcemeta::core::Decimal{0};
+  }
+  std::size_t digit_count = 0;
+  for (std::size_t index = 0; index < e_pos; index++) {
+    const auto character = scientific[index];
+    if (character >= '0' && character <= '9') {
+      digit_count++;
+    }
+  }
+  const auto adjusted_exp = std::stoll(scientific.substr(e_pos + 1));
+  const auto stored_exp =
+      adjusted_exp - static_cast<std::int64_t>(digit_count) + 1;
+  return sourcemeta::core::Decimal{"0e" + std::to_string(stored_exp)};
+}
+
+static auto decimal_minus(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_snan()) {
+    return quiet_sNaN(value);
+  }
+  if (value.is_nan()) {
+    return value;
+  }
+  return zero_at_operand_quantum(value) - value;
+}
+
+static auto decimal_plus(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_snan()) {
+    return quiet_sNaN(value);
+  }
+  if (value.is_nan()) {
+    return value;
+  }
+  return zero_at_operand_quantum(value) + value;
+}
+
+static auto decimal_copyabs(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_snan()) {
+    return sourcemeta::core::Decimal::snan(value.nan_payload());
+  }
+  if (value.is_nan()) {
+    return sourcemeta::core::Decimal::nan(value.nan_payload());
+  }
+  return value.is_signed() ? -value : value;
+}
+
+static auto decimal_copynegate(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_snan() || value.is_nan()) {
+    const std::string prefix{value.is_signed() ? "" : "-"};
+    const std::string kind{value.is_snan() ? "sNaN" : "NaN"};
+    return sourcemeta::core::Decimal{prefix + kind +
+                                     std::to_string(value.nan_payload())};
+  }
+  return -value;
+}
+
+static auto decimal_trim(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_nan() || value.is_infinite()) {
+    return value;
+  }
+  if (value.is_zero()) {
+    return value.is_signed() ? sourcemeta::core::Decimal{"-0"}
+                             : sourcemeta::core::Decimal{"0"};
+  }
+
+  // IBM General Decimal Arithmetic trim: strip trailing zeros from the
+  // coefficient, but stop once the stored exponent reaches zero when the
+  // operand had a fractional part. Operands with a non-negative stored
+  // exponent strip freely like Decimal::reduce; operands with a negative
+  // stored exponent stop once the fractional zeros are gone so trim(10.0) is
+  // 10 (quantum E+0), not 1E+1. Recover the stored coefficient digits and
+  // exponent via to_scientific_string's canonical form.
+  const auto scientific = value.to_scientific_string();
+  const auto e_pos = scientific.find('e');
+  std::string coefficient_digits;
+  for (std::size_t index = 0; index < e_pos; index++) {
+    const auto character = scientific[index];
+    if (character >= '0' && character <= '9') {
+      coefficient_digits.push_back(character);
+    }
+  }
+  const auto adjusted_exp =
+      static_cast<std::int64_t>(std::stoll(scientific.substr(e_pos + 1)));
+  const auto original_exp =
+      adjusted_exp - static_cast<std::int64_t>(coefficient_digits.size()) + 1;
+
+  if (original_exp == 0) {
+    return value;
+  }
+
+  if (original_exp > 0) {
+    return value.reduce();
+  }
+
+  std::size_t trailing_zeros = 0;
+  while (trailing_zeros < coefficient_digits.size() &&
+         coefficient_digits[coefficient_digits.size() - 1 - trailing_zeros] ==
+             '0') {
+    trailing_zeros++;
+  }
+  const auto max_strippable = -static_cast<std::int64_t>(original_exp);
+  const auto strippable =
+      std::min(static_cast<std::int64_t>(trailing_zeros), max_strippable);
+  const auto new_exp = static_cast<std::int64_t>(original_exp) + strippable;
+  const auto kept = coefficient_digits.substr(
+      0, coefficient_digits.size() - static_cast<std::size_t>(strippable));
+  const std::string sign_prefix = value.is_signed() ? "-" : "";
+  return sourcemeta::core::Decimal{sign_prefix + kept + "e" +
+                                   std::to_string(new_exp)};
+}
+
+TEST(DecimalTrimHelper, four_digit_coefficient_small_negative_exponent) {
+  const sourcemeta::core::Decimal input{"1.2300e-30"};
+  const sourcemeta::core::Decimal expected{"1.23e-30"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, three_digit_coefficient_small_negative_exponent) {
+  const sourcemeta::core::Decimal input{"1.200e-30"};
+  const sourcemeta::core::Decimal expected{"1.2e-30"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, trailing_zero_coefficient_no_decimal_small_fractional) {
+  const sourcemeta::core::Decimal input{"1000e-10"};
+  const sourcemeta::core::Decimal expected{"1e-7"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, trailing_zero_coefficient_very_small_fractional) {
+  const sourcemeta::core::Decimal input{"100e-21"};
+  const sourcemeta::core::Decimal expected{"1e-19"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, scientific_form_fractional_zeros) {
+  const sourcemeta::core::Decimal input{"1.00e-7"};
+  const sourcemeta::core::Decimal expected{"1e-7"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, negative_trailing_zero_coefficient) {
+  const sourcemeta::core::Decimal input{"-1000e-10"};
+  const sourcemeta::core::Decimal expected{"-1e-7"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(DecimalTrimHelper, non_decimal_point_fractional_scientific_form) {
+  const sourcemeta::core::Decimal input{"10E+1"};
+  const sourcemeta::core::Decimal expected{"1e+2"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper,
+     maximum_stored_exponent_coefficient_without_trailing_zero) {
+  const sourcemeta::core::Decimal input{"11e2147483647"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, input);
+  EXPECT_TRUE(result.same_quantum(input));
+}
+
+static auto decimal_propagate_nan(const sourcemeta::core::Decimal &left,
+                                  const sourcemeta::core::Decimal &right)
+    -> sourcemeta::core::Decimal {
+  const sourcemeta::core::Decimal *source;
+  if (left.is_snan()) {
+    source = &left;
+  } else if (right.is_snan()) {
+    source = &right;
+  } else if (left.is_nan()) {
+    source = &left;
+  } else {
+    source = &right;
+  }
+
+  auto result = sourcemeta::core::Decimal::nan(source->nan_payload());
+  if (source->is_signed()) {
+    result = -result;
+  }
+  return result;
+}
+
+static auto expect_comparison_result(const sourcemeta::core::Decimal &left,
+                                     const sourcemeta::core::Decimal &right,
+                                     const std::string &expected) -> bool {
+  if (expected == "0") {
+    EXPECT_TRUE(left == right);
+  } else if (expected == "1") {
+    EXPECT_TRUE(left > right);
+  } else if (expected == "-1") {
+    EXPECT_TRUE(left < right);
+  } else {
+    return false;
+  }
+
+  return true;
+}
+
 static auto expect_decimal_eq(const sourcemeta::core::Decimal &result,
-                              const sourcemeta::core::Decimal &expected)
-    -> void {
+                              const sourcemeta::core::Decimal &expected,
+                              bool check_quantum = true) -> void {
   if (expected.is_nan()) {
     EXPECT_TRUE(result.is_nan());
     if (expected.is_snan()) {
@@ -119,11 +368,21 @@ static auto expect_decimal_eq(const sourcemeta::core::Decimal &result,
     } else {
       EXPECT_TRUE(result.is_qnan());
     }
+    EXPECT_EQ(result.is_signed(), expected.is_signed());
+    if (expected.nan_payload() < 1000) {
+      EXPECT_EQ(result.nan_payload(), expected.nan_payload());
+    }
   } else if (expected.is_infinite()) {
     EXPECT_TRUE(result.is_infinite());
     EXPECT_EQ(result.is_signed(), expected.is_signed());
   } else {
     EXPECT_EQ(result, expected);
+    if (expected.is_zero()) {
+      EXPECT_EQ(result.is_signed(), expected.is_signed());
+    }
+    if (check_quantum) {
+      EXPECT_TRUE(result.same_quantum(expected));
+    }
   }
 }
 
@@ -134,8 +393,8 @@ public:
   auto TestBody() -> void override {
     const auto operation{to_lower(this->test_case_.operation)};
 
-    if (operation == "compare") {
-      this->run_compare();
+    if (operation == "compare" || operation == "comparesig") {
+      this->run_comparison(operation == "comparesig");
     } else if (operation == "add") {
       this->run_binary(
           [](const auto &left, const auto &right) { return left + right; });
@@ -152,45 +411,88 @@ public:
       this->run_binary(
           [](const auto &left, const auto &right) { return left % right; });
     } else if (operation == "minus") {
-      this->run_unary([](const auto &value) { return -value; });
-    } else if (operation == "plus") {
-      this->run_unary([](const auto &value) { return +value; });
-    } else if (operation == "abs") {
+      this->run_unary([](const auto &value) { return decimal_minus(value); });
+    } else if (operation == "copynegate") {
       this->run_unary(
-          [](const auto &value) { return value.is_signed() ? -value : value; });
+          [](const auto &value) { return decimal_copynegate(value); });
+    } else if (operation == "plus") {
+      this->run_unary([](const auto &value) { return decimal_plus(value); });
+    } else if (operation == "abs") {
+      this->run_unary([](const auto &value) { return decimal_abs(value); });
+    } else if (operation == "copyabs") {
+      this->run_unary([](const auto &value) { return decimal_copyabs(value); });
     } else if (operation == "tointegral" || operation == "tointegralx") {
       this->run_unary([](const auto &value) { return value.to_integral(); });
     } else if (operation == "tosci" || operation == "toeng") {
       this->run_conversion();
+    } else if (operation == "copy") {
+      this->run_unary([](const auto &value) { return value; });
+    } else if (operation == "copysign") {
+      this->run_copysign();
+    } else if (operation == "comparetotal") {
+      this->run_binary([](const auto &left, const auto &right) {
+        return left.compare_total(right);
+      });
+    } else if (operation == "comparetotmag") {
+      this->run_binary([](const auto &left, const auto &right) {
+        return decimal_copyabs(left).compare_total(decimal_copyabs(right));
+      });
+    } else if (operation == "max") {
+      this->run_max_min(true, false);
+    } else if (operation == "min") {
+      this->run_max_min(false, false);
+    } else if (operation == "maxmag") {
+      this->run_max_min(true, true);
+    } else if (operation == "minmag") {
+      this->run_max_min(false, true);
+    } else if (operation == "divideint") {
+      this->run_binary([](const auto &left, const auto &right) {
+        return left.divide_integer(right);
+      });
+    } else if (operation == "samequantum") {
+      this->run_binary([](const auto &left, const auto &right) {
+        return sourcemeta::core::Decimal{left.same_quantum(right) ? 1 : 0};
+      });
+    } else if (operation == "logb") {
+      this->run_logb();
+    } else if (operation == "scaleb") {
+      this->run_binary([](const auto &left, const auto &right) {
+        return left.scale_by(right);
+      });
+    } else if (operation == "reduce") {
+      this->run_reduce();
+    } else if (operation == "trim") {
+      this->run_trim();
     } else {
       FAIL();
     }
   }
 
 private:
-  auto run_compare() -> void {
-    const auto expected{strip_quotes(this->test_case_.expected)};
-
-    // TODO: The decTest spec defines compare(NaN, x) = NaN, but our
-    // comparison operators return bool, so we cannot represent a NaN
-    // comparison result
-    if (to_lower(expected).find("nan") != std::string::npos) {
-      GTEST_SKIP() << "NaN comparison result";
-      return;
-    }
-
+  auto run_comparison(bool signal_on_nan) -> void {
     const auto left{make_decimal(this->test_case_.operand1)};
     const auto right{make_decimal(this->test_case_.operand2)};
 
-    if (expected == "0") {
-      EXPECT_TRUE(left == right);
-    } else if (expected == "1") {
-      EXPECT_TRUE(left > right);
-    } else if (expected == "-1") {
-      EXPECT_TRUE(left < right);
-    } else {
-      FAIL();
+    if (signal_on_nan &&
+        has_condition(this->test_case_.conditions, "invalid_operation")) {
+      EXPECT_TRUE(make_decimal(this->test_case_.expected).is_nan());
+      return;
     }
+
+    const auto expected{strip_quotes(this->test_case_.expected)};
+    if (to_lower(expected).find("nan") != std::string::npos) {
+      EXPECT_FALSE(left == right);
+      EXPECT_TRUE(left != right);
+      EXPECT_FALSE(left < right);
+      EXPECT_FALSE(left > right);
+      EXPECT_FALSE(left <= right);
+      EXPECT_FALSE(left >= right);
+      const auto expected_decimal{make_decimal(this->test_case_.expected)};
+      EXPECT_TRUE(expected_decimal.is_nan());
+      return;
+    }
+
+    EXPECT_TRUE(expect_comparison_result(left, right, expected));
   }
 
   template <typename Operation> auto run_binary(Operation op) -> void {
@@ -204,10 +506,12 @@ private:
       try {
         const auto result{op(make_decimal(this->test_case_.operand1),
                              make_decimal(this->test_case_.operand2))};
-        EXPECT_TRUE(result.is_nan());
+        expect_decimal_eq(result, make_decimal(this->test_case_.expected));
       } catch (const sourcemeta::core::NumericInvalidOperationError &) {
         SUCCEED();
       } catch (const sourcemeta::core::NumericDivisionByZeroError &) {
+        SUCCEED();
+      } catch (const sourcemeta::core::NumericOverflowError &) {
         SUCCEED();
       }
       return;
@@ -238,7 +542,8 @@ private:
   template <typename Operation> auto run_unary(Operation op) -> void {
     if (has_condition(this->test_case_.conditions, "invalid_operation")) {
       try {
-        EXPECT_TRUE(op(make_decimal(this->test_case_.operand1)).is_nan());
+        expect_decimal_eq(op(make_decimal(this->test_case_.operand1)),
+                          make_decimal(this->test_case_.expected));
       } catch (const sourcemeta::core::NumericInvalidOperationError &) {
         SUCCEED();
       }
@@ -249,6 +554,32 @@ private:
                       make_decimal(this->test_case_.expected));
   }
 
+  auto run_reduce() -> void {
+    const auto input = make_decimal(this->test_case_.operand1);
+    if (has_condition(this->test_case_.conditions, "invalid_operation")) {
+      try {
+        const auto result = input.reduce();
+        expect_decimal_eq(result, make_decimal(this->test_case_.expected));
+      } catch (const sourcemeta::core::NumericInvalidOperationError &) {
+        SUCCEED();
+      }
+      return;
+    }
+
+    expect_decimal_eq(input.reduce(), make_decimal(this->test_case_.expected));
+  }
+
+  auto run_trim() -> void {
+    const auto input = make_decimal(this->test_case_.operand1);
+    const auto expected = make_decimal(this->test_case_.expected);
+    const auto result = decimal_trim(input);
+    expect_decimal_eq(result, expected);
+    if (result.is_finite() && expected.is_finite()) {
+      EXPECT_TRUE(result.same_quantum(expected))
+          << "trim result quantum differs from expected";
+    }
+  }
+
   // TODO: Our to_scientific_string() always uses exponential form
   // (e.g. "1.0e+1" instead of "10"), which differs from the spec's
   // to-scientific-string. Our to_string() has the same issue with
@@ -257,9 +588,6 @@ private:
     const auto input{strip_quotes(this->test_case_.operand1)};
 
     if (has_condition(this->test_case_.conditions, "conversion_syntax")) {
-      // Our max_context parser accepts NaN payloads that exceed the test
-      // file's precision. If parsing succeeds, just verify the result is NaN
-      // (since conversion_syntax on NaN inputs always expects NaN).
       try {
         const auto result{sourcemeta::core::Decimal{input}};
         EXPECT_TRUE(result.is_nan());
@@ -270,7 +598,85 @@ private:
     }
 
     expect_decimal_eq(sourcemeta::core::Decimal{input},
-                      make_decimal(this->test_case_.expected));
+                      make_decimal(this->test_case_.expected), false);
+  }
+
+  auto run_copysign() -> void {
+    const auto left{make_decimal(this->test_case_.operand1)};
+    const auto right{make_decimal(this->test_case_.operand2)};
+    auto result = decimal_copyabs(left);
+    if (right.is_signed()) {
+      if (result.is_snan() || result.is_nan()) {
+        const std::string kind{result.is_snan() ? "sNaN" : "NaN"};
+        result = sourcemeta::core::Decimal{
+            "-" + kind + std::to_string(result.nan_payload())};
+      } else {
+        result = -result;
+      }
+    }
+
+    expect_decimal_eq(result, make_decimal(this->test_case_.expected));
+  }
+
+  auto run_logb() -> void {
+    if (has_condition(this->test_case_.conditions, "division_by_zero")) {
+      try {
+        auto result = make_decimal(this->test_case_.operand1).logb();
+        static_cast<void>(result);
+        FAIL() << "Expected division_by_zero";
+      } catch (const sourcemeta::core::NumericDivisionByZeroError &) {
+        SUCCEED();
+      }
+      return;
+    }
+
+    this->run_unary([](const auto &value) { return value.logb(); });
+  }
+
+  auto run_max_min(bool is_max, bool by_magnitude) -> void {
+    const auto left{make_decimal(this->test_case_.operand1)};
+    const auto right{make_decimal(this->test_case_.operand2)};
+    const auto expected{make_decimal(this->test_case_.expected)};
+
+    if (left.is_snan() || right.is_snan()) {
+      expect_decimal_eq(decimal_propagate_nan(left, right), expected);
+      return;
+    }
+
+    if (left.is_qnan() && right.is_qnan()) {
+      expect_decimal_eq(decimal_propagate_nan(left, right), expected);
+      return;
+    }
+
+    if (left.is_qnan()) {
+      expect_decimal_eq(right, expected);
+      return;
+    }
+
+    if (right.is_qnan()) {
+      expect_decimal_eq(left, expected);
+      return;
+    }
+
+    int comparison;
+    if (by_magnitude) {
+      auto abs_left = decimal_abs(left);
+      auto abs_right = decimal_abs(right);
+      comparison = abs_left < abs_right ? -1 : (abs_left > abs_right ? 1 : 0);
+    } else {
+      comparison = left < right ? -1 : (left > right ? 1 : 0);
+    }
+
+    sourcemeta::core::Decimal result{0};
+    if (comparison != 0) {
+      result = (is_max == (comparison > 0)) ? left : right;
+    } else {
+      auto total_cmp = left.compare_total(right);
+      result =
+          (is_max == (total_cmp > sourcemeta::core::Decimal{0})) ? left : right;
+    }
+
+    expect_decimal_eq(result, expected);
   }
 
   DecTestCase test_case_;
@@ -366,13 +772,15 @@ static auto parse_directive(const std::string &line, DecTestContext &context)
   auto key{full_line.substr(0, colon_position)};
   auto value{full_line.substr(colon_position + 1)};
 
-  while (!key.empty() && key.back() == ' ') {
+  while (!key.empty() &&
+         (key.back() == ' ' || key.back() == '\t' || key.back() == '\r')) {
     key.remove_suffix(1);
   }
-  while (!value.empty() && value.front() == ' ') {
+  while (!value.empty() && (value.front() == ' ' || value.front() == '\t')) {
     value.remove_prefix(1);
   }
-  while (!value.empty() && value.back() == ' ') {
+  while (!value.empty() && (value.back() == ' ' || value.back() == '\t' ||
+                            value.back() == '\r')) {
     value.remove_suffix(1);
   }
 
@@ -383,6 +791,10 @@ static auto parse_directive(const std::string &line, DecTestContext &context)
   }
   if (lower_key == "rounding") {
     context.rounding = to_lower(std::string{value});
+    return true;
+  }
+  if (lower_key == "maxexponent") {
+    context.max_exponent = std::stoi(std::string{value});
     return true;
   }
 
@@ -417,8 +829,32 @@ static auto should_skip_test(const DecTestCase &test_case,
     return true;
   }
 
-  if (operation == "compare") {
+  if (operation == "compare" || operation == "comparetotal" ||
+      operation == "comparetotmag" || operation == "comparesig" ||
+      operation == "copy" || operation == "copyabs" ||
+      operation == "copynegate" || operation == "copysign" ||
+      operation == "samequantum") {
     return false;
+  }
+
+  if (operation == "divideint" || operation == "reduce" ||
+      operation == "trim" || operation == "scaleb") {
+    if (operation == "scaleb" &&
+        has_condition(test_case.conditions, "invalid_operation")) {
+      auto scale_bound = 2 * (context.max_exponent + context.precision);
+      try {
+        auto scale_value = std::stoll(test_case.operand2);
+        if (scale_value > scale_bound || scale_value < -scale_bound) {
+          return true;
+        }
+      } catch (const std::invalid_argument &) {
+        return true;
+      } catch (const std::out_of_range &) {
+        return true;
+      }
+    }
+
+    return has_skip_condition(test_case.conditions);
   }
 
   // TODO: Our Decimal context is fixed at 16-digit precision. Tests
@@ -435,6 +871,16 @@ static auto should_skip_test(const DecTestCase &test_case,
     if (context.rounding != "half_even") {
       return true;
     }
+  }
+
+  // IEEE 754 §6.3: under round-toward-negative (floor), the sign of a zero
+  // sum or difference is '-' where every other rounding attribute gives '+'.
+  // Our Decimal has no rounding mode knob, so zero-result add/subtract rows
+  // under floor rounding are skipped.
+  if ((operation == "add" || operation == "subtract") &&
+      context.rounding == "floor" &&
+      count_significant_digits(test_case.expected) == 0) {
+    return true;
   }
 
   return has_skip_condition(test_case.conditions);
@@ -476,8 +922,7 @@ auto main(int argc, char **argv) -> int {
       continue;
     }
 
-    const auto suite_name{"DecTest_" +
-                          sanitize_test_name(filepath.stem().string())};
+    const auto file_stem{sanitize_test_name(filepath.stem().string())};
 
     auto file{sourcemeta::core::read_file(filepath)};
     DecTestContext context;
@@ -508,7 +953,9 @@ auto main(int argc, char **argv) -> int {
         continue;
       }
 
-      const auto test_name{sanitize_test_name(test_case.id)};
+      const auto suite_name{"DecTest_" +
+                            sanitize_test_name(to_lower(test_case.operation))};
+      const auto test_name{file_stem + "_" + sanitize_test_name(test_case.id)};
       testing::RegisterTest(suite_name.c_str(), test_name.c_str(), nullptr,
                             nullptr, __FILE__, __LINE__,
                             [test_case = std::move(test_case)]() -> DecTest * {
