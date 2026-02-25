@@ -18,6 +18,7 @@
 // NOLINTEND(misc-include-cleaner)
 
 #include <cassert>     // assert
+#include <cstddef>     // std::size_t
 #include <functional>  // std::reference_wrapper
 #include <memory>      // std::allocator
 #include <ostream>     // std::basic_ostream
@@ -650,6 +651,60 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 }
 
+namespace detail {
+
+inline auto hash_combine(const std::size_t left, const std::size_t right)
+    -> std::size_t {
+  return left ^ (right + 0x9e3779b97f4a7c15ULL + (left << 6U) + (left >> 2U));
+}
+
+template <typename Token> [[nodiscard]] auto token_hash(const Token &token) {
+  if (token.is_property()) {
+    return static_cast<std::size_t>(token.property_hash().a);
+  }
+
+  return static_cast<std::size_t>(token.to_index());
+}
+
+template <typename PointerType>
+[[nodiscard]] auto pointer_hash(const PointerType &pointer) -> std::size_t {
+  auto result{pointer.size()};
+  if (result == 0) {
+    return result;
+  }
+
+  const auto middle{pointer.size() / 2};
+  const auto last{pointer.size() - 1};
+
+  result = hash_combine(result, token_hash(pointer.at(0)));
+  result = hash_combine(result, token_hash(pointer.at(middle)));
+  result = hash_combine(result, token_hash(pointer.at(last)));
+
+  return result;
+}
+
+} // namespace detail
+
 } // namespace sourcemeta::core
+
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  [[nodiscard]] auto
+  operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::pointer_hash(pointer);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  [[nodiscard]] auto
+  operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::pointer_hash(pointer);
+  }
+};
+
+} // namespace std
 
 #endif
