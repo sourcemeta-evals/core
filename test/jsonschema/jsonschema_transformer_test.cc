@@ -770,6 +770,44 @@ TEST(JSONSchema_transformer, check_with_default_dialect) {
   EXPECT_FALSE(std::get<3>(entries.at(1)).description.has_value());
 }
 
+TEST(JSONSchema_transformer, iterate_rules_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule1>();
+
+  std::vector<std::string> names;
+  std::vector<std::string> messages;
+  for (auto iterator = bundle.begin(); iterator != bundle.end(); ++iterator) {
+    names.push_back(iterator->first);
+    messages.push_back(iterator->second->message());
+  }
+
+  ASSERT_EQ(names.size(), 2);
+  EXPECT_EQ(names.at(0), "example_rule_1");
+  EXPECT_EQ(names.at(1), "example_rule_2");
+  EXPECT_EQ(messages.at(0), "Keyword foo is not permitted");
+  EXPECT_EQ(messages.at(1), "Keyword bar is not permitted");
+
+  const auto &const_bundle{bundle};
+  auto iterator{const_bundle.cbegin()};
+  ASSERT_NE(iterator, const_bundle.cend());
+  EXPECT_EQ(iterator->first, "example_rule_1");
+  EXPECT_EQ(iterator->second->name(), "example_rule_1");
+  ++iterator;
+  ASSERT_NE(iterator, const_bundle.cend());
+  EXPECT_EQ(iterator->first, "example_rule_2");
+  EXPECT_EQ(iterator->second->name(), "example_rule_2");
+  ++iterator;
+  EXPECT_EQ(iterator, const_bundle.cend());
+}
+
+TEST(JSONSchema_transformer, iterate_rules_read_only_empty) {
+  sourcemeta::core::SchemaTransformer bundle;
+
+  EXPECT_EQ(bundle.begin(), bundle.end());
+  EXPECT_EQ(bundle.cbegin(), bundle.cend());
+}
+
 TEST(JSONSchema_transformer, remove_rule_by_name) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();
