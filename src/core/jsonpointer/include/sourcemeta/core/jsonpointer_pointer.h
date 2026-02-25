@@ -612,4 +612,45 @@ private:
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Specialization of `std::hash` for `GenericPointer` to enable use with
+/// `std::unordered_map` and `std::unordered_set`. The hash is O(1) by sampling
+/// the first, middle, and last tokens of the pointer.
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    auto token_hash = [](const typename sourcemeta::core::GenericPointer<
+                          PropertyT, Hash>::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, last, and middle tokens for O(1) hashing
+    std::size_t result{token_hash(pointer.at(0))};
+    if (size > 1) {
+      result ^= token_hash(pointer.at(size - 1)) << 1;
+    }
+    if (size > 2) {
+      result ^= token_hash(pointer.at(size / 2)) << 2;
+    }
+
+    // Mix in the size to differentiate pointers of different lengths
+    result ^= std::hash<std::size_t>{}(size);
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
