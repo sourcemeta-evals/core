@@ -4,6 +4,7 @@
 
 #include <exception>
 #include <sstream>
+#include <type_traits>
 
 #define __EXPECT_PARSE_ERROR(input, expected_line, expected_column,            \
                              expected_error, expected_message)                 \
@@ -704,6 +705,14 @@ TEST(JSON_parse_error, read_json_invalid_bigint) {
   } catch (...) {
     FAIL() << "The parse function was expected to throw a file parse error";
   }
+}
+
+TEST(JSON_parse_error, file_parse_error_path_returns_reference) {
+  const sourcemeta::core::JSONFileParseError error{std::filesystem::path{"foo"},
+                                                   1, 1, "message"};
+  EXPECT_TRUE(
+      (std::is_same_v<decltype(error.path()), const std::filesystem::path &>));
+  EXPECT_EQ(error.path(), std::filesystem::path{"foo"});
 }
 
 TEST(JSON_parse_error, read_json_directory) {
