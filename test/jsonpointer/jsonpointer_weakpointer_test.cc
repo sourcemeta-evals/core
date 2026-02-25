@@ -4,6 +4,8 @@
 #include <sourcemeta/core/jsonpointer.h>
 
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 
 static const std::string foo = "foo";
 static const std::string bar = "bar";
@@ -333,4 +335,23 @@ TEST(JSONWeakPointer_pointer, to_weak_pointer) {
 
   EXPECT_TRUE(result.at(2).is_property());
   EXPECT_EQ(result.at(2).to_property(), "baz");
+}
+
+TEST(JSONWeakPointer_pointer, hash_unordered_containers) {
+  const sourcemeta::core::WeakPointer key{std::cref(foo), 1, std::cref(bar)};
+
+  std::unordered_set<sourcemeta::core::WeakPointer> set;
+  EXPECT_TRUE(set.emplace(key).second);
+  EXPECT_FALSE(set.emplace(sourcemeta::core::WeakPointer{std::cref(foo), 1,
+                                                         std::cref(bar)})
+                   .second);
+  EXPECT_NE(set.find(sourcemeta::core::WeakPointer{std::cref(foo), 1,
+                                                   std::cref(bar)}),
+            set.end());
+
+  std::unordered_map<sourcemeta::core::WeakPointer, int> map;
+  EXPECT_TRUE(map.emplace(key, 42).second);
+  EXPECT_EQ(
+      map.at(sourcemeta::core::WeakPointer{std::cref(foo), 1, std::cref(bar)}),
+      42);
 }

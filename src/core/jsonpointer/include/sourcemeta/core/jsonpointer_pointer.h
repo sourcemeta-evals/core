@@ -610,6 +610,97 @@ private:
   Container data;
 };
 
+namespace detail {
+
+inline auto jsonpointer_hash_combine(std::size_t &seed,
+                                     const std::size_t value) noexcept -> void {
+  seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6U) + (seed >> 2U);
+}
+
+template <typename T>
+[[nodiscard]] inline auto jsonpointer_hash_to_size(const T &value) noexcept
+    -> std::size_t {
+  using Decayed = std::remove_cvref_t<T>;
+  if constexpr (std::is_integral_v<Decayed> || std::is_enum_v<Decayed> ||
+                requires(const Decayed &candidate) {
+                  candidate >> (sizeof(std::size_t) * 8U);
+                  static_cast<std::size_t>(candidate);
+                }) {
+    if constexpr (sizeof(Decayed) <= sizeof(std::size_t)) {
+      return static_cast<std::size_t>(value);
+    } else {
+      return static_cast<std::size_t>(value) ^
+             static_cast<std::size_t>(value >> (sizeof(std::size_t) * 8U));
+    }
+  } else {
+    return std::hash<Decayed>{}(value);
+  }
+}
+
+template <typename T>
+[[nodiscard]] inline auto
+jsonpointer_property_hash_head(const T &value) noexcept -> std::size_t {
+  if constexpr (requires { value.a; }) {
+    return jsonpointer_hash_to_size(value.a);
+  } else {
+    return jsonpointer_hash_to_size(value);
+  }
+}
+
+template <typename Token>
+[[nodiscard]] inline auto jsonpointer_token_hash(const Token &token) noexcept
+    -> std::size_t {
+  std::size_t result{token.is_property() ? 1U : 0U};
+  if (token.is_property()) {
+    jsonpointer_hash_combine(
+        result, jsonpointer_property_hash_head(token.property_hash()));
+  } else {
+    jsonpointer_hash_combine(result,
+                             jsonpointer_hash_to_size(token.to_index()));
+  }
+
+  return result;
+}
+
+} // namespace detail
+
 } // namespace sourcemeta::core
+
+namespace std {
+
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  [[nodiscard]] auto
+  operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash> &pointer)
+      const noexcept -> std::size_t {
+    std::size_t result{pointer.size()};
+    if (pointer.empty()) {
+      return result;
+    }
+
+    const auto begin{pointer.cbegin()};
+    sourcemeta::core::detail::jsonpointer_hash_combine(result, 1U);
+    sourcemeta::core::detail::jsonpointer_hash_combine(
+        result, sourcemeta::core::detail::jsonpointer_token_hash(begin[0]));
+
+    if (pointer.size() > 2) {
+      sourcemeta::core::detail::jsonpointer_hash_combine(result, 2U);
+      sourcemeta::core::detail::jsonpointer_hash_combine(
+          result, sourcemeta::core::detail::jsonpointer_token_hash(
+                      begin[pointer.size() / 2U]));
+    }
+
+    if (pointer.size() > 1) {
+      sourcemeta::core::detail::jsonpointer_hash_combine(result, 3U);
+      sourcemeta::core::detail::jsonpointer_hash_combine(
+          result, sourcemeta::core::detail::jsonpointer_token_hash(
+                      begin[pointer.size() - 1U]));
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
 
 #endif
