@@ -18,6 +18,36 @@ auto is_official_metaschema_reference(const sourcemeta::core::Pointer &pointer,
          sourcemeta::core::schema_official_resolver(destination).has_value();
 }
 
+auto has_identifier(const sourcemeta::core::JSON &schema,
+                    const std::string &base_dialect) -> bool {
+  if (!schema.is_object()) {
+    return false;
+  }
+
+  if (base_dialect == "https://json-schema.org/draft/2020-12/schema" ||
+      base_dialect == "https://json-schema.org/draft/2020-12/hyper-schema" ||
+      base_dialect == "https://json-schema.org/draft/2019-09/schema" ||
+      base_dialect == "https://json-schema.org/draft/2019-09/hyper-schema" ||
+      base_dialect == "http://json-schema.org/draft-07/schema#" ||
+      base_dialect == "http://json-schema.org/draft-07/hyper-schema#" ||
+      base_dialect == "http://json-schema.org/draft-06/schema#" ||
+      base_dialect == "http://json-schema.org/draft-06/hyper-schema#") {
+    return schema.defines("$id");
+  }
+
+  if (base_dialect == "http://json-schema.org/draft-04/schema#" ||
+      base_dialect == "http://json-schema.org/draft-04/hyper-schema#" ||
+      base_dialect == "http://json-schema.org/draft-03/schema#" ||
+      base_dialect == "http://json-schema.org/draft-03/hyper-schema#" ||
+      base_dialect == "http://json-schema.org/draft-02/hyper-schema#" ||
+      base_dialect == "http://json-schema.org/draft-01/hyper-schema#" ||
+      base_dialect == "http://json-schema.org/draft-00/hyper-schema#") {
+    return schema.defines("id");
+  }
+
+  return schema.defines("$id") || schema.defines("id");
+}
+
 auto dependencies_internal(
     const sourcemeta::core::JSON &schema,
     const sourcemeta::core::SchemaWalker &walker,
@@ -249,6 +279,13 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
             const std::optional<Pointer> &default_container,
             const SchemaFrame::Paths &paths) -> void {
   SchemaFrame frame{SchemaFrame::Mode::References};
+
+  if (default_id.has_value() && schema.is_object()) {
+    const auto base{base_dialect(schema, resolver, default_dialect)};
+    if (base.has_value() && !has_identifier(schema, base.value())) {
+      reidentify(schema, default_id.value(), base.value());
+    }
+  }
 
   if (default_container.has_value()) {
     // This is undefined behavior
