@@ -45,4 +45,59 @@ auto gzip(std::string_view input) -> std::optional<std::string> {
   return compressed.str();
 }
 
+auto gunzip(std::istream &input) -> std::optional<std::string> {
+  z_stream stream;
+  std::memset(&stream, 0, sizeof(stream));
+  int code = inflateInit2(&stream, 16 + MAX_WBITS);
+  if (code != Z_OK) {
+    return std::nullopt;
+  }
+
+  std::array<char, 4096> input_buffer;
+  std::array<char, 4096> output_buffer;
+  std::string output;
+  bool end_of_input{false};
+
+  do {
+    if (stream.avail_in == 0 && !end_of_input) {
+      input.read(input_buffer.data(),
+                 static_cast<std::streamsize>(input_buffer.size()));
+      const auto size{input.gcount()};
+      if (size > 0) {
+        stream.next_in = reinterpret_cast<Bytef *>(input_buffer.data());
+        stream.avail_in = static_cast<uInt>(size);
+      } else if (input.eof()) {
+        end_of_input = true;
+      } else {
+        inflateEnd(&stream);
+        return std::nullopt;
+      }
+    }
+
+    stream.next_out = reinterpret_cast<Bytef *>(output_buffer.data());
+    stream.avail_out = sizeof(output_buffer);
+    code = inflate(&stream, Z_NO_FLUSH);
+    if (code != Z_OK && code != Z_STREAM_END) {
+      inflateEnd(&stream);
+      return std::nullopt;
+    }
+
+    output.append(output_buffer.data(),
+                  static_cast<std::string::size_type>(sizeof(output_buffer)) -
+                      stream.avail_out);
+  } while (code != Z_STREAM_END && !(end_of_input && stream.avail_in == 0));
+
+  if (code != Z_STREAM_END) {
+    inflateEnd(&stream);
+    return std::nullopt;
+  }
+
+  code = inflateEnd(&stream);
+  if (code != Z_OK) {
+    return std::nullopt;
+  }
+
+  return output;
+}
+
 } // namespace sourcemeta::core
