@@ -5,6 +5,7 @@
 
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 #include "jsonschema_transform_rules.h"
@@ -580,6 +581,35 @@ TEST(JSONSchema_transformer, check_with_default_dialect) {
   EXPECT_EQ(std::get<1>(entries.at(1)), "example_rule_2");
   EXPECT_EQ(std::get<2>(entries.at(1)), "Keyword bar is not permitted");
   EXPECT_EQ(std::get<3>(entries.at(1)), "");
+}
+
+TEST(JSONSchema_transformer, rules_iterable) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  const auto &rules{bundle.rules()};
+  EXPECT_TRUE((std::is_const_v<std::remove_reference_t<decltype(rules)>>));
+
+  EXPECT_EQ(rules.size(), 2);
+  EXPECT_TRUE(rules.contains("example_rule_1"));
+  EXPECT_TRUE(rules.contains("example_rule_2"));
+
+  const auto it{rules.find("example_rule_1")};
+  ASSERT_NE(it, rules.end());
+  EXPECT_EQ(it->first, "example_rule_1");
+  ASSERT_NE(it->second, nullptr);
+  EXPECT_EQ(it->second->name(), "example_rule_1");
+  EXPECT_EQ(it->second->message(), "Keyword foo is not permitted");
+
+  std::vector<std::string> names;
+  for (const auto &[name, rule] : rules) {
+    names.push_back(name);
+    EXPECT_EQ(rule->name(), name);
+  }
+
+  EXPECT_EQ(names,
+            (std::vector<std::string>{"example_rule_1", "example_rule_2"}));
 }
 
 TEST(JSONSchema_transformer, remove_rule_by_name) {

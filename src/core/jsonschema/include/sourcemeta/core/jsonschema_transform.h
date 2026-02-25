@@ -210,12 +210,18 @@ public:
   auto add(Args &&...args) -> void {
     auto rule{std::make_unique<T>(std::forward<Args>(args)...)};
     // Rules must only be defined once
-    assert(!this->rules.contains(rule->name()));
-    this->rules.emplace(rule->name(), std::move(rule));
+    assert(!this->rules_.contains(rule->name()));
+    this->rules_.emplace(rule->name(), std::move(rule));
   }
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// The type of the rules container
+  using Rules = std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+
+  /// Access the registered rules
+  auto rules() const noexcept -> const Rules &;
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
@@ -249,7 +255,7 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(disable : 4251)
 #endif
-  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  Rules rules_;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif
