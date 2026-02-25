@@ -56,6 +56,30 @@ TEST(JSONSchema_transformer, flat_document_no_applicators) {
   EXPECT_EQ(document, expected);
 }
 
+TEST(JSONSchema_transformer, iterate_rules_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule1>();
+
+  const sourcemeta::core::SchemaTransformer &read_only_bundle{bundle};
+  auto iterator{read_only_bundle.begin()};
+  ASSERT_NE(iterator, read_only_bundle.end());
+  EXPECT_EQ(iterator->first, "example_rule_1");
+  ASSERT_NE(iterator->second, nullptr);
+  EXPECT_EQ(iterator->second->message(), "Keyword foo is not permitted");
+
+  ++iterator;
+  ASSERT_NE(iterator, read_only_bundle.end());
+  EXPECT_EQ(iterator->first, "example_rule_2");
+  ASSERT_NE(iterator->second, nullptr);
+  EXPECT_EQ(iterator->second->message(), "Keyword bar is not permitted");
+
+  ++iterator;
+  EXPECT_EQ(iterator, read_only_bundle.end());
+  EXPECT_EQ(read_only_bundle.cbegin(), read_only_bundle.begin());
+  EXPECT_EQ(read_only_bundle.cend(), read_only_bundle.end());
+}
+
 TEST(JSONSchema_transformer, throw_if_no_dialect_invalid_default) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();
