@@ -130,6 +130,13 @@ auto uri_escape_for_path(const std::string &value) -> std::string {
   return result;
 }
 
+auto uri_unescape_for_path(std::string_view value) -> std::string {
+  std::istringstream input{std::string{value}};
+  std::ostringstream output;
+  sourcemeta::core::uri_unescape(input, output);
+  return output.str();
+}
+
 } // namespace
 
 namespace sourcemeta::core {
@@ -314,6 +321,33 @@ auto URI::path() const -> std::optional<std::string> {
   }
 
   return this->path_;
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto scheme{this->scheme()};
+  if (!scheme.has_value() || scheme.value() != "file") {
+    return std::filesystem::path{this->path().value_or("")};
+  }
+
+  auto result{uri_unescape_for_path(this->path().value_or(""))};
+  const auto host{this->host()};
+  if (host.has_value() && !host.value().empty()) {
+    result = "//" + uri_unescape_for_path(host.value()) + result;
+  } else {
+    while (result.size() > 1 && result[0] == '/' && result[1] == '/') {
+      result.erase(0, 1);
+    }
+
+    const bool is_windows_drive{result.size() >= 3 && result.front() == '/' &&
+                                ((result[1] >= 'A' && result[1] <= 'Z') ||
+                                 (result[1] >= 'a' && result[1] <= 'z')) &&
+                                result[2] == ':'};
+    if (is_windows_drive) {
+      result.erase(0, 1);
+    }
+  }
+
+  return std::filesystem::path{result};
 }
 
 auto URI::path(const std::string &path) -> URI & {
