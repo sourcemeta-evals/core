@@ -217,6 +217,19 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// Iterate over registered rules for introspection in read-only mode
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  [[nodiscard]] auto begin() const noexcept -> const_iterator {
+    return this->rules.cbegin();
+  }
+
+  [[nodiscard]] auto end() const noexcept -> const_iterator {
+    return this->rules.cend();
+  }
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///

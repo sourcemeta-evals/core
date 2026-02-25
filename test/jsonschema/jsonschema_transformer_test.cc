@@ -616,6 +616,33 @@ TEST(JSONSchema_transformer, remove_rule_by_name) {
   EXPECT_EQ(document, expected);
 }
 
+TEST(JSONSchema_transformer, iterate_rules_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  EXPECT_EQ(bundle.begin(), bundle.end());
+
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> names;
+  for (const auto &[name, rule] : bundle) {
+    names.push_back(name);
+    EXPECT_EQ(name, rule->name());
+  }
+
+  EXPECT_EQ(names,
+            (std::vector<std::string>{"example_rule_1", "example_rule_2"}));
+
+  EXPECT_TRUE(bundle.remove("example_rule_1"));
+  names.clear();
+
+  for (const auto &[name, rule] : bundle) {
+    names.push_back(name);
+    EXPECT_EQ(name, rule->name());
+  }
+
+  EXPECT_EQ(names, (std::vector<std::string>{"example_rule_2"}));
+}
+
 TEST(JSONSchema_transformer, unfixable_apply_without_description) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRuleUnfixable1>();
