@@ -18,7 +18,8 @@
 // NOLINTEND(misc-include-cleaner)
 
 #include <cassert>     // assert
-#include <functional>  // std::reference_wrapper
+#include <cstddef>     // std::size_t
+#include <functional>  // std::reference_wrapper, std::hash
 #include <memory>      // std::allocator
 #include <ostream>     // std::basic_ostream
 #include <string>      // std::basic_string
@@ -651,5 +652,66 @@ auto from_json(const JSON &value) -> std::optional<T> {
 }
 
 } // namespace sourcemeta::core
+
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto count{pointer.size()};
+    if (count == 0) {
+      return 0;
+    }
+
+    auto token_hash = [](const sourcemeta::core::Pointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, middle, and last for O(1)
+    auto result{token_hash(pointer.at(0))};
+    result ^= token_hash(pointer.at(count / 2)) + 0x9e3779b9 + (result << 6) +
+              (result >> 2);
+    result ^= token_hash(pointer.at(count - 1)) + 0x9e3779b9 + (result << 6) +
+              (result >> 2);
+    result ^= count + 0x9e3779b9 + (result << 6) + (result >> 2);
+    return result;
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto count{pointer.size()};
+    if (count == 0) {
+      return 0;
+    }
+
+    auto token_hash =
+        [](const sourcemeta::core::WeakPointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, middle, and last for O(1)
+    auto result{token_hash(pointer.at(0))};
+    result ^= token_hash(pointer.at(count / 2)) + 0x9e3779b9 + (result << 6) +
+              (result >> 2);
+    result ^= token_hash(pointer.at(count - 1)) + 0x9e3779b9 + (result << 6) +
+              (result >> 2);
+    result ^= count + 0x9e3779b9 + (result << 6) + (result >> 2);
+    return result;
+  }
+};
+
+} // namespace std
 
 #endif
