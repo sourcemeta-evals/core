@@ -3,6 +3,8 @@
 #include <sourcemeta/core/jsonpointer.h>
 
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 
 TEST(JSONPointer_pointer, general_traits) {
   EXPECT_TRUE(std::is_default_constructible<sourcemeta::core::Pointer>::value);
@@ -246,4 +248,27 @@ TEST(JSONPointer_pointer, push_back_index_move) {
   EXPECT_EQ(pointer.at(0).to_property(), "foo");
   EXPECT_TRUE(pointer.at(1).is_index());
   EXPECT_EQ(pointer.at(1).to_index(), 0);
+}
+
+TEST(JSONPointer_pointer, unordered_map_lookup) {
+  std::unordered_map<sourcemeta::core::Pointer, int> pointers;
+  const sourcemeta::core::Pointer key{"foo", 1, "bar"};
+  pointers.emplace(key, 42);
+  EXPECT_EQ(pointers.at(sourcemeta::core::Pointer{"foo", 1, "bar"}), 42);
+}
+
+TEST(JSONPointer_pointer, unordered_set_collision_fallback_to_equality) {
+  std::unordered_set<sourcemeta::core::Pointer> pointers;
+  const sourcemeta::core::Pointer pointer_1{"foo", "bar", "baz", "qux"};
+  const sourcemeta::core::Pointer pointer_2{"foo", "quux", "baz", "qux"};
+
+  EXPECT_EQ(std::hash<sourcemeta::core::Pointer>{}(pointer_1),
+            std::hash<sourcemeta::core::Pointer>{}(pointer_2));
+
+  pointers.insert(pointer_1);
+  pointers.insert(pointer_2);
+
+  EXPECT_EQ(pointers.size(), 2);
+  EXPECT_EQ(pointers.count(pointer_1), 1);
+  EXPECT_EQ(pointers.count(pointer_2), 1);
 }

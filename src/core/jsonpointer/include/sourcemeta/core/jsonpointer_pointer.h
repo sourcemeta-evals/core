@@ -612,4 +612,65 @@ private:
 
 } // namespace sourcemeta::core
 
+namespace sourcemeta::core::internal {
+
+template <typename PointerT>
+[[nodiscard]] inline auto
+hash_pointer_token(const typename PointerT::Token &token) noexcept
+    -> std::size_t {
+  if (token.is_property()) {
+    const auto property_hash{token.property_hash()};
+    if constexpr (requires { property_hash.a; }) {
+      return static_cast<std::size_t>(property_hash.a);
+    } else {
+      return static_cast<std::size_t>(property_hash);
+    }
+  } else {
+    return static_cast<std::size_t>(token.to_index());
+  }
+}
+
+template <typename PointerT>
+[[nodiscard]] inline auto hash_pointer(const PointerT &pointer) noexcept
+    -> std::size_t {
+  std::size_t result{pointer.size()};
+  const auto combine = [](const std::size_t seed,
+                          const std::size_t value) -> std::size_t {
+    return seed ^ (value + 0x9e3779b97f4a7c15ULL + (seed << 6U) + (seed >> 2U));
+  };
+
+  if (pointer.empty()) {
+    return result;
+  }
+
+  // O(1) sampling strategy
+  result = combine(result, hash_pointer_token<PointerT>(pointer.at(0)));
+
+  if (pointer.size() > 1) {
+    result = combine(result, hash_pointer_token<PointerT>(pointer.back()));
+  }
+
+  if (pointer.size() > 2) {
+    result = combine(
+        result, hash_pointer_token<PointerT>(pointer.at(pointer.size() / 2)));
+  }
+
+  return result;
+}
+
+} // namespace sourcemeta::core::internal
+
+namespace std {
+
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  [[nodiscard]] inline auto
+  operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash> &pointer)
+      const noexcept -> std::size_t {
+    return sourcemeta::core::internal::hash_pointer(pointer);
+  }
+};
+
+} // namespace std
+
 #endif

@@ -4,11 +4,14 @@
 #include <sourcemeta/core/jsonpointer.h>
 
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 
 static const std::string foo = "foo";
 static const std::string bar = "bar";
 static const std::string baz = "baz";
 static const std::string qux = "qux";
+static const std::string quux = "quux";
 
 TEST(JSONWeakPointer_pointer, general_traits) {
   EXPECT_TRUE(
@@ -333,4 +336,31 @@ TEST(JSONWeakPointer_pointer, to_weak_pointer) {
 
   EXPECT_TRUE(result.at(2).is_property());
   EXPECT_EQ(result.at(2).to_property(), "baz");
+}
+
+TEST(JSONWeakPointer_pointer, unordered_map_lookup) {
+  std::unordered_map<sourcemeta::core::WeakPointer, int> pointers;
+  const sourcemeta::core::WeakPointer key{std::cref(foo), 1, std::cref(bar)};
+  pointers.emplace(key, 42);
+  EXPECT_EQ(pointers.at(sourcemeta::core::WeakPointer{std::cref(foo), 1,
+                                                      std::cref(bar)}),
+            42);
+}
+
+TEST(JSONWeakPointer_pointer, unordered_set_collision_fallback_to_equality) {
+  std::unordered_set<sourcemeta::core::WeakPointer> pointers;
+  const sourcemeta::core::WeakPointer pointer_1{std::cref(foo), std::cref(bar),
+                                                std::cref(baz), std::cref(qux)};
+  const sourcemeta::core::WeakPointer pointer_2{std::cref(foo), std::cref(quux),
+                                                std::cref(baz), std::cref(qux)};
+
+  EXPECT_EQ(std::hash<sourcemeta::core::WeakPointer>{}(pointer_1),
+            std::hash<sourcemeta::core::WeakPointer>{}(pointer_2));
+
+  pointers.insert(pointer_1);
+  pointers.insert(pointer_2);
+
+  EXPECT_EQ(pointers.size(), 2);
+  EXPECT_EQ(pointers.count(pointer_1), 1);
+  EXPECT_EQ(pointers.count(pointer_2), 1);
 }
