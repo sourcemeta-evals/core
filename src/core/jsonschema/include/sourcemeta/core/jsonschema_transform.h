@@ -191,6 +191,10 @@ private:
 /// until no longer of them applies.
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaTransformer {
 public:
+  using rules_type =
+      std::map<std::string, std::unique_ptr<const SchemaTransformRule>>;
+  using const_iterator = typename rules_type::const_iterator;
+
   /// Create a transform bundle
   SchemaTransformer() = default;
 
@@ -216,6 +220,20 @@ public:
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// Iterate over the registered rules for read-only introspection
+  [[nodiscard]] auto begin() const noexcept -> const_iterator {
+    return this->rules.cbegin();
+  }
+  [[nodiscard]] auto end() const noexcept -> const_iterator {
+    return this->rules.cend();
+  }
+  [[nodiscard]] auto cbegin() const noexcept -> const_iterator {
+    return this->rules.cbegin();
+  }
+  [[nodiscard]] auto cend() const noexcept -> const_iterator {
+    return this->rules.cend();
+  }
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
@@ -249,7 +267,7 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(disable : 4251)
 #endif
-  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  rules_type rules;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif

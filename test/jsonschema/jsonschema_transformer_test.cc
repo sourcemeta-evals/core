@@ -582,6 +582,35 @@ TEST(JSONSchema_transformer, check_with_default_dialect) {
   EXPECT_EQ(std::get<3>(entries.at(1)), "");
 }
 
+TEST(JSONSchema_transformer, iterate_rules_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> names;
+  std::vector<std::string> messages;
+  for (const auto &[name, rule] : bundle) {
+    ASSERT_NE(rule, nullptr);
+    names.emplace_back(name);
+    messages.emplace_back(rule->message());
+  }
+
+  EXPECT_EQ(names,
+            (std::vector<std::string>{"example_rule_1", "example_rule_2"}));
+  EXPECT_EQ(messages,
+            (std::vector<std::string>{"Keyword foo is not permitted",
+                                      "Keyword bar is not permitted"}));
+
+  EXPECT_TRUE(bundle.remove("example_rule_1"));
+  auto iterator{bundle.cbegin()};
+  ASSERT_NE(iterator, bundle.cend());
+  EXPECT_EQ(iterator->first, "example_rule_2");
+  ASSERT_NE(iterator->second, nullptr);
+  EXPECT_EQ(iterator->second->name(), "example_rule_2");
+  ++iterator;
+  EXPECT_EQ(iterator, bundle.cend());
+}
+
 TEST(JSONSchema_transformer, remove_rule_by_name) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();
