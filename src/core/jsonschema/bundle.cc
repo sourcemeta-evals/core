@@ -258,6 +258,22 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
     return;
   }
 
+  if (default_id.has_value() &&
+      !sourcemeta::core::identify(
+           schema, resolver,
+           sourcemeta::core::SchemaIdentificationStrategy::Loose,
+           default_dialect)
+           .has_value()) {
+    const auto root_base_dialect{
+        sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
+    if (!root_base_dialect.has_value()) {
+      throw sourcemeta::core::SchemaUnknownBaseDialectError();
+    }
+
+    sourcemeta::core::reidentify(schema, default_id.value(),
+                                 root_base_dialect.value());
+  }
+
   const auto vocabularies{
       sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
   if (vocabularies.contains(
