@@ -201,6 +201,11 @@ public:
   /// ```
   [[nodiscard]] auto path() const -> std::optional<std::string>;
 
+  /// Convert the URI into a file system path. For `file://` URIs, the
+  /// authority/path are converted to file system form. For non-`file://` URIs,
+  /// this returns the URI path component.
+  [[nodiscard]] auto to_path() const -> std::filesystem::path;
+
   /// Set the path part of the URI. For example:
   ///
   /// ```cpp
