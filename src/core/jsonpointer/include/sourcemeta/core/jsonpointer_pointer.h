@@ -5,7 +5,7 @@
 
 #include <algorithm>        // std::copy, std::equal
 #include <cassert>          // assert
-#include <cstddef>          // std::size_t, std::hash
+#include <cstddef>          // std::size_t
 #include <functional>       // std::reference_wrapper
 #include <initializer_list> // std::initializer_list
 #include <iterator>         // std::advance, std::back_inserter
@@ -645,6 +645,8 @@ struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
       result ^= token_hash(pointer.at(size / 2)) << 2;
     }
 
+    // Mix in the size to differentiate pointers of different lengths
+    result ^= std::hash<std::size_t>{}(size);
     return result;
   }
 };

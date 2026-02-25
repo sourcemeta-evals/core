@@ -18,9 +18,10 @@ TEST(JSONPointer_hash, pointer_single_property) {
 }
 
 TEST(JSONPointer_hash, pointer_single_index) {
-  const sourcemeta::core::Pointer pointer{1};
+  const sourcemeta::core::Pointer pointer_1{1};
+  const sourcemeta::core::Pointer pointer_2{1};
   const std::hash<sourcemeta::core::Pointer> hasher;
-  EXPECT_NE(hasher(pointer), 0);
+  EXPECT_EQ(hasher(pointer_1), hasher(pointer_2));
 }
 
 TEST(JSONPointer_hash, pointer_equal_pointers_same_hash) {
@@ -66,13 +67,12 @@ TEST(JSONPointer_hash, pointer_mixed_tokens) {
   (void)hash;
 }
 
-TEST(JSONPointer_hash, pointer_index_zero) {
-  const sourcemeta::core::Pointer pointer{0};
+TEST(JSONPointer_hash, pointer_index_zero_differs_from_empty) {
+  const sourcemeta::core::Pointer empty_ptr;
+  const sourcemeta::core::Pointer zero_ptr{0};
   const std::hash<sourcemeta::core::Pointer> hasher;
-  // Index 0 should still produce a non-zero hash due to size mixing
-  // or at least not crash
-  const auto hash{hasher(pointer)};
-  (void)hash;
+  // A pointer with index 0 should hash differently from the empty pointer
+  EXPECT_NE(hasher(empty_ptr), hasher(zero_ptr));
 }
 
 static const std::string foo = "foo";
@@ -93,9 +93,10 @@ TEST(JSONPointer_hash, weak_pointer_single_property) {
 }
 
 TEST(JSONPointer_hash, weak_pointer_single_index) {
-  const sourcemeta::core::WeakPointer pointer{1};
+  const sourcemeta::core::WeakPointer pointer_1{1};
+  const sourcemeta::core::WeakPointer pointer_2{1};
   const std::hash<sourcemeta::core::WeakPointer> hasher;
-  EXPECT_NE(hasher(pointer), 0);
+  EXPECT_EQ(hasher(pointer_1), hasher(pointer_2));
 }
 
 TEST(JSONPointer_hash, weak_pointer_equal_pointers_same_hash) {
