@@ -717,6 +717,19 @@ TEST(JSON_parse_error, read_json_directory) {
   }
 }
 
+TEST(JSON_parse_error, file_parse_error_path_is_const_ref) {
+  try {
+    sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
+                                "stub_invalid_1.json");
+  } catch (const sourcemeta::core::JSONFileParseError &error) {
+    const std::filesystem::path &ref1 = error.path();
+    const std::filesystem::path &ref2 = error.path();
+    EXPECT_EQ(&ref1, &ref2);
+  } catch (...) {
+    FAIL() << "The parse function was expected to throw a file parse error";
+  }
+}
+
 TEST(JSON_parse_error, read_json_non_existent) {
   try {
     sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
