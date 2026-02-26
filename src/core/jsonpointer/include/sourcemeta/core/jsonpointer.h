@@ -42,6 +42,53 @@ using Pointer = GenericPointer<JSON::String, PropertyHashJSON<JSON::String>>;
 using WeakPointer = GenericPointer<std::reference_wrapper<const std::string>,
                                    PropertyHashJSON<JSON::String>>;
 
+namespace detail {
+
+template <typename Token>
+[[nodiscard]] inline auto jsonpointer_hash_token(const Token &token) noexcept
+    -> std::size_t {
+  if (token.is_property()) {
+    return static_cast<std::size_t>(token.property_hash().a);
+  }
+
+  return static_cast<std::size_t>(token.to_index());
+}
+
+inline auto jsonpointer_hash_combine(std::size_t &seed,
+                                     const std::size_t value) noexcept -> void {
+  seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6U) + (seed >> 2U);
+}
+
+template <typename PointerType>
+[[nodiscard]] inline auto
+jsonpointer_hash_pointer(const PointerType &pointer) noexcept -> std::size_t {
+  std::size_t result{pointer.size()};
+  if (pointer.empty()) {
+    return result;
+  }
+
+  const auto first{static_cast<typename PointerType::size_type>(0)};
+  const auto middle{pointer.size() / 2};
+  const auto last{pointer.size() - 1};
+
+  detail::jsonpointer_hash_combine(
+      result, detail::jsonpointer_hash_token(pointer.at(first)) ^ 0x1U);
+
+  if (middle != first) {
+    detail::jsonpointer_hash_combine(
+        result, detail::jsonpointer_hash_token(pointer.at(middle)) ^ 0x2U);
+  }
+
+  if (last != first && last != middle) {
+    detail::jsonpointer_hash_combine(
+        result, detail::jsonpointer_hash_token(pointer.at(last)) ^ 0x3U);
+  }
+
+  return result;
+}
+
+} // namespace detail
+
 /// @ingroup jsonpointer
 /// A global constant instance of the empty JSON Pointer.
 const Pointer empty_pointer;
@@ -651,5 +698,25 @@ auto from_json(const JSON &value) -> std::optional<T> {
 }
 
 } // namespace sourcemeta::core
+
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  [[nodiscard]] inline auto
+  operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::jsonpointer_hash_pointer(pointer);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  [[nodiscard]] inline auto
+  operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::jsonpointer_hash_pointer(pointer);
+  }
+};
+
+} // namespace std
 
 #endif
