@@ -612,4 +612,39 @@ private:
 
 } // namespace sourcemeta::core
 
+namespace std {
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    const auto count{pointer.size()};
+    if (count == 0) {
+      return 0;
+    }
+
+    const auto hash_token =
+        [](const typename sourcemeta::core::GenericPointer<
+            PropertyT, Hash>::Token &token) noexcept -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, last, and middle tokens for O(1) hashing
+    std::size_t result{hash_token(pointer.at(0))};
+    if (count > 1) {
+      result ^= hash_token(pointer.at(count - 1)) << 1;
+    }
+
+    if (count > 2) {
+      result ^= hash_token(pointer.at(count / 2)) << 2;
+    }
+
+    return result;
+  }
+};
+} // namespace std
+
 #endif
