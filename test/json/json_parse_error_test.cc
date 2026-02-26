@@ -4,6 +4,7 @@
 
 #include <exception>
 #include <sstream>
+#include <type_traits> // std::is_same_v
 
 #define __EXPECT_PARSE_ERROR(input, expected_line, expected_column,            \
                              expected_error, expected_message)                 \
@@ -701,6 +702,20 @@ TEST(JSON_parse_error, read_json_invalid_bigint) {
     EXPECT_STREQ(error.what(),
                  "The JSON value is not representable by the IETF RFC 8259 "
                  "interoperable signed integer range");
+  } catch (...) {
+    FAIL() << "The parse function was expected to throw a file parse error";
+  }
+}
+
+TEST(JSON_parse_error, file_error_path_returns_const_reference) {
+  try {
+    sourcemeta::core::read_json(std::filesystem::path{TEST_DIRECTORY} /
+                                "stub_invalid_1.json");
+  } catch (const sourcemeta::core::JSONFileParseError &error) {
+    using path_return_type = decltype(error.path());
+    static_assert(
+        std::is_same_v<path_return_type, const std::filesystem::path &>);
+    EXPECT_EQ(&error.path(), &error.path());
   } catch (...) {
     FAIL() << "The parse function was expected to throw a file parse error";
   }
