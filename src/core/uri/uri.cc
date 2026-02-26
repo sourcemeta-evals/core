@@ -6,6 +6,7 @@
 
 #include <algorithm>  // std::replace
 #include <cassert>    // assert
+#include <cctype>     // std::isalpha
 #include <cstdint>    // std::uint32_t
 #include <filesystem> // std::filesystem
 #include <optional>   // std::optional
@@ -314,6 +315,54 @@ auto URI::path() const -> std::optional<std::string> {
   }
 
   return this->path_;
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  if (!uri_path.has_value()) {
+    return {};
+  }
+
+  const auto scheme{this->scheme()};
+  if (!scheme.has_value() || scheme.value() != "file") {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  std::istringstream input{uri_path.value()};
+  std::ostringstream output;
+  uri_unescape(input, output);
+  auto decoded_path{output.str()};
+
+  const auto uri_host{this->host()};
+  if (uri_host.has_value() && !uri_host.value().empty() &&
+      uri_host.value() != "localhost") {
+    std::istringstream host_input{std::string{uri_host.value()}};
+    std::ostringstream host_output;
+    uri_unescape(host_input, host_output);
+
+    std::string result{"\\\\"};
+    result += host_output.str();
+
+    if (!decoded_path.empty()) {
+      decoded_path.erase(0, decoded_path.find_first_not_of('/'));
+      if (!decoded_path.empty()) {
+        std::ranges::replace(decoded_path, '/', '\\');
+        result += '\\';
+        result += decoded_path;
+      }
+    }
+
+    return std::filesystem::path{result};
+  }
+
+  if (decoded_path.size() >= 3 && decoded_path.front() == '/' &&
+      std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+      decoded_path[2] == ':') {
+    decoded_path.erase(decoded_path.begin());
+    std::ranges::replace(decoded_path, '/', '\\');
+  }
+
+  return std::filesystem::path{decoded_path};
 }
 
 auto URI::path(const std::string &path) -> URI & {
