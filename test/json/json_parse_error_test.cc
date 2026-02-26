@@ -4,6 +4,8 @@
 
 #include <exception>
 #include <sstream>
+#include <type_traits>
+#include <utility>
 
 #define __EXPECT_PARSE_ERROR(input, expected_line, expected_column,            \
                              expected_error, expected_message)                 \
@@ -657,6 +659,13 @@ TEST(JSON_parse_error,
 TEST(JSON_parse_error, backspace_is_not_whitespace) {
   std::istringstream input{"\bfalse\b"};
   EXPECT_PARSE_ERROR(input, 1, 1);
+}
+
+TEST(JSON_parse_error, file_parse_error_path_returns_reference) {
+  using ReturnType =
+      decltype(std::declval<const sourcemeta::core::JSONFileParseError &>()
+                   .path());
+  EXPECT_TRUE((std::is_same_v<ReturnType, const std::filesystem::path &>));
 }
 
 TEST(JSON_parse_error, read_json_invalid_1) {
