@@ -5,7 +5,7 @@
 
 #include <algorithm>        // std::copy, std::equal
 #include <cassert>          // assert
-#include <cstddef>          // std::size_t
+#include <cstddef>          // std::size_t, std::hash
 #include <functional>       // std::reference_wrapper
 #include <initializer_list> // std::initializer_list
 #include <iterator>         // std::advance, std::back_inserter
@@ -611,5 +611,43 @@ private:
 };
 
 } // namespace sourcemeta::core
+
+namespace std {
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    auto token_hash =
+        [](const typename sourcemeta::core::GenericPointer<
+            PropertyT, Hash>::Token &token) noexcept -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, last, and middle token for O(1) hashing
+    std::size_t result{token_hash(pointer.at(0))};
+    if (size > 1) {
+      result ^= token_hash(pointer.at(size - 1)) << 1;
+    }
+
+    if (size > 2) {
+      result ^= token_hash(pointer.at(size / 2)) << 2;
+    }
+
+    // Mix in the size for better distribution
+    result ^= std::hash<std::size_t>{}(size);
+
+    return result;
+  }
+};
+} // namespace std
 
 #endif
