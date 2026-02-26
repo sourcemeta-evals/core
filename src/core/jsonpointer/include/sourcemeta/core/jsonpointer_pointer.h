@@ -6,7 +6,7 @@
 #include <algorithm>        // std::copy, std::equal
 #include <cassert>          // assert
 #include <cstddef>          // std::size_t
-#include <functional>       // std::reference_wrapper
+#include <functional>       // std::reference_wrapper, std::hash
 #include <initializer_list> // std::initializer_list
 #include <iterator>         // std::advance, std::back_inserter
 #include <type_traits>      // std::enable_if_t, std::is_same_v, std::false_type
@@ -611,5 +611,42 @@ private:
 };
 
 } // namespace sourcemeta::core
+
+namespace std {
+
+/// @ingroup jsonpointer
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    const auto count{pointer.size()};
+    if (count == 0) {
+      return 0;
+    }
+
+    // Sample first, last, and middle tokens for O(1) hashing
+    const auto token_hash{
+        [](const typename sourcemeta::core::GenericPointer<
+            PropertyT, Hash>::Token &token) noexcept -> std::size_t {
+          if (token.is_property()) {
+            return static_cast<std::size_t>(token.property_hash().a);
+          } else {
+            return static_cast<std::size_t>(token.to_index());
+          }
+        }};
+
+    std::size_t result{token_hash(pointer.at(0))};
+    if (count > 1) {
+      result ^= token_hash(pointer.at(count - 1)) << 1;
+    }
+    if (count > 2) {
+      result ^= token_hash(pointer.at(count / 2)) << 2;
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
 
 #endif
