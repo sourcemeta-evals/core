@@ -98,20 +98,23 @@ public:
       return false;
     }
 
-    if (vocabularies.contains(
-            "http://json-schema.org/draft-02/hyper-schema#") &&
+    if (contains_any(vocabularies,
+                     {"http://json-schema.org/draft-02/schema#",
+                      "http://json-schema.org/draft-02/hyper-schema#"}) &&
         schema.defines_any({"enum", "disallow", "extends"})) {
       return false;
     }
 
-    if (vocabularies.contains(
-            "http://json-schema.org/draft-01/hyper-schema#") &&
+    if (contains_any(vocabularies,
+                     {"http://json-schema.org/draft-01/schema#",
+                      "http://json-schema.org/draft-01/hyper-schema#"}) &&
         schema.defines_any({"enum", "disallow", "extends"})) {
       return false;
     }
 
-    if (vocabularies.contains(
-            "http://json-schema.org/draft-00/hyper-schema#") &&
+    if (contains_any(vocabularies,
+                     {"http://json-schema.org/draft-00/schema#",
+                      "http://json-schema.org/draft-00/hyper-schema#"}) &&
         schema.defines_any({"enum", "disallow", "extends"})) {
       return false;
     }
