@@ -130,6 +130,18 @@ auto uri_escape_for_path(const std::string &value) -> std::string {
   return result;
 }
 
+auto uri_unescape_string(const std::string &value) -> std::string {
+  std::istringstream input{value};
+  std::ostringstream output;
+  sourcemeta::core::uri_unescape(input, output);
+  return output.str();
+}
+
+auto is_windows_drive_path(const std::string &path) -> bool {
+  return path.size() >= 3 && path.front() == '/' &&
+         std::isalpha(path[1]) != 0 && path[2] == ':';
+}
+
 } // namespace
 
 namespace sourcemeta::core {
@@ -740,6 +752,33 @@ auto URI::operator<(const URI &other) const noexcept -> bool {
                   this->path_, this->query_, this->fragment_) <
          std::tie(other.scheme_, other.userinfo_, other.host_, other.port_,
                   other.path_, other.query_, other.fragment_);
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto result_path{this->path()};
+  if (!result_path.has_value()) {
+    return std::filesystem::path{};
+  }
+
+  const auto scheme{this->scheme()};
+  if (!scheme.has_value() || scheme.value() != "file") {
+    return std::filesystem::path{result_path.value()};
+  }
+
+  auto decoded_path{uri_unescape_string(result_path.value())};
+  const auto host{this->host()};
+  if (host.has_value() && !host->empty() && host.value() != "localhost") {
+    auto decoded_host{uri_unescape_string(std::string{host.value()})};
+    std::ranges::replace(decoded_path, '/', '\\');
+    return std::filesystem::path{"\\\\" + decoded_host + decoded_path};
+  }
+
+  if (is_windows_drive_path(decoded_path)) {
+    decoded_path.erase(decoded_path.begin());
+    std::ranges::replace(decoded_path, '/', '\\');
+  }
+
+  return std::filesystem::path{decoded_path};
 }
 
 auto URI::canonicalize(const std::string &input) -> std::string {
