@@ -582,6 +582,33 @@ TEST(JSONSchema_transformer, check_with_default_dialect) {
   EXPECT_EQ(std::get<3>(entries.at(1)), "");
 }
 
+TEST(JSONSchema_transformer, iterate_rules_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule1>();
+
+  std::vector<std::string> names;
+  for (const auto &[name, rule] : bundle) {
+    names.emplace_back(name);
+    EXPECT_EQ(name, rule->name());
+  }
+
+  EXPECT_EQ(names,
+            (std::vector<std::string>{"example_rule_1", "example_rule_2"}));
+  EXPECT_EQ(bundle.begin(), bundle.cbegin());
+  EXPECT_EQ(bundle.end(), bundle.cend());
+
+  EXPECT_TRUE(bundle.remove("example_rule_2"));
+
+  names.clear();
+  for (const auto &[name, rule] : bundle) {
+    names.emplace_back(name);
+    EXPECT_EQ(name, rule->name());
+  }
+
+  EXPECT_EQ(names, (std::vector<std::string>{"example_rule_1"}));
+}
+
 TEST(JSONSchema_transformer, remove_rule_by_name) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();
