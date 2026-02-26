@@ -770,6 +770,33 @@ TEST(JSONSchema_transformer, check_with_default_dialect) {
   EXPECT_FALSE(std::get<3>(entries.at(1)).description.has_value());
 }
 
+TEST(JSONSchema_transformer, iterate_registered_rules_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule1>();
+  bundle.add<ExampleRule2>();
+
+  std::vector<std::string> names;
+  for (const auto &[name, rule] : bundle) {
+    names.push_back(name);
+    EXPECT_EQ(rule->name(), name);
+  }
+
+  ASSERT_EQ(names.size(), 2);
+  EXPECT_EQ(names.at(0), "example_rule_1");
+  EXPECT_EQ(names.at(1), "example_rule_2");
+
+  auto iterator{bundle.cbegin()};
+  EXPECT_NE(iterator, bundle.cend());
+  EXPECT_EQ(iterator->first, "example_rule_1");
+  EXPECT_EQ(iterator->second->message(), "Keyword foo is not permitted");
+  ++iterator;
+  EXPECT_NE(iterator, bundle.cend());
+  EXPECT_EQ(iterator->first, "example_rule_2");
+  EXPECT_EQ(iterator->second->message(), "Keyword bar is not permitted");
+  ++iterator;
+  EXPECT_EQ(iterator, bundle.cend());
+}
+
 TEST(JSONSchema_transformer, remove_rule_by_name) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRule1>();
