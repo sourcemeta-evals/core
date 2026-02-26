@@ -616,6 +616,29 @@ TEST(JSONSchema_transformer, remove_rule_by_name) {
   EXPECT_EQ(document, expected);
 }
 
+TEST(JSONSchema_transformer, iterate_rules_read_only) {
+  sourcemeta::core::SchemaTransformer bundle;
+  bundle.add<ExampleRule2>();
+  bundle.add<ExampleRule1>();
+
+  const sourcemeta::core::SchemaTransformer &rules{bundle};
+  std::vector<std::string> names;
+  std::vector<std::string> messages;
+  for (const auto &[name, rule] : rules) {
+    ASSERT_NE(rule, nullptr);
+    names.push_back(name);
+    messages.push_back(rule->message());
+  }
+
+  EXPECT_EQ((std::vector<std::string>{"example_rule_1", "example_rule_2"}),
+            names);
+  EXPECT_EQ((std::vector<std::string>{"Keyword foo is not permitted",
+                                      "Keyword bar is not permitted"}),
+            messages);
+  EXPECT_EQ(rules.begin(), rules.cbegin());
+  EXPECT_EQ(rules.end(), rules.cend());
+}
+
 TEST(JSONSchema_transformer, unfixable_apply_without_description) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRuleUnfixable1>();
