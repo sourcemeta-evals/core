@@ -145,6 +145,24 @@ TEST(JSONSchema_SchemaMapResolver, embedded_resource) {
   EXPECT_EQ(resolver("https://www.sourcemeta.com/string").value(), embedded);
 }
 
+TEST(JSONSchema_SchemaMapResolver, single_schema_draft4) {
+  sourcemeta::core::SchemaMapResolver resolver{
+      sourcemeta::core::schema_official_resolver};
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "id": "https://www.sourcemeta.com/test",
+    "$schema": "http://json-schema.org/draft-04/schema#"
+  })JSON");
+
+  const auto result{resolver.add(document)};
+  EXPECT_TRUE(result);
+
+  EXPECT_TRUE(resolver("https://www.sourcemeta.com/test").has_value());
+  const auto resolved{resolver("https://www.sourcemeta.com/test").value()};
+  EXPECT_TRUE(resolved.defines("id"));
+  EXPECT_EQ(resolved.at("id").to_string(), "https://www.sourcemeta.com/test");
+}
+
 TEST(JSONSchema_SchemaMapResolver, embedded_resource_with_callback) {
   sourcemeta::core::SchemaMapResolver resolver;
   std::unordered_set<sourcemeta::core::JSON::String> identifiers;
