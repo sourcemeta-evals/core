@@ -12,6 +12,7 @@
 
 #include <cassert>     // assert
 #include <concepts>    // std::derived_from
+#include <cstddef>     // std::size_t
 #include <functional>  // std::function
 #include <map>         // std::map
 #include <memory>      // std::make_unique, std::unique_ptr
@@ -216,6 +217,20 @@ public:
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// The number of rules in the bundle
+  [[nodiscard]] auto size() const noexcept -> std::size_t;
+
+  // Not worth documenting these details
+#if !defined(DOXYGEN)
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+  auto begin() const noexcept -> const_iterator;
+  auto end() const noexcept -> const_iterator;
+  auto cbegin() const noexcept -> const_iterator;
+  auto cend() const noexcept -> const_iterator;
+#endif
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
