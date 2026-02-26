@@ -28,6 +28,19 @@ TEST(JSONPointer_json_auto, from_json_invalid_type) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, from_json_double_encoded_string) {
+  const sourcemeta::core::Pointer expected{"patternProperties", "[\\-]"};
+  std::ostringstream stream;
+  stream << sourcemeta::core::to_json(expected);
+
+  const sourcemeta::core::JSON input{stream.str()};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), expected);
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const std::string foo{"foo"};
   const std::string bar{"bar"};

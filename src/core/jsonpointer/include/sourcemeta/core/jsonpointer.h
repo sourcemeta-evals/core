@@ -644,7 +644,18 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 
   try {
-    return to_pointer(value.to_string());
+    const auto nested{parse_json(value.to_string())};
+    if (nested.is_string()) {
+      return to_pointer(nested);
+    }
+  } catch (const PointerParseError &) {
+    return std::nullopt;
+  } catch (const JSONParseError &) {
+    // Ignore. We may already be dealing with the plain parsed pointer string.
+  }
+
+  try {
+    return to_pointer(value);
   } catch (const PointerParseError &) {
     return std::nullopt;
   }
