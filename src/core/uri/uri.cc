@@ -815,7 +815,6 @@ auto URI::to_path() const -> std::filesystem::path {
   if (uri_host.has_value() && !uri_host.value().empty()) {
     std::string unc_path{"/"};
     unc_path += "/";
-    std::string host_decoded;
     std::istringstream host_input{std::string{uri_host.value()}};
     std::ostringstream host_output;
     host_input >> std::noskipws;
