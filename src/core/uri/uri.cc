@@ -786,4 +786,55 @@ auto URI::from_path(const std::filesystem::path &path) -> URI {
   return result;
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  const auto uri_path{this->path()};
+
+  // For non file:// URIs, just return the path component
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (uri_path.has_value()) {
+      return std::filesystem::path{uri_path.value()};
+    }
+
+    return std::filesystem::path{};
+  }
+
+  // Percent-decode the path
+  std::string decoded_path;
+  if (uri_path.has_value()) {
+    std::istringstream input{uri_path.value()};
+    std::ostringstream output;
+    // Disable whitespace skipping so spaces are preserved
+    input >> std::noskipws;
+    uri_unescape(input, output);
+    decoded_path = output.str();
+  }
+
+  // Handle UNC paths: file://server/share/... where host is present
+  const auto uri_host{this->host()};
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    std::string unc_path{"/"};
+    unc_path += "/";
+    std::string host_decoded;
+    std::istringstream host_input{std::string{uri_host.value()}};
+    std::ostringstream host_output;
+    host_input >> std::noskipws;
+    uri_unescape(host_input, host_output);
+    unc_path += host_output.str();
+    unc_path += decoded_path;
+    return std::filesystem::path{unc_path};
+  }
+
+  // For file:///C:/... style Windows paths, strip the leading slash
+  // A Windows drive letter looks like /C: where second char is alpha
+  // and third char is ':'
+  if (decoded_path.size() >= 3 && decoded_path[0] == '/' &&
+      std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+      decoded_path[2] == ':') {
+    decoded_path.erase(0, 1);
+  }
+
+  return std::filesystem::path{decoded_path};
+}
+
 } // namespace sourcemeta::core
