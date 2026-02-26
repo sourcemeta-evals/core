@@ -217,6 +217,20 @@ public:
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
 
+  /// The underlying container type for rules
+  using container_type =
+      std::map<std::string, std::unique_ptr<SchemaTransformRule>>;
+  /// A read-only iterator over the registered rules
+  using const_iterator = typename container_type::const_iterator;
+  /// Get a read-only begin iterator over the registered rules
+  auto begin() const -> const_iterator;
+  /// Get a read-only end iterator over the registered rules
+  auto end() const -> const_iterator;
+  /// Get a read-only begin iterator over the registered rules
+  auto cbegin() const -> const_iterator;
+  /// Get a read-only end iterator over the registered rules
+  auto cend() const -> const_iterator;
+
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
   ///
@@ -249,7 +263,7 @@ private:
 #if defined(_MSC_VER)
 #pragma warning(disable : 4251)
 #endif
-  std::map<std::string, std::unique_ptr<SchemaTransformRule>> rules;
+  container_type rules;
 #if defined(_MSC_VER)
 #pragma warning(default : 4251)
 #endif
