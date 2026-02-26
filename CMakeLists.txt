@@ -8,6 +8,7 @@ option(SOURCEMETA_CORE_LANG_PARALLEL "Build the Sourcemeta Core language paralle
 option(SOURCEMETA_CORE_TIME "Build the Sourcemeta Core time library" ON)
 option(SOURCEMETA_CORE_UUID "Build the Sourcemeta Core UUID library" ON)
 option(SOURCEMETA_CORE_MD5 "Build the Sourcemeta Core MD5 library" ON)
+option(SOURCEMETA_CORE_GZIP "Build the Sourcemeta Core GZIP library" ON)
 option(SOURCEMETA_CORE_REGEX "Build the Sourcemeta Core Regex library" ON)
 option(SOURCEMETA_CORE_URI "Build the Sourcemeta Core URI library" ON)
 option(SOURCEMETA_CORE_JSON "Build the Sourcemeta Core JSON library" ON)
@@ -73,6 +74,11 @@ endif()
 
 if(SOURCEMETA_CORE_MD5)
   add_subdirectory(src/core/md5)
+endif()
+
+if(SOURCEMETA_CORE_GZIP)
+  find_package(ZLIB REQUIRED)
+  add_subdirectory(src/core/gzip)
 endif()
 
 if(SOURCEMETA_CORE_REGEX)
@@ -175,6 +181,10 @@ if(SOURCEMETA_CORE_TESTS)
 
   if(SOURCEMETA_CORE_MD5)
     add_subdirectory(test/md5)
+  endif()
+
+  if(SOURCEMETA_CORE_GZIP)
+    add_subdirectory(test/gzip)
   endif()
 
   if(SOURCEMETA_CORE_REGEX)
