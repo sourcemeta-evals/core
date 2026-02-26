@@ -18,6 +18,7 @@
 // NOLINTEND(misc-include-cleaner)
 
 #include <cassert>     // assert
+#include <cstddef>     // std::size_t
 #include <functional>  // std::reference_wrapper
 #include <memory>      // std::allocator
 #include <ostream>     // std::basic_ostream
@@ -41,6 +42,51 @@ using Pointer = GenericPointer<JSON::String, PropertyHashJSON<JSON::String>>;
 /// @ingroup jsonpointer
 using WeakPointer = GenericPointer<std::reference_wrapper<const std::string>,
                                    PropertyHashJSON<JSON::String>>;
+
+namespace internal {
+
+template <typename PointerT>
+[[nodiscard]] auto hash_pointer(const PointerT &pointer) noexcept
+    -> std::size_t {
+  auto combine = [](const std::size_t seed,
+                    const std::size_t value) noexcept -> std::size_t {
+    return seed ^ (value + 0x9e3779b97f4a7c15ULL +
+                   (seed << static_cast<std::size_t>(6)) +
+                   (seed >> static_cast<std::size_t>(2)));
+  };
+
+  auto hash_token =
+      [&combine](
+          const typename PointerT::Token &token) noexcept -> std::size_t {
+    if (token.is_property()) {
+      return combine(0x3243f6a8885a308dULL,
+                     static_cast<std::size_t>(token.property_hash().a));
+    }
+
+    return combine(0xc3a5c85c97cb3127ULL,
+                   static_cast<std::size_t>(token.to_index()));
+  };
+
+  auto result = combine(0, pointer.size());
+  if (pointer.empty()) {
+    return result;
+  }
+
+  result = combine(combine(result, 0), hash_token(pointer.at(0)));
+  if (pointer.size() > 1) {
+    const auto middle{pointer.size() / 2};
+    result = combine(combine(result, middle), hash_token(pointer.at(middle)));
+  }
+
+  if (pointer.size() > 2) {
+    const auto last{pointer.size() - 1};
+    result = combine(combine(result, last), hash_token(pointer.back()));
+  }
+
+  return result;
+}
+
+} // namespace internal
 
 /// @ingroup jsonpointer
 /// A global constant instance of the empty JSON Pointer.
@@ -651,5 +697,25 @@ auto from_json(const JSON &value) -> std::optional<T> {
 }
 
 } // namespace sourcemeta::core
+
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  [[nodiscard]] auto
+  operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::internal::hash_pointer(pointer);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  [[nodiscard]] auto
+  operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::internal::hash_pointer(pointer);
+  }
+};
+
+} // namespace std
 
 #endif
