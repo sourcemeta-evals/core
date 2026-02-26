@@ -6,6 +6,7 @@
 
 #include <algorithm>  // std::replace
 #include <cassert>    // assert
+#include <cctype>     // std::isalpha
 #include <cstdint>    // std::uint32_t
 #include <filesystem> // std::filesystem
 #include <optional>   // std::optional
@@ -128,6 +129,13 @@ auto uri_escape_for_path(const std::string &value) -> std::string {
   }
 
   return result;
+}
+
+auto uri_unescape_path(const std::string &value) -> std::string {
+  std::istringstream input{value};
+  std::ostringstream output;
+  sourcemeta::core::uri_unescape(input, output);
+  return output.str();
 }
 
 } // namespace
@@ -314,6 +322,39 @@ auto URI::path() const -> std::optional<std::string> {
   }
 
   return this->path_;
+}
+
+auto URI::to_path() const -> std::filesystem::path {
+  const auto result_path{this->path()};
+  if (!result_path.has_value()) {
+    return {};
+  }
+
+  const auto result_scheme{this->scheme()};
+  if (!result_scheme.has_value() || result_scheme.value() != "file") {
+    return std::filesystem::path{result_path.value()};
+  }
+
+  auto decoded_path{uri_unescape_path(result_path.value())};
+
+  const auto result_host{this->host()};
+  if (result_host.has_value() && !result_host.value().empty()) {
+    std::ostringstream unc;
+    unc << "//" << uri_unescape_path(std::string{result_host.value()});
+    if (!decoded_path.starts_with('/')) {
+      unc << '/';
+    }
+    unc << decoded_path;
+    return std::filesystem::path{unc.str()};
+  }
+
+  if (decoded_path.size() >= 3 && decoded_path.front() == '/' &&
+      std::isalpha(static_cast<unsigned char>(decoded_path[1])) &&
+      decoded_path[2] == ':') {
+    decoded_path.erase(0, 1);
+  }
+
+  return std::filesystem::path{decoded_path};
 }
 
 auto URI::path(const std::string &path) -> URI & {
