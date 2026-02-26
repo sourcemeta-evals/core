@@ -746,6 +746,38 @@ auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  if (!uri_path.has_value()) {
+    return std::filesystem::path{};
+  }
+
+  const auto uri_scheme{this->scheme()};
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  // Percent-decode the path
+  std::istringstream encoded{uri_path.value()};
+  std::ostringstream decoded;
+  uri_unescape(encoded, decoded);
+  auto result{decoded.str()};
+
+  // Handle UNC paths: file://server/share/...
+  const auto uri_host{this->host()};
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    return std::filesystem::path{"//" + std::string{uri_host.value()} + result};
+  }
+
+  // Handle Windows drive letters: /C:/... -> C:/...
+  if (result.size() >= 3 && result[0] == '/' &&
+      std::isalpha(static_cast<unsigned char>(result[1])) && result[2] == ':') {
+    result.erase(0, 1);
+  }
+
+  return std::filesystem::path{result};
+}
+
 auto URI::from_path(const std::filesystem::path &path) -> URI {
   auto normalized{path.lexically_normal().string()};
   const auto is_unc{normalized.starts_with("\\\\")};
