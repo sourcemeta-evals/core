@@ -116,7 +116,9 @@ private:
 };
 
 /// @ingroup jsonschema
-/// An error that represents a broken schema resolution event
+/// An error that represents a broken reference after a schema transformation.
+/// This is thrown by SchemaTransformRule::rereference when a transformation
+/// accidentally breaks a reference and the rule does not know how to fix it.
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaBrokenReferenceError
     : public SchemaReferenceError {
   using SchemaReferenceError::SchemaReferenceError;
