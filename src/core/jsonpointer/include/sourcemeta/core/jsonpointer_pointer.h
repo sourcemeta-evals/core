@@ -5,8 +5,8 @@
 
 #include <algorithm>        // std::copy, std::equal
 #include <cassert>          // assert
-#include <cstddef>          // std::size_t
-#include <functional>       // std::reference_wrapper
+#include <cstddef>          // std::size_t, std::ptrdiff_t
+#include <functional>       // std::reference_wrapper, std::hash
 #include <initializer_list> // std::initializer_list
 #include <iterator>         // std::advance, std::back_inserter
 #include <type_traits>      // std::enable_if_t, std::is_same_v, std::false_type
@@ -611,5 +611,44 @@ private:
 };
 
 } // namespace sourcemeta::core
+
+namespace std {
+
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    // O(1) hash: sample first, middle, and last tokens
+    const auto count{pointer.size()};
+    if (count == 0) {
+      return 0;
+    }
+
+    std::size_t result{hash_token(pointer.at(0))};
+    if (count > 1) {
+      result ^= hash_token(pointer.at(count - 1)) << 1;
+    }
+
+    if (count > 2) {
+      result ^= hash_token(pointer.at(count / 2)) << 2;
+    }
+
+    return result;
+  }
+
+private:
+  static auto hash_token(
+      const sourcemeta::core::GenericToken<PropertyT, Hash> &token) noexcept
+      -> std::size_t {
+    if (token.is_property()) {
+      // Use the first member of the pre-computed property hash
+      return static_cast<std::size_t>(token.property_hash().a);
+    } else {
+      return static_cast<std::size_t>(token.to_index());
+    }
+  }
+};
+
+} // namespace std
 
 #endif
