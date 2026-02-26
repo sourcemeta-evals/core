@@ -3815,3 +3815,117 @@ TEST(AlterSchema_lint_2020_12,
 
   EXPECT_EQ(document, expected);
 }
+
+// Tests for unnecessary_allof_ref_wrapper rule
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_1) {
+  // Basic case: single $ref-only branch in allOf
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_2) {
+  // Should not apply when there's already a $ref sibling to allOf
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/foo",
+    "allOf": [
+      { "$ref": "https://example.com/bar" }
+    ]
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/foo",
+    "allOf": [
+      { "$ref": "https://example.com/bar" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_3) {
+  // Should not apply when there are multiple $ref branches
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com/foo" },
+      { "$ref": "https://example.com/bar" }
+    ]
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com/foo" },
+      { "$ref": "https://example.com/bar" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_with_sibling) {
+  // Single $ref-only branch in allOf with sibling keywords on parent
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Test",
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  LINT_AND_FIX_FOR_READABILITY(document);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Test",
+    "$ref": "https://example.com"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_lint_trace) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  LINT_WITHOUT_FIX_FOR_READABILITY(document, result, traces);
+
+  EXPECT_FALSE(result.first);
+  EXPECT_GE(traces.size(), 1);
+  // Find our rule in the traces
+  bool found = false;
+  for (const auto &trace : traces) {
+    if (std::get<1>(trace) == "unnecessary_allof_ref_wrapper") {
+      found = true;
+      EXPECT_EQ(std::get<2>(trace),
+                "In modern JSON Schema versions (2019-09+), wrapping `$ref` in "
+                "`allOf` is no longer necessary as `$ref` no longer overrides "
+                "sibling keywords");
+      break;
+    }
+  }
+  EXPECT_TRUE(found);
+}
