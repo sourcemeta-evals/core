@@ -201,6 +201,18 @@ public:
   /// ```
   [[nodiscard]] auto path() const -> std::optional<std::string>;
 
+  /// Attempt to convert the URI into a file system path. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/uri.h>
+  /// #include <cassert>
+  /// #include <filesystem>
+  ///
+  /// const sourcemeta::core::URI uri{"file:///foo/bar"};
+  /// assert(uri.to_path() == std::filesystem::path{"/foo/bar"});
+  /// ```
+  [[nodiscard]] auto to_path() const -> std::filesystem::path;
+
   /// Set the path part of the URI. For example:
   ///
   /// ```cpp
