@@ -12,6 +12,7 @@
 
 #include <cassert>     // assert
 #include <concepts>    // std::derived_from
+#include <cstddef>     // std::size_t
 #include <functional>  // std::function
 #include <map>         // std::map
 #include <memory>      // std::make_unique, std::unique_ptr
@@ -216,6 +217,23 @@ public:
 
   /// Remove a rule from the bundle
   auto remove(const std::string &name) -> bool;
+
+  /// The type of a read-only iterator over the rules of the bundle
+  using const_iterator =
+      std::map<std::string,
+               std::unique_ptr<SchemaTransformRule>>::const_iterator;
+
+  /// Get a read-only begin iterator over the rules of the bundle
+  [[nodiscard]] auto begin() const -> const_iterator;
+  /// Get a read-only end iterator over the rules of the bundle
+  [[nodiscard]] auto end() const -> const_iterator;
+  /// Get a read-only begin iterator over the rules of the bundle
+  [[nodiscard]] auto cbegin() const -> const_iterator;
+  /// Get a read-only end iterator over the rules of the bundle
+  [[nodiscard]] auto cend() const -> const_iterator;
+
+  /// Get the number of rules in the bundle
+  [[nodiscard]] auto size() const -> std::size_t;
 
   /// The callback that is called whenever the condition of a rule holds true.
   /// The arguments are as follows:
