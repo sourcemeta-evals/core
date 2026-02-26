@@ -144,7 +144,8 @@ sourcemeta_library(NAMESPACE sourcemeta PROJECT core NAME alterschema
     linter/if_without_then_else.h
     linter/max_contains_without_contains.h
     linter/min_contains_without_contains.h
-    linter/then_without_if.h)
+    linter/then_without_if.h
+    linter/unnecessary_allof_ref_wrapper.h)
 
 if(SOURCEMETA_CORE_INSTALL)
   sourcemeta_library_install(NAMESPACE sourcemeta PROJECT core NAME alterschema)
