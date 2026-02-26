@@ -746,6 +746,51 @@ auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_scheme{this->scheme()};
+  if (uri_scheme.has_value() && uri_scheme.value() == "file") {
+    const auto uri_host{this->host()};
+    const auto uri_path{this->path()};
+    std::string raw_path;
+
+    // UNC path: file://server/share/...
+    if (uri_host.has_value() && !uri_host.value().empty()) {
+      raw_path += "//";
+      raw_path += uri_host.value();
+    }
+
+    if (uri_path.has_value()) {
+      const auto &path_value{uri_path.value()};
+      // Detect Windows drive letter like /C:/...
+      // The path starts with / followed by a drive letter and colon
+      if (path_value.size() >= 3 && path_value[0] == '/' &&
+          std::isalpha(static_cast<unsigned char>(path_value[1])) &&
+          path_value[2] == ':') {
+        // Strip leading slash for Windows drive paths
+        raw_path += path_value.substr(1);
+      } else {
+        raw_path += path_value;
+      }
+    }
+
+    // Percent-decode the path
+    std::istringstream input{raw_path};
+    // Disable whitespace skipping for uri_unescape
+    input >> std::noskipws;
+    std::ostringstream output;
+    uri_unescape(input, output);
+    return std::filesystem::path{output.str()};
+  }
+
+  // For non file:// URIs, return the path component
+  const auto uri_path{this->path()};
+  if (uri_path.has_value()) {
+    return std::filesystem::path{uri_path.value()};
+  }
+
+  return std::filesystem::path{};
+}
+
 auto URI::from_path(const std::filesystem::path &path) -> URI {
   auto normalized{path.lexically_normal().string()};
   const auto is_unc{normalized.starts_with("\\\\")};
