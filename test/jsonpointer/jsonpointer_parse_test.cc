@@ -272,32 +272,36 @@ TEST(JSONPointer_parse, pipe) {
 }
 
 TEST(JSONPointer_parse, backslash_after_letter) {
+  // In JSON Pointer, backslash has no special meaning, it is treated literally
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/i\\\\j");
+      sourcemeta::core::to_pointer("/i\\j");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "i\\j");
 }
 
 TEST(JSONPointer_parse, backslash) {
-  const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\\\");
+  // In JSON Pointer, backslash has no special meaning, it is treated literally
+  const sourcemeta::core::Pointer pointer = sourcemeta::core::to_pointer("/\\");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\\");
 }
 
 TEST(JSONPointer_parse, double_quote_after_letter) {
+  // In JSON Pointer, double quote has no special meaning, it is treated
+  // literally
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/k\\\"l");
+      sourcemeta::core::to_pointer("/k\"l");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "k\"l");
 }
 
 TEST(JSONPointer_parse, double_quote) {
-  const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\\"");
+  // In JSON Pointer, double quote has no special meaning, it is treated
+  // literally
+  const sourcemeta::core::Pointer pointer = sourcemeta::core::to_pointer("/\"");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\"");
@@ -326,8 +330,9 @@ TEST(JSONPointer_parse, escaped_slash) {
 }
 
 TEST(JSONPointer_parse, escaped_slash_with_backslash) {
+  // In JSON Pointer, backslash has no special meaning
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\\\/");
+      sourcemeta::core::to_pointer("/\\/");
   EXPECT_EQ(pointer.size(), 2);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\\");
@@ -336,8 +341,9 @@ TEST(JSONPointer_parse, escaped_slash_with_backslash) {
 }
 
 TEST(JSONPointer_parse, escaped_slash_with_backslash_after_letter) {
+  // In JSON Pointer, backslash has no special meaning
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/x\\\\/");
+      sourcemeta::core::to_pointer("/x\\/");
   EXPECT_EQ(pointer.size(), 2);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "x\\");
@@ -405,133 +411,141 @@ TEST(JSONPointer_parse, hyphen_slash_hyphen) {
 }
 
 TEST(JSONPointer_parse, escaped_quote_within_string) {
+  // In JSON Pointer, double quote has no special meaning
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/foo\\\"bar");
+      sourcemeta::core::to_pointer("/foo\"bar");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "foo\"bar");
 }
 
 TEST(JSONPointer_parse, escaped_quote) {
-  const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\\"");
+  // In JSON Pointer, double quote has no special meaning
+  const sourcemeta::core::Pointer pointer = sourcemeta::core::to_pointer("/\"");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\"");
 }
 
 TEST(JSONPointer_parse, escaped_backslash_within_string) {
+  // In JSON Pointer, backslash has no special meaning
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/foo\\\\bar");
+      sourcemeta::core::to_pointer("/foo\\bar");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "foo\\bar");
 }
 
 TEST(JSONPointer_parse, escaped_backslash) {
-  const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\\\");
+  // In JSON Pointer, backslash has no special meaning
+  const sourcemeta::core::Pointer pointer = sourcemeta::core::to_pointer("/\\");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\\");
 }
 
 TEST(JSONPointer_parse, control_backslash_backspace) {
-  const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\b");
+  // Backspace character directly in the pointer
+  const sourcemeta::core::Pointer pointer = sourcemeta::core::to_pointer("/\b");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\b");
 }
 
 TEST(JSONPointer_parse, control_backslash_backspace_within_string) {
+  // Backspace character directly in the pointer
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/foo\\bbar");
+      sourcemeta::core::to_pointer("/foo\bbar");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "foo\bbar");
 }
 
 TEST(JSONPointer_parse, control_backslash_formfeed) {
-  const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\f");
+  // Formfeed character directly in the pointer
+  const sourcemeta::core::Pointer pointer = sourcemeta::core::to_pointer("/\f");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\f");
 }
 
 TEST(JSONPointer_parse, control_backslash_formfeed_within_string) {
+  // Formfeed character directly in the pointer
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/foo\\fbar");
+      sourcemeta::core::to_pointer("/foo\fbar");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "foo\fbar");
 }
 
 TEST(JSONPointer_parse, control_backslash_newline) {
-  const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\n");
+  // Newline character directly in the pointer
+  const sourcemeta::core::Pointer pointer = sourcemeta::core::to_pointer("/\n");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\n");
 }
 
 TEST(JSONPointer_parse, control_backslash_newline_within_string) {
+  // Newline character directly in the pointer
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/foo\\nbar");
+      sourcemeta::core::to_pointer("/foo\nbar");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "foo\nbar");
 }
 
 TEST(JSONPointer_parse, control_backslash_carriage) {
-  const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\r");
+  // Carriage return character directly in the pointer
+  const sourcemeta::core::Pointer pointer = sourcemeta::core::to_pointer("/\r");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\r");
 }
 
 TEST(JSONPointer_parse, control_backslash_carriage_within_string) {
+  // Carriage return character directly in the pointer
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/foo\\rbar");
+      sourcemeta::core::to_pointer("/foo\rbar");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "foo\rbar");
 }
 
 TEST(JSONPointer_parse, control_backslash_tab) {
-  const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/\\t");
+  // Tab character directly in the pointer
+  const sourcemeta::core::Pointer pointer = sourcemeta::core::to_pointer("/\t");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "\t");
 }
 
 TEST(JSONPointer_parse, control_backslash_tab_within_string) {
+  // Tab character directly in the pointer
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/foo\\tbar");
+      sourcemeta::core::to_pointer("/foo\tbar");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "foo\tbar");
 }
 
 TEST(JSONPointer_parse, property_with_unicode_code_point) {
+  // JSON Pointer does not support \uXXXX escape sequences; use the actual
+  // character
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("/foo\\u002Abar");
+      sourcemeta::core::to_pointer("/foo*bar");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
-  EXPECT_EQ(pointer.at(0).to_property(), "foo\u002Abar");
+  EXPECT_EQ(pointer.at(0).to_property(), "foo*bar");
 }
 
 TEST(JSONPointer_parse, unicode_slashes) {
+  // JSON Pointer uses ~1 to encode slashes, not \u002F
   const sourcemeta::core::Pointer pointer =
-      sourcemeta::core::to_pointer("\\u002Ffoo\\u002Fbar");
-  EXPECT_EQ(pointer.size(), 2);
+      sourcemeta::core::to_pointer("/~1foo~1bar");
+  EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
-  EXPECT_EQ(pointer.at(0).to_property(), "foo");
-  EXPECT_TRUE(pointer.at(1).is_property());
-  EXPECT_EQ(pointer.at(1).to_property(), "bar");
+  EXPECT_EQ(pointer.at(0).to_property(), "/foo/bar");
 }
 
 TEST(JSONPointer_parse, regex_caret) {
@@ -547,10 +561,9 @@ TEST(JSONPointer_parse, regex_caret) {
 }
 
 TEST(JSONPointer_parse, regex_backslash) {
+  // Backslash has no special meaning in JSON Pointer, it is literal
   const sourcemeta::core::Pointer pointer =
-      // Needs escaping because here we are interpreting as a C string and not
-      // as a JSON string
-      sourcemeta::core::to_pointer("/[\\\\-]");
+      sourcemeta::core::to_pointer("/[\\-]");
   EXPECT_EQ(pointer.size(), 1);
   EXPECT_TRUE(pointer.at(0).is_property());
   EXPECT_EQ(pointer.at(0).to_property(), "[\\-]");
