@@ -746,6 +746,64 @@ auto URI::canonicalize(const std::string &input) -> std::string {
   return URI{input}.canonicalize().recompose();
 }
 
+auto URI::to_path() const -> std::filesystem::path {
+  const auto uri_path{this->path()};
+  const auto uri_scheme{this->scheme()};
+
+  // For non file:// URIs, just return the path component
+  if (!uri_scheme.has_value() || uri_scheme.value() != "file") {
+    if (!uri_path.has_value()) {
+      return std::filesystem::path{};
+    }
+
+    // Percent-decode the path
+    std::istringstream input{uri_path.value()};
+    std::ostringstream output;
+    uri_unescape(input, output);
+    return std::filesystem::path{output.str()};
+  }
+
+  // file:// URI handling
+  const auto uri_host{this->host()};
+  std::string result;
+
+  // UNC path: file://server/share/...
+  if (uri_host.has_value() && !uri_host.value().empty()) {
+    result = "//";
+    result += std::string{uri_host.value()};
+  }
+
+  if (uri_path.has_value()) {
+    const auto &raw_path{uri_path.value()};
+
+    // Check for Windows drive letter like /C:/...
+    // The path starts with / followed by a drive letter and colon
+    if (raw_path.size() >= 3 && raw_path[0] == '/' &&
+        std::isalpha(static_cast<unsigned char>(raw_path[1])) &&
+        raw_path[2] == ':') {
+      // Skip the leading slash for Windows paths (only if not UNC)
+      if (result.empty()) {
+        std::istringstream input{raw_path.substr(1)};
+        std::ostringstream output;
+        uri_unescape(input, output);
+        result = output.str();
+      } else {
+        std::istringstream input{raw_path};
+        std::ostringstream output;
+        uri_unescape(input, output);
+        result += output.str();
+      }
+    } else {
+      std::istringstream input{raw_path};
+      std::ostringstream output;
+      uri_unescape(input, output);
+      result += output.str();
+    }
+  }
+
+  return std::filesystem::path{result};
+}
+
 auto URI::from_path(const std::filesystem::path &path) -> URI {
   auto normalized{path.lexically_normal().string()};
   const auto is_unc{normalized.starts_with("\\\\")};
