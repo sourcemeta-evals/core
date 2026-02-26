@@ -18,6 +18,7 @@
 // NOLINTEND(misc-include-cleaner)
 
 #include <cassert>     // assert
+#include <cstddef>     // std::size_t
 #include <functional>  // std::reference_wrapper
 #include <memory>      // std::allocator
 #include <ostream>     // std::basic_ostream
@@ -650,6 +651,67 @@ auto from_json(const JSON &value) -> std::optional<T> {
   }
 }
 
+namespace detail {
+
+template <typename PointerT>
+[[nodiscard]] inline auto
+jsonpointer_hash_token(const typename PointerT::Token &token) noexcept
+    -> std::size_t {
+  if (token.is_property()) {
+    return static_cast<std::size_t>(token.property_hash().a) ^
+           static_cast<std::size_t>(0x9e3779b9U);
+  }
+
+  return static_cast<std::size_t>(token.to_index());
+}
+
+template <typename PointerT>
+[[nodiscard]] inline auto jsonpointer_hash(const PointerT &pointer) noexcept
+    -> std::size_t {
+  auto result{pointer.size()};
+  const auto combine = [](std::size_t &state, const std::size_t value) {
+    state ^= value + static_cast<std::size_t>(0x9e3779b97f4a7c15ULL) +
+             (state << 6U) + (state >> 2U);
+  };
+
+  if (pointer.empty()) {
+    return result;
+  }
+
+  combine(result, jsonpointer_hash_token<PointerT>(pointer.at(0)));
+  if (pointer.size() > 2) {
+    combine(result,
+            jsonpointer_hash_token<PointerT>(pointer.at(pointer.size() / 2)));
+  }
+  if (pointer.size() > 1) {
+    combine(result, jsonpointer_hash_token<PointerT>(pointer.back()));
+  }
+
+  return result;
+}
+
+} // namespace detail
+
 } // namespace sourcemeta::core
+
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  [[nodiscard]] auto
+  operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::jsonpointer_hash(pointer);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  [[nodiscard]] auto
+  operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::jsonpointer_hash(pointer);
+  }
+};
+
+} // namespace std
 
 #endif

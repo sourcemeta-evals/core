@@ -3,6 +3,8 @@
 #include <sourcemeta/core/jsonpointer.h>
 
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 
 TEST(JSONPointer_pointer, general_traits) {
   EXPECT_TRUE(std::is_default_constructible<sourcemeta::core::Pointer>::value);
@@ -246,4 +248,22 @@ TEST(JSONPointer_pointer, push_back_index_move) {
   EXPECT_EQ(pointer.at(0).to_property(), "foo");
   EXPECT_TRUE(pointer.at(1).is_index());
   EXPECT_EQ(pointer.at(1).to_index(), 0);
+}
+
+TEST(JSONPointer_pointer, unordered_containers) {
+  const sourcemeta::core::Pointer first{"foo", 2, "bar"};
+  const sourcemeta::core::Pointer second{"foo", 2, "bar"};
+  const sourcemeta::core::Pointer third{"foo", 3, "bar"};
+
+  std::unordered_set<sourcemeta::core::Pointer> set;
+  EXPECT_TRUE(set.emplace(first).second);
+  EXPECT_FALSE(set.emplace(second).second);
+  EXPECT_EQ(set.count(second), 1);
+  EXPECT_EQ(set.count(third), 0);
+
+  std::unordered_map<sourcemeta::core::Pointer, int> map;
+  map.emplace(first, 1);
+  map[second] = 2;
+  EXPECT_EQ(map.size(), 1);
+  EXPECT_EQ(map.at(first), 2);
 }
