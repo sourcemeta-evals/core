@@ -755,3 +755,65 @@ TEST(JSON_object, rename_match_destination_exists) {
   EXPECT_TRUE(document.at("bar").is_boolean());
   EXPECT_TRUE(document.at("bar").to_boolean());
 }
+
+TEST(JSON_object, merge_non_overlapping) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json("{\"foo\":1}");
+  const sourcemeta::core::JSON other =
+      sourcemeta::core::parse_json("{\"bar\":2,\"baz\":3}");
+  document.merge(other.as_object());
+  EXPECT_EQ(document.size(), 3);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_TRUE(document.defines("bar"));
+  EXPECT_TRUE(document.defines("baz"));
+  EXPECT_EQ(document.at("foo").to_integer(), 1);
+  EXPECT_EQ(document.at("bar").to_integer(), 2);
+  EXPECT_EQ(document.at("baz").to_integer(), 3);
+}
+
+TEST(JSON_object, merge_overlapping_keys) {
+  sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":1,\"bar\":2}");
+  const sourcemeta::core::JSON other =
+      sourcemeta::core::parse_json("{\"bar\":99,\"baz\":3}");
+  document.merge(other.as_object());
+  EXPECT_EQ(document.size(), 3);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_TRUE(document.defines("bar"));
+  EXPECT_TRUE(document.defines("baz"));
+  EXPECT_EQ(document.at("foo").to_integer(), 1);
+  EXPECT_EQ(document.at("bar").to_integer(), 99);
+  EXPECT_EQ(document.at("baz").to_integer(), 3);
+}
+
+TEST(JSON_object, merge_empty_source) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json("{\"foo\":1}");
+  const sourcemeta::core::JSON other = sourcemeta::core::JSON::make_object();
+  document.merge(other.as_object());
+  EXPECT_EQ(document.size(), 1);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_EQ(document.at("foo").to_integer(), 1);
+}
+
+TEST(JSON_object, merge_into_empty) {
+  sourcemeta::core::JSON document = sourcemeta::core::JSON::make_object();
+  const sourcemeta::core::JSON other =
+      sourcemeta::core::parse_json("{\"foo\":1,\"bar\":2}");
+  document.merge(other.as_object());
+  EXPECT_EQ(document.size(), 2);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_TRUE(document.defines("bar"));
+  EXPECT_EQ(document.at("foo").to_integer(), 1);
+  EXPECT_EQ(document.at("bar").to_integer(), 2);
+}
+
+TEST(JSON_object, merge_overwrites_different_types) {
+  sourcemeta::core::JSON document =
+      sourcemeta::core::parse_json("{\"foo\":true}");
+  const sourcemeta::core::JSON other =
+      sourcemeta::core::parse_json("{\"foo\":42}");
+  document.merge(other.as_object());
+  EXPECT_EQ(document.size(), 1);
+  EXPECT_TRUE(document.defines("foo"));
+  EXPECT_TRUE(document.at("foo").is_integer());
+  EXPECT_EQ(document.at("foo").to_integer(), 42);
+}

@@ -1283,6 +1283,26 @@ public:
   /// ```
   auto assign_if_missing(const String &key, JSON &&value) -> void;
 
+  /// This method merges the members of another JSON object into this object,
+  /// assigning each key-value pair one by one. If a key already exists, its
+  /// value will be overwritten. For example:
+  ///
+  /// ```cpp
+  /// #include <sourcemeta/core/json.h>
+  /// #include <cassert>
+  ///
+  /// sourcemeta::core::JSON document =
+  ///   sourcemeta::core::parse_json("{ \"foo\": 1 }");
+  /// const sourcemeta::core::JSON other =
+  ///   sourcemeta::core::parse_json("{ \"bar\": 2, \"baz\": 3 }");
+  /// document.merge(other);
+  /// assert(document.size() == 3);
+  /// assert(document.defines("foo"));
+  /// assert(document.defines("bar"));
+  /// assert(document.defines("baz"));
+  /// ```
+  auto merge(const Object &other) -> void;
+
   /// This method deletes an object key. For example:
   ///
   /// ```cpp
