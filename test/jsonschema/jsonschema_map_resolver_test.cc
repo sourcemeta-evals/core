@@ -181,3 +181,26 @@ TEST(JSONSchema_SchemaMapResolver, embedded_resource_with_callback) {
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/test"));
   EXPECT_TRUE(identifiers.contains("https://www.sourcemeta.com/string"));
 }
+
+TEST(JSONSchema_SchemaMapResolver, draft4_uses_id_keyword) {
+  sourcemeta::core::SchemaMapResolver resolver;
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#"
+  })JSON");
+
+  const auto result{resolver.add(document, std::nullopt,
+                                 "https://www.sourcemeta.com/legacy")};
+  EXPECT_TRUE(result);
+
+  const auto registered{resolver("https://www.sourcemeta.com/legacy")};
+  ASSERT_TRUE(registered.has_value());
+
+  // Draft 4 and older use `id`, not `$id`. SchemaMapResolver::add must
+  // pick the correct identifier keyword based on the schema's base
+  // dialect, not the immediate dialect.
+  EXPECT_TRUE(registered->defines("id"));
+  EXPECT_FALSE(registered->defines("$id"));
+  EXPECT_EQ(registered->at("id"),
+            sourcemeta::core::JSON{"https://www.sourcemeta.com/legacy"});
+}
