@@ -206,7 +206,8 @@ TEST(JSONSchema_SchemaMapResolver, custom_metaschema_uses_base_dialect_id) {
   sourcemeta::core::SchemaMapResolver resolver{
       sourcemeta::core::schema_official_resolver};
 
-  const sourcemeta::core::JSON metaschema = sourcemeta::core::parse_json(R"JSON({
+  const sourcemeta::core::JSON metaschema =
+      sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-04/schema#",
     "id": "https://www.sourcemeta.com/my-custom-meta"
   })JSON");
@@ -217,10 +218,12 @@ TEST(JSONSchema_SchemaMapResolver, custom_metaschema_uses_base_dialect_id) {
     "$schema": "https://www.sourcemeta.com/my-custom-meta"
   })JSON");
 
-  EXPECT_TRUE(resolver.add(
-      document, std::nullopt, "https://www.sourcemeta.com/legacy-via-custom"));
+  EXPECT_TRUE(resolver.add(document, std::nullopt,
+                           "https://www.sourcemeta.com/legacy-via-custom"));
 
-  const auto registered{resolver("https://www.sourcemeta.com/legacy-via-custom")};
+  const auto registered{
+      resolver("https://www.sourcemeta.com/legacy-via-custom")};
   ASSERT_TRUE(registered.has_value());
   EXPECT_TRUE(registered->defines("id"));
   EXPECT_FALSE(registered->defines("$id"));
+}
