@@ -196,11 +196,31 @@ TEST(JSONSchema_SchemaMapResolver, draft4_uses_id_keyword) {
   const auto registered{resolver("https://www.sourcemeta.com/legacy")};
   ASSERT_TRUE(registered.has_value());
 
-  // Draft 4 and older use `id`, not `$id`. SchemaMapResolver::add must
-  // pick the correct identifier keyword based on the schema's base
-  // dialect, not the immediate dialect.
   EXPECT_TRUE(registered->defines("id"));
   EXPECT_FALSE(registered->defines("$id"));
   EXPECT_EQ(registered->at("id"),
             sourcemeta::core::JSON{"https://www.sourcemeta.com/legacy"});
 }
+
+TEST(JSONSchema_SchemaMapResolver, custom_metaschema_uses_base_dialect_id) {
+  sourcemeta::core::SchemaMapResolver resolver{
+      sourcemeta::core::schema_official_resolver};
+
+  const sourcemeta::core::JSON metaschema = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://www.sourcemeta.com/my-custom-meta"
+  })JSON");
+
+  EXPECT_TRUE(resolver.add(metaschema));
+
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/my-custom-meta"
+  })JSON");
+
+  EXPECT_TRUE(resolver.add(
+      document, std::nullopt, "https://www.sourcemeta.com/legacy-via-custom"));
+
+  const auto registered{resolver("https://www.sourcemeta.com/legacy-via-custom")};
+  ASSERT_TRUE(registered.has_value());
+  EXPECT_TRUE(registered->defines("id"));
+  EXPECT_FALSE(registered->defines("$id"));
