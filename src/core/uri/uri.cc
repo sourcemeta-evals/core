@@ -4,19 +4,28 @@
 
 #include "escaping.h"
 
-#include <algorithm>  // std::replace
-#include <cassert>    // assert
-#include <cstdint>    // std::uint32_t
-#include <filesystem> // std::filesystem
-#include <optional>   // std::optional
-#include <sstream>    // std::ostringstream, std::istringstream
-#include <stdexcept>  // std::length_error, std::runtime_error
-#include <string>     // std::stoul, std::string, std::tolower
-#include <tuple>      // std::tie
-#include <utility>    // std::move
-#include <vector>     // std::vector
+#include <algorithm>   // std::ranges::equal, std::ranges::replace, std::replace
+#include <cassert>     // assert
+#include <cstdint>     // std::uint32_t
+#include <filesystem>  // std::filesystem
+#include <optional>    // std::optional
+#include <sstream>     // std::ostringstream, std::istringstream
+#include <stdexcept>   // std::length_error, std::runtime_error
+#include <string>      // std::stoul, std::string, std::tolower
+#include <string_view> // std::string_view
+#include <tuple>       // std::tie
+#include <utility>     // std::move
+#include <vector>      // std::vector
 
 namespace {
+
+auto is_localhost_host(const std::string_view host) -> bool {
+  constexpr std::string_view localhost{"localhost"};
+  return std::ranges::equal(
+      host, localhost, [](const char left, const char right) {
+        return std::tolower(static_cast<unsigned char>(left)) == right;
+      });
+}
 
 auto uri_normalize(UriUriA *uri) -> void {
   if (uriNormalizeSyntaxA(uri) != URI_SUCCESS) {
@@ -751,6 +760,29 @@ auto URI::to_path() const -> std::filesystem::path {
   auto path{this->path().value_or("")};
   if (!scheme.has_value() || scheme.value() != "file") {
     return path;
+  }
+
+  // RFC 8089: a non-empty, non-localhost host on a file URI denotes a UNC
+  // server. The "localhost" host is equivalent to no host
+  const auto host_value{this->host()};
+  const auto is_unc{host_value.has_value() && !host_value->empty() &&
+                    !is_localhost_host(host_value.value())};
+  if (is_unc) {
+    if (!path.empty() && path.front() == '/') {
+      path.erase(0, 1);
+    }
+    std::ranges::replace(path, '/', '\\');
+    std::istringstream unc_input{path};
+    std::ostringstream unc_output;
+    uri_unescape(unc_input, unc_output);
+    std::string unc{"\\\\"};
+    unc.append(host_value.value());
+    const auto unescaped_path{unc_output.str()};
+    if (!unescaped_path.empty()) {
+      unc.push_back('\\');
+      unc.append(unescaped_path);
+    }
+    return unc;
   }
 
   const auto is_windows_absolute{path.size() >= 3 && path[0] == '/' &&
