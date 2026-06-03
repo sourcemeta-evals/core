@@ -11,7 +11,7 @@ namespace sourcemeta::core {
 
 auto parse_yaml(std::basic_istream<JSON::Char, JSON::CharTraits> &stream,
                 const JSON::ParseCallback &callback) -> JSON {
-  const auto start_pos{stream.tellg()};
+      const auto start_pos{stream.tellg()};
   std::ostringstream buffer;
   buffer << stream.rdbuf();
   const auto input{buffer.str()};
