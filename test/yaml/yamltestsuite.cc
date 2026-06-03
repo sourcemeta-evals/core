@@ -3,14 +3,17 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/yaml.h>
 
-#include <algorithm>  // std::min
-#include <exception>  // std::exception
-#include <filesystem> // std::filesystem
-#include <fstream>    // std::ifstream
-#include <string>     // std::string
-#include <vector>     // std::vector
+#include <exception>     // std::exception
+#include <filesystem>    // std::filesystem
+#include <fstream>       // std::ifstream
+#include <string>        // std::string
+#include <unordered_set> // std::unordered_set
+#include <vector>        // std::vector
 
 enum class YAMLTestType { Success, Error };
+
+// Skip-list intentionally empty: the YAML parser handles all cases.
+const std::unordered_set<std::string> SKIPPED_TESTS{};
 
 class YAMLTest : public testing::Test {
 public:
@@ -51,9 +54,7 @@ public:
       }
 
       EXPECT_EQ(yaml_documents.size(), json_documents.size());
-      const auto compare_count{
-          std::min(yaml_documents.size(), json_documents.size())};
-      for (std::size_t index = 0; index < compare_count; index++) {
+      for (std::size_t index = 0; index < yaml_documents.size(); index++) {
         EXPECT_EQ(yaml_documents[index], json_documents[index]);
       }
     } else if (this->type == YAMLTestType::Error) {
@@ -87,6 +88,10 @@ int main(int argc, char **argv) {
 
     const auto test_directory{entry.path()};
     const auto test_name{test_directory.filename().string()};
+
+    if (SKIPPED_TESTS.find(test_name) != SKIPPED_TESTS.end()) {
+      continue;
+    }
 
     const auto json_file{test_directory / "in.json"};
     const auto error_file{test_directory / "error"};
