@@ -15,7 +15,8 @@
 #include <istream>    // std::basic_istream
 
 /// @defgroup yaml YAML
-/// @brief A YAML 1.2 parser that converts YAML to JSON.
+/// @brief A YAML parser that converts YAML to JSON, based on libyaml-compatible
+/// semantics.
 ///
 /// This functionality is included as follows:
 ///

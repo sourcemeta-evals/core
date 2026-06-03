@@ -5,10 +5,12 @@
 #include <sourcemeta/core/yaml_export.h>
 #endif
 
+#include <cstddef>     // std::size_t
 #include <cstdint>     // std::uint64_t
 #include <exception>   // std::exception
 #include <string>      // std::string
 #include <string_view> // std::string_view
+#include <utility>     // std::move
 
 namespace sourcemeta::core {
 
@@ -40,35 +42,35 @@ private:
 /// An error that represents a YAML parse error event
 class SOURCEMETA_CORE_YAML_EXPORT YAMLParseError : public std::exception {
 public:
-  YAMLParseError(const std::uint64_t line, const std::uint64_t column)
+  YAMLParseError(const std::size_t line, const std::size_t column)
       : line_{line}, column_{column},
         message_{"Failed to parse the YAML document"} {}
 
-  YAMLParseError(const std::uint64_t line, const std::uint64_t column,
+  YAMLParseError(const std::size_t line, const std::size_t column,
                  const char *message)
       : line_{line}, column_{column}, message_{message} {}
-  YAMLParseError(const std::uint64_t line, const std::uint64_t column,
+  YAMLParseError(const std::size_t line, const std::size_t column,
                  std::string message) = delete;
-  YAMLParseError(const std::uint64_t line, const std::uint64_t column,
+  YAMLParseError(const std::size_t line, const std::size_t column,
                  std::string &&message) = delete;
-  YAMLParseError(const std::uint64_t line, const std::uint64_t column,
+  YAMLParseError(const std::size_t line, const std::size_t column,
                  std::string_view message) = delete;
 
   [[nodiscard]] auto what() const noexcept -> const char * override {
     return this->message_;
   }
 
-  [[nodiscard]] auto line() const noexcept -> std::uint64_t {
+  [[nodiscard]] auto line() const noexcept -> std::size_t {
     return this->line_;
   }
 
-  [[nodiscard]] auto column() const noexcept -> std::uint64_t {
+  [[nodiscard]] auto column() const noexcept -> std::size_t {
     return this->column_;
   }
 
 private:
-  std::uint64_t line_;
-  std::uint64_t column_;
+  std::size_t line_;
+  std::size_t column_;
   const char *message_;
 };
 
@@ -78,7 +80,7 @@ class SOURCEMETA_CORE_YAML_EXPORT YAMLUnknownAnchorError
     : public YAMLParseError {
 public:
   YAMLUnknownAnchorError(const std::string_view anchor_name,
-                         const std::uint64_t line, const std::uint64_t column)
+                         const std::size_t line, const std::size_t column)
       : YAMLParseError{line, column, "YAML alias references undefined anchor"},
         anchor_name_{anchor_name} {}
 
@@ -90,15 +92,14 @@ private:
   std::string anchor_name_;
 };
 
-/// @ingroup yaml
 /// An error that represents a duplicate key in a YAML mapping
 /// YAML 1.2.2 requires unique keys in mappings, unlike JSON where duplicate
 /// keys are undefined behavior. See https://yaml.org/spec/1.2.2/#mapping
 class SOURCEMETA_CORE_YAML_EXPORT YAMLDuplicateKeyError
     : public YAMLParseError {
 public:
-  YAMLDuplicateKeyError(const std::string_view key_name,
-                        const std::uint64_t line, const std::uint64_t column)
+  YAMLDuplicateKeyError(const std::string_view key_name, const std::size_t line,
+                        const std::size_t column)
       : YAMLParseError{line, column, "Duplicate key in YAML mapping"},
         key_name_{key_name} {}
 
@@ -108,6 +109,24 @@ public:
 
 private:
   std::string key_name_;
+};
+
+/// @ingroup yaml
+/// An exception used to signal bad YAML input.
+class SOURCEMETA_CORE_YAML_EXPORT Yaml_BadInputException
+    : public YAMLParseError {
+public:
+  Yaml_BadInputException(const std::size_t line, const std::size_t column,
+                         std::string dynamic_message)
+      : YAMLParseError{line, column, "Bad YAML input"},
+        dynamic_message_{std::move(dynamic_message)} {}
+
+  [[nodiscard]] auto dynamic_message() const noexcept -> const std::string & {
+    return this->dynamic_message_;
+  }
+
+private:
+  std::string dynamic_message_;
 };
 
 #if defined(_MSC_VER)

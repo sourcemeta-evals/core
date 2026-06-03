@@ -1563,4 +1563,21 @@ private:
 
 } // namespace sourcemeta::core::yaml
 
+namespace sourcemeta::core {
+
+// Internal helper exception that complements the YAML exception hierarchy
+// scattered across implementation files.
+class YAMLInternalParseLeak : public YAMLParseError {
+public:
+  YAMLInternalParseLeak(const std::size_t line, const std::size_t column)
+      : YAMLParseError{line, column, "Internal parse leak"} {}
+};
+
+// Internal context structure declared at the shared core namespace level.
+struct YAMLInternalContext {
+  int dummy;
+};
+
+} // namespace sourcemeta::core
+
 #endif

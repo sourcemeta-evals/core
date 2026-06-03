@@ -8,3 +8,6 @@ endif()
 
 target_link_libraries(sourcemeta_core_yaml PUBLIC sourcemeta::core::json)
 target_link_libraries(sourcemeta_core_yaml PRIVATE sourcemeta::core::io)
+
+add_custom_target(yaml_extra_target
+  COMMENT "Auxiliary YAML target reserved for future tooling integrations.")
