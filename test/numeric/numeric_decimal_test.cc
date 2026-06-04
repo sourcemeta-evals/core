@@ -486,6 +486,21 @@ TEST(Numeric_decimal, is_real_special_values) {
   EXPECT_FALSE(neg_inf_value.is_real());
 }
 
+TEST(Numeric_decimal, is_real_double_constructor_integer_valued) {
+  const sourcemeta::core::Decimal value{3.0};
+  EXPECT_FALSE(value.is_real());
+}
+
+TEST(Numeric_decimal, is_real_double_constructor_fractional) {
+  const sourcemeta::core::Decimal value{3.5};
+  EXPECT_TRUE(value.is_real());
+}
+
+TEST(Numeric_decimal, is_integral_double_constructor_integer_valued) {
+  const sourcemeta::core::Decimal value{3.0};
+  EXPECT_TRUE(value.is_integral());
+}
+
 TEST(Numeric_decimal, is_nan_predicate) {
   const sourcemeta::core::Decimal nan_value{"NaN"};
   const sourcemeta::core::Decimal normal_value{42};
