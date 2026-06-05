@@ -144,7 +144,9 @@ public:
     return !(this->flags_ & (FLAG_NAN | FLAG_SNAN | FLAG_INFINITE));
   }
 
-  /// Check if the decimal number is a real number (finite and not NaN)
+  /// Check if the decimal number represents a non-integral real value, meaning
+  /// the value is finite AND not mathematically integral (i.e. has a non-zero
+  /// fractional component).
   [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
   is_real() const -> bool {
     return this->is_finite() && !this->is_integral();
