@@ -47,7 +47,7 @@ TEST(Numeric_uint128, construct_from_negative_int64) {
 }
 
 TEST(Numeric_uint128, explicit_cast_to_uint64) {
-  const sourcemeta::core::uint128_t value{12345ULL};
+  const sourcemeta::core::uint128_t value{static_cast<std::uint64_t>(12345ULL)};
   EXPECT_EQ(static_cast<std::uint64_t>(value), 12345ULL);
 }
 
@@ -159,7 +159,8 @@ TEST(Numeric_uint128, addition_overflow_into_high_bits) {
 
 TEST(Numeric_uint128, large_multiplication_roundtrip) {
   // 10^18 * 5 = 5 * 10^18, which fits in 64 bits
-  const sourcemeta::core::uint128_t base{1000000000000000000ULL};
+  const sourcemeta::core::uint128_t base{
+      static_cast<std::uint64_t>(1000000000000000000ULL)};
   const sourcemeta::core::uint128_t factor{5};
   const auto product = base * factor;
   EXPECT_EQ(static_cast<std::uint64_t>(product), 5000000000000000000ULL);
@@ -167,7 +168,8 @@ TEST(Numeric_uint128, large_multiplication_roundtrip) {
 
 TEST(Numeric_uint128, large_multiply_then_divide) {
   // (10^18 * 7) / 7 should give back 10^18
-  const sourcemeta::core::uint128_t base{1000000000000000000ULL};
+  const sourcemeta::core::uint128_t base{
+      static_cast<std::uint64_t>(1000000000000000000ULL)};
   const sourcemeta::core::uint128_t factor{7};
   const auto product = base * factor;
   const auto back = product / static_cast<std::uint64_t>(7);
@@ -176,7 +178,8 @@ TEST(Numeric_uint128, large_multiply_then_divide) {
 
 TEST(Numeric_uint128, modulo_large_value) {
   // 10^18 % 7
-  const sourcemeta::core::uint128_t value{1000000000000000000ULL};
+  const sourcemeta::core::uint128_t value{
+      static_cast<std::uint64_t>(1000000000000000000ULL)};
   const auto result = value % static_cast<std::uint64_t>(7);
   EXPECT_EQ(static_cast<std::uint64_t>(result), 1000000000000000000ULL % 7ULL);
 }
@@ -191,19 +194,22 @@ TEST(Numeric_uint128, overflow_multiply_then_divide) {
 }
 
 TEST(Numeric_uint128, addition_commutativity) {
-  const sourcemeta::core::uint128_t left{123456789ULL};
-  const sourcemeta::core::uint128_t right{987654321ULL};
+  const sourcemeta::core::uint128_t left{
+      static_cast<std::uint64_t>(123456789ULL)};
+  const sourcemeta::core::uint128_t right{
+      static_cast<std::uint64_t>(987654321ULL)};
   EXPECT_TRUE((left + right) == (right + left));
 }
 
 TEST(Numeric_uint128, multiplication_commutativity) {
-  const sourcemeta::core::uint128_t left{12345ULL};
-  const sourcemeta::core::uint128_t right{67890ULL};
+  const sourcemeta::core::uint128_t left{static_cast<std::uint64_t>(12345ULL)};
+  const sourcemeta::core::uint128_t right{static_cast<std::uint64_t>(67890ULL)};
   EXPECT_TRUE((left * right) == (right * left));
 }
 
 TEST(Numeric_uint128, multiply_by_zero) {
-  const sourcemeta::core::uint128_t value{999999ULL};
+  const sourcemeta::core::uint128_t value{
+      static_cast<std::uint64_t>(999999ULL)};
   const sourcemeta::core::uint128_t zero{0};
   const auto result = value * zero;
   EXPECT_EQ(static_cast<std::uint64_t>(result), 0);
