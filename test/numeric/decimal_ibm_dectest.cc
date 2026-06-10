@@ -8,6 +8,7 @@
 #include <filesystem>  // std::filesystem
 #include <iostream>    // std::cerr
 #include <sstream>     // std::istringstream
+#include <stdexcept>   // std::invalid_argument, std::out_of_range
 #include <string>      // std::string
 #include <string_view> // std::string_view
 #include <vector>      // std::vector
@@ -581,7 +582,9 @@ static auto should_skip_test(const DecTestCase &test_case,
       if (scale_value > scale_bound || scale_value < -scale_bound) {
         return true;
       }
-    } catch (...) {
+    } catch (const std::invalid_argument &) {
+      return true;
+    } catch (const std::out_of_range &) {
       return true;
     }
   }
