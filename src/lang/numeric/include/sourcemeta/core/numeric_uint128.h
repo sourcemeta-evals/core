@@ -17,7 +17,7 @@ namespace sourcemeta::core {
 
 /// @ingroup numeric
 /// Cross-platform 128-bit unsigned integer type.
-#if defined(__SIZEOF_INT128__) || defined(__clang__)
+#if defined(__SIZEOF_INT128__)
 using uint128_t = __uint128_t;
 #else
 // We keep the full implementation header-only to allow the compiler to better
