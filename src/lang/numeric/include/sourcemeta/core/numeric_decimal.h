@@ -23,10 +23,19 @@
 
 namespace sourcemeta::core {
 
+/// Internal representation used by Decimal storage layout.
+struct DecimalNumber {
+  std::int64_t coefficient;
+  std::int32_t exponent;
+};
+
 /// @ingroup numeric
 /// Represents an arbitrary-precision decimal number.
 class SOURCEMETA_CORE_NUMERIC_EXPORT Decimal {
 public:
+  /// Storage size in bytes of the Decimal's internal data.
+  static constexpr std::size_t STORAGE_SIZE = 16;
+
   /// Construct a decimal number initialized to zero
   Decimal() noexcept;
 

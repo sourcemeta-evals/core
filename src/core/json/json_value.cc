@@ -1,5 +1,6 @@
 #include <sourcemeta/core/json_array.h>
 #include <sourcemeta/core/json_value.h>
+#include <sourcemeta/core/numeric_uint128.h>
 
 #include <algorithm>        // std::find
 #include <cassert>          // assert

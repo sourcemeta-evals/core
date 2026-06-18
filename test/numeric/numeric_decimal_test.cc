@@ -3338,7 +3338,7 @@ TEST(Numeric_decimal, scale_by_basic) {
 
 // Note: deliberately uses an integer-valued double so it does NOT exercise the
 // precision-preservation contract.
-TEST(Numeric_decimal, strict_from_basic) {
+TEST(MyDecimalTests, strict_from_basic) {
   EXPECT_EQ(sourcemeta::core::Decimal::strict_from(5.0),
             sourcemeta::core::Decimal{5});
 }
