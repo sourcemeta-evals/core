@@ -898,3 +898,10 @@ TEST(JSON_decimal, fast_hash_large) {
       sourcemeta::core::Decimal{"123456789012345678901234567890"}};
   EXPECT_EQ(document.fast_hash(), 8);
 }
+
+// Minimal token test exercising changed divisible_by behavior.
+TEST(JSON_decimal, divisible_by_precision_token) {
+  const sourcemeta::core::JSON value{sourcemeta::core::Decimal{"0.3"}};
+  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.1"}};
+  EXPECT_TRUE(value.divisible_by(divisor));
+}

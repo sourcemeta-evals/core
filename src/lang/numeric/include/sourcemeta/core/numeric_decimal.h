@@ -5,12 +5,21 @@
 #include <sourcemeta/core/numeric_export.h>
 #endif
 
+#include <cassert>  // assert
 #include <concepts> // std::integral
-#include <cstddef>  // std::byte
+#include <ostream>  // std::ostream
 #include <cstdint>  // std::int32_t, std::int64_t, std::uint32_t, std::uint64_t
 #include <string>   // std::string
 #include <string_view> // std::string_view
 #include <type_traits> // std::is_signed_v
+
+#if defined(__GNUC__) || defined(__clang__)
+#define SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE [[gnu::always_inline]]
+#elif defined(_MSC_VER)
+#define SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE [[msvc::forceinline]]
+#else
+#define SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE
+#endif
 
 namespace sourcemeta::core {
 
@@ -75,6 +84,8 @@ public:
   /// Create a signaling NaN value with an optional payload
   [[nodiscard]] static auto snan(std::uint64_t payload = 0) -> Decimal;
 
+  [[nodiscard]] static auto strict_from(double value) -> Decimal;
+
   /// Create a positive infinity value
   [[nodiscard]] static auto infinity() -> Decimal;
 
@@ -108,19 +119,26 @@ public:
   /// Check if the decimal number is zero
   [[nodiscard]] auto is_zero() const -> bool;
 
-  /// Check if the decimal number represents an integer value, which includes a
-  /// number like `3.0`
+  /// Check if the decimal number represents an integer
   [[nodiscard]] auto is_integral() const -> bool;
 
-  /// Check if the decimal number represents an integer value _without_ a
-  /// decimal component in its original representation.
-  [[nodiscard]] auto is_integer() const -> bool;
+  /// Check if the decimal number is an integer
+  [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
+  is_integer() const -> bool {
+    return (this->flags_ & FLAG_INTEGER_LITERAL) != 0;
+  }
 
   /// Check if the decimal number is finite
-  [[nodiscard]] auto is_finite() const -> bool;
+  [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
+  is_finite() const -> bool {
+    return !(this->flags_ & (FLAG_NAN | FLAG_SNAN | FLAG_INFINITE));
+  }
 
-  /// Check if the decimal number is a real number (finite and not NaN)
-  [[nodiscard]] auto is_real() const -> bool;
+  /// Check if the decimal number is a real number
+  [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
+  is_real() const -> bool {
+    return this->is_finite() && !this->is_integral();
+  }
 
   /// Check if the decimal number can be represented as a 32-bit float without
   /// precision loss
@@ -144,28 +162,59 @@ public:
 
   /// Check if the decimal number is NaN (Not a Number), either quiet or
   /// signaling
-  [[nodiscard]] auto is_nan() const -> bool;
+  [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
+  is_nan() const -> bool {
+    return (this->flags_ & FLAG_NAN) != 0;
+  }
 
   /// Check if the decimal number is a signaling NaN
-  [[nodiscard]] auto is_snan() const -> bool;
+  [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
+  is_snan() const -> bool {
+    return (this->flags_ & FLAG_SNAN) != 0;
+  }
 
   /// Check if the decimal number is a quiet NaN
-  [[nodiscard]] auto is_qnan() const -> bool;
+  [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
+  is_qnan() const -> bool {
+    return (this->flags_ & FLAG_NAN) != 0 && !(this->flags_ & FLAG_SNAN);
+  }
 
   /// Get the payload of a NaN value (0 if no payload)
-  [[nodiscard]] auto nan_payload() const -> std::uint64_t;
+  [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
+  nan_payload() const -> std::uint64_t {
+    assert(this->is_nan());
+    return static_cast<std::uint64_t>(this->coefficient_);
+  }
 
   /// Check if the decimal number is infinite
-  [[nodiscard]] auto is_infinite() const -> bool;
+  [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
+  is_infinite() const -> bool {
+    return (this->flags_ & FLAG_INFINITE) != 0;
+  }
 
   /// Check if the decimal number is signed (negative, including -0)
-  [[nodiscard]] auto is_signed() const -> bool;
+  [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
+  is_signed() const -> bool {
+    return (this->flags_ & FLAG_SIGN) != 0;
+  }
 
   /// Round the decimal number to an integral value
   [[nodiscard]] auto to_integral() const -> Decimal;
 
   /// Check if this decimal number is divisible by another
   [[nodiscard]] auto divisible_by(const Decimal &divisor) const -> bool;
+
+  [[nodiscard]] auto reduce() const -> Decimal;
+
+  [[nodiscard]] auto logb() const -> Decimal;
+
+  [[nodiscard]] auto scale_by(const Decimal &scale) const -> Decimal;
+
+  [[nodiscard]] auto same_quantum(const Decimal &other) const -> bool;
+
+  [[nodiscard]] auto compare_total(const Decimal &other) const -> Decimal;
+
+  [[nodiscard]] auto divide_integer(const Decimal &other) const -> Decimal;
 
   /// Add another decimal number to this one
   auto operator+=(const Decimal &other) -> Decimal &;
@@ -234,13 +283,16 @@ public:
   [[nodiscard]] auto operator>=(const Decimal &other) const -> bool;
 
 private:
-  struct Data;
-  static constexpr std::size_t STORAGE_SIZE = 256;
-  // NOLINTNEXTLINE(modernize-avoid-c-arrays)
-  alignas(std::max_align_t) std::byte storage[STORAGE_SIZE];
+  static constexpr std::uint8_t FLAG_SIGN = 0x01;
+  static constexpr std::uint8_t FLAG_NAN = 0x02;
+  static constexpr std::uint8_t FLAG_SNAN = 0x04;
+  static constexpr std::uint8_t FLAG_INFINITE = 0x08;
+  static constexpr std::uint8_t FLAG_INTEGER_LITERAL = 0x40;
 
-  [[nodiscard]] auto data() -> Data *;
-  [[nodiscard]] auto data() const -> const Data *;
+  std::int64_t coefficient_{0};
+  std::uint64_t coefficient_high_{0};
+  std::int32_t exponent_{0};
+  std::uint8_t flags_{0};
 };
 
 template <typename T>
@@ -307,6 +359,11 @@ template <typename T>
   requires std::integral<T>
 inline auto operator>=(const T left, const Decimal &right) -> bool {
   return Decimal{left} >= right;
+}
+
+inline auto operator<<(std::ostream &stream, const Decimal &value)
+    -> std::ostream & {
+  return stream << value.to_string();
 }
 
 } // namespace sourcemeta::core

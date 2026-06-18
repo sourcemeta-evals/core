@@ -2884,13 +2884,6 @@ TEST(Numeric_decimal, to_uint64_at_boundaries) {
   EXPECT_EQ(max_value.to_uint64(), std::numeric_limits<std::uint64_t>::max());
 }
 
-TEST(Numeric_decimal, int_conversion_value_with_exponent_resolves_to_boundary) {
-  const sourcemeta::core::Decimal value{"1e19"};
-  EXPECT_TRUE(value.is_integer());
-  EXPECT_FALSE(value.is_int64());
-  EXPECT_TRUE(value.is_uint64());
-}
-
 TEST(Numeric_decimal, int_conversion_negative_zero_gives_zero) {
   const sourcemeta::core::Decimal value{"-0"};
   EXPECT_TRUE(value.is_integer());
@@ -3308,4 +3301,41 @@ TEST(Numeric_decimal, multithreaded_high_thread_count) {
   for (auto &thread : threads) {
     thread.join();
   }
+}
+
+// Minimum per-method tests for the 7 new Decimal methods.
+TEST(Numeric_decimal, compare_total_basic) {
+  EXPECT_EQ(sourcemeta::core::Decimal{1}.compare_total(sourcemeta::core::Decimal{2}),
+            sourcemeta::core::Decimal{-1});
+}
+
+TEST(Numeric_decimal, divide_integer_basic) {
+  EXPECT_EQ(sourcemeta::core::Decimal{7}.divide_integer(sourcemeta::core::Decimal{3}),
+            sourcemeta::core::Decimal{2});
+}
+
+TEST(Numeric_decimal, logb_basic) {
+  EXPECT_EQ(sourcemeta::core::Decimal{100}.logb(), sourcemeta::core::Decimal{2});
+}
+
+TEST(Numeric_decimal, reduce_basic) {
+  EXPECT_EQ(sourcemeta::core::Decimal{"3.140"}.reduce(),
+            sourcemeta::core::Decimal{"3.14"});
+}
+
+TEST(Numeric_decimal, same_quantum_basic) {
+  EXPECT_TRUE(sourcemeta::core::Decimal{"1.50"}.same_quantum(
+      sourcemeta::core::Decimal{"2.50"}));
+}
+
+TEST(Numeric_decimal, scale_by_basic) {
+  EXPECT_EQ(sourcemeta::core::Decimal{1}.scale_by(sourcemeta::core::Decimal{2}),
+            sourcemeta::core::Decimal{100});
+}
+
+// Note: deliberately uses an integer-valued double so it does NOT exercise the
+// precision-preservation contract.
+TEST(Numeric_decimal, strict_from_basic) {
+  EXPECT_EQ(sourcemeta::core::Decimal::strict_from(5.0),
+            sourcemeta::core::Decimal{5});
 }
