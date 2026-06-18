@@ -3305,17 +3305,20 @@ TEST(Numeric_decimal, multithreaded_high_thread_count) {
 
 // Minimum per-method tests for the 7 new Decimal methods.
 TEST(Numeric_decimal, compare_total_basic) {
-  EXPECT_EQ(sourcemeta::core::Decimal{1}.compare_total(sourcemeta::core::Decimal{2}),
-            sourcemeta::core::Decimal{-1});
+  EXPECT_EQ(
+      sourcemeta::core::Decimal{1}.compare_total(sourcemeta::core::Decimal{2}),
+      sourcemeta::core::Decimal{-1});
 }
 
 TEST(Numeric_decimal, divide_integer_basic) {
-  EXPECT_EQ(sourcemeta::core::Decimal{7}.divide_integer(sourcemeta::core::Decimal{3}),
-            sourcemeta::core::Decimal{2});
+  EXPECT_EQ(
+      sourcemeta::core::Decimal{7}.divide_integer(sourcemeta::core::Decimal{3}),
+      sourcemeta::core::Decimal{2});
 }
 
 TEST(Numeric_decimal, logb_basic) {
-  EXPECT_EQ(sourcemeta::core::Decimal{100}.logb(), sourcemeta::core::Decimal{2});
+  EXPECT_EQ(sourcemeta::core::Decimal{100}.logb(),
+            sourcemeta::core::Decimal{2});
 }
 
 TEST(Numeric_decimal, reduce_basic) {

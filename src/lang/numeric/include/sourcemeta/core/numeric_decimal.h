@@ -7,8 +7,8 @@
 
 #include <cassert>  // assert
 #include <concepts> // std::integral
-#include <ostream>  // std::ostream
 #include <cstdint>  // std::int32_t, std::int64_t, std::uint32_t, std::uint64_t
+#include <ostream>  // std::ostream
 #include <string>   // std::string
 #include <string_view> // std::string_view
 #include <type_traits> // std::is_signed_v
