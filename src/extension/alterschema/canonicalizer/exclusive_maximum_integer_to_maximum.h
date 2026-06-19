@@ -44,7 +44,7 @@ public:
         new_value -= sourcemeta::core::Decimal{1};
       }
 
-      if (current.is_integer()) {
+      if (current.is_integral()) {
         new_value -= sourcemeta::core::Decimal{1};
       }
 
