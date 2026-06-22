@@ -885,4 +885,44 @@ private:
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    std::size_t seed = 0;
+    const auto hash_combine = [&seed](const auto &value) {
+      seed ^= static_cast<std::size_t>(value) + 0x9e3779b9 + (seed << 6) +
+              (seed >> 2);
+    };
+
+    const auto hash_token = [&](const auto &token) {
+      if (token.is_property()) {
+        hash_combine(token.property_hash().a);
+      } else {
+        hash_combine(token.to_index());
+      }
+    };
+
+    if (pointer.empty()) {
+      return seed;
+    }
+
+    hash_token(pointer.at(0));
+
+    if (pointer.size() > 1) {
+      hash_token(pointer.back());
+    }
+
+    if (pointer.size() > 2) {
+      hash_token(pointer.at(pointer.size() / 2));
+    }
+
+    return seed;
+  }
+};
+
+} // namespace std
+
 #endif
