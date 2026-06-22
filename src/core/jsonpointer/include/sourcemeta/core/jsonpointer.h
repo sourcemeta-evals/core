@@ -660,4 +660,80 @@ using PointerWalker = GenericPointerWalker<WeakPointer>;
 
 } // namespace sourcemeta::core
 
+/// @ingroup jsonpointer
+/// Hash support for JSON Pointer to enable use with std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling the first, middle, and last
+/// tokens.
+template <> struct std::hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    // Helper to hash a single token
+    const auto hash_token =
+        [](const sourcemeta::core::Pointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        // Use the first member of the property hash for simplicity
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        // For integer tokens, the index itself is the hash
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, middle, and last tokens for O(1) hashing
+    std::size_t result{hash_token(pointer.at(0))};
+    if (size > 1) {
+      result ^= hash_token(pointer.at(size - 1)) << 1;
+    }
+    if (size > 2) {
+      result ^= hash_token(pointer.at(size / 2)) << 2;
+    }
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash support for JSON WeakPointer to enable use with std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling the first, middle, and last
+/// tokens.
+template <> struct std::hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    // Helper to hash a single token
+    const auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        // Use the first member of the property hash for simplicity
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        // For integer tokens, the index itself is the hash
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    // Sample first, middle, and last tokens for O(1) hashing
+    std::size_t result{hash_token(pointer.at(0))};
+    if (size > 1) {
+      result ^= hash_token(pointer.at(size - 1)) << 1;
+    }
+    if (size > 2) {
+      result ^= hash_token(pointer.at(size / 2)) << 2;
+    }
+
+    return result;
+  }
+};
+
 #endif
