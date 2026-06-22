@@ -660,4 +660,76 @@ using PointerWalker = GenericPointerWalker<WeakPointer>;
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash a single JSON Pointer token in O(1) time
+template <typename PropertyT, typename Hash>
+auto hash_token(const sourcemeta::core::GenericToken<PropertyT, Hash> &token)
+    -> std::size_t {
+  if (token.is_property()) {
+    // Use the first member of the property hash for simplicity
+    return static_cast<std::size_t>(token.property_hash().a);
+  } else {
+    // For integer tokens, the index itself is the hash
+    return static_cast<std::size_t>(token.to_index());
+  }
+}
+
+/// @ingroup jsonpointer
+/// Hash specialization for sourcemeta::core::Pointer to enable use in
+/// std::unordered_map and std::unordered_set. The hash is O(1) by sampling
+/// only the first, middle, and last tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    // Sample first, middle, and last tokens for O(1) hashing
+    std::size_t result = hash_token(pointer.at(0));
+    if (size > 1) {
+      result ^= hash_token(pointer.back()) << 1;
+    }
+    if (size > 2) {
+      result ^= hash_token(pointer.at(size / 2)) << 2;
+    }
+
+    // Mix in the size for better distribution
+    result ^= size << 3;
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash specialization for sourcemeta::core::WeakPointer to enable use in
+/// std::unordered_map and std::unordered_set. The hash is O(1) by sampling
+/// only the first, middle, and last tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    // Sample first, middle, and last tokens for O(1) hashing
+    std::size_t result = hash_token(pointer.at(0));
+    if (size > 1) {
+      result ^= hash_token(pointer.back()) << 1;
+    }
+    if (size > 2) {
+      result ^= hash_token(pointer.at(size / 2)) << 2;
+    }
+
+    // Mix in the size for better distribution
+    result ^= size << 3;
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
