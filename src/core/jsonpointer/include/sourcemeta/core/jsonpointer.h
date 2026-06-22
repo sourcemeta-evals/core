@@ -660,4 +660,75 @@ using PointerWalker = GenericPointerWalker<WeakPointer>;
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash support for Pointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling first, middle, and last
+/// tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    auto hash_token = [](const sourcemeta::core::Pointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    if (size == 1) {
+      return hash_token(pointer.at(0));
+    } else if (size == 2) {
+      return hash_token(pointer.at(0)) ^ (hash_token(pointer.at(1)) << 1);
+    } else {
+      const auto middle{size / 2};
+      return hash_token(pointer.at(0)) ^ (hash_token(pointer.at(middle)) << 1) ^
+             (hash_token(pointer.at(size - 1)) << 2);
+    }
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash support for WeakPointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling first, middle, and last
+/// tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    auto hash_token =
+        [](const sourcemeta::core::WeakPointer::Token &token) noexcept
+        -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    if (size == 1) {
+      return hash_token(pointer.at(0));
+    } else if (size == 2) {
+      return hash_token(pointer.at(0)) ^ (hash_token(pointer.at(1)) << 1);
+    } else {
+      const auto middle{size / 2};
+      return hash_token(pointer.at(0)) ^ (hash_token(pointer.at(middle)) << 1) ^
+             (hash_token(pointer.at(size - 1)) << 2);
+    }
+  }
+};
+
+} // namespace std
+
 #endif
