@@ -660,4 +660,70 @@ using PointerWalker = GenericPointerWalker<WeakPointer>;
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash support for Pointer to allow use in std::unordered_map/set
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    auto token_hash =
+        [](const sourcemeta::core::Pointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    std::size_t result{token_hash(pointer.at(0))};
+    if (size > 1) {
+      result ^= token_hash(pointer.back()) << 1;
+    }
+    if (size > 2) {
+      result ^= token_hash(pointer.at(size / 2)) << 2;
+    }
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash support for WeakPointer to allow use in std::unordered_map/set
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    auto token_hash =
+        [](const sourcemeta::core::WeakPointer::Token &token) -> std::size_t {
+      if (token.is_property()) {
+        return static_cast<std::size_t>(token.property_hash().a);
+      } else {
+        return static_cast<std::size_t>(token.to_index());
+      }
+    };
+
+    std::size_t result{token_hash(pointer.at(0))};
+    if (size > 1) {
+      result ^= token_hash(pointer.back()) << 1;
+    }
+    if (size > 2) {
+      result ^= token_hash(pointer.at(size / 2)) << 2;
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
