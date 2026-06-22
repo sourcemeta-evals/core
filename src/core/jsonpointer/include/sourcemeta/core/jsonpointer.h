@@ -16,6 +16,7 @@
 // NOLINTEND(misc-include-cleaner)
 
 #include <cassert>     // assert
+#include <cstddef>     // std::size_t
 #include <functional>  // std::reference_wrapper
 #include <memory>      // std::allocator
 #include <optional>    // std::optional
@@ -41,6 +42,51 @@ using Pointer = GenericPointer<JSON::String, PropertyHashJSON<JSON::String>>;
 using WeakPointer = GenericPointer<
     // We use this instead of a string view as the latter occupies more memory
     std::reference_wrapper<const std::string>, PropertyHashJSON<JSON::String>>;
+
+namespace detail {
+
+template <typename PropertyT, typename Hash>
+[[nodiscard]] inline auto
+hash_pointer_token(const GenericToken<PropertyT, Hash> &token) noexcept
+    -> std::size_t {
+  constexpr std::size_t property_tag{0x9E3779B185EBCA87ULL};
+  constexpr std::size_t index_tag{0xC2B2AE3D27D4EB4FULL};
+
+  if (token.is_property()) {
+    const auto property_hash{token.property_hash()};
+    return static_cast<std::size_t>(property_hash.a) ^ property_tag;
+  }
+
+  return static_cast<std::size_t>(token.to_index()) ^ index_tag;
+}
+
+template <typename PropertyT, typename Hash>
+[[nodiscard]] inline auto
+hash_pointer(const GenericPointer<PropertyT, Hash> &pointer) noexcept
+    -> std::size_t {
+  std::size_t result{0};
+  const auto combine{[&result](const std::size_t value) {
+    result ^= value + 0x9E3779B97F4A7C15ULL + (result << 6U) + (result >> 2U);
+  }};
+
+  const auto size{pointer.size()};
+  combine(size);
+  if (size == 0) {
+    return result;
+  }
+
+  combine(hash_pointer_token(pointer.at(0)));
+  if (size > 2) {
+    combine(hash_pointer_token(pointer.at(size / 2)));
+  }
+  if (size > 1) {
+    combine(hash_pointer_token(pointer.back()));
+  }
+
+  return result;
+}
+
+} // namespace detail
 
 /// @ingroup jsonpointer
 /// A global constant instance of the empty JSON Pointer.
@@ -659,5 +705,25 @@ auto to_uri(const WeakPointer &pointer, const std::string_view base) -> URI;
 using PointerWalker = GenericPointerWalker<WeakPointer>;
 
 } // namespace sourcemeta::core
+
+namespace std {
+
+template <> struct hash<sourcemeta::core::Pointer> {
+  [[nodiscard]] auto
+  operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::hash_pointer(pointer);
+  }
+};
+
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  [[nodiscard]] auto
+  operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    return sourcemeta::core::detail::hash_pointer(pointer);
+  }
+};
+
+} // namespace std
 
 #endif

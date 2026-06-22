@@ -125,6 +125,31 @@ TEST(JSONWeakPointer_pointer, equality_false) {
   EXPECT_FALSE(pointer_1 == pointer_2);
 }
 
+TEST(JSONWeakPointer_pointer, hash_unordered_containers) {
+  static const std::string alpha = "alpha";
+  static const std::string beta = "beta";
+
+  const sourcemeta::core::WeakPointer pointer_1{
+      std::cref(foo), std::cref(alpha), std::cref(bar), std::cref(baz)};
+  const sourcemeta::core::WeakPointer pointer_2{std::cref(foo), std::cref(beta),
+                                                std::cref(bar), std::cref(baz)};
+  const sourcemeta::core::WeakPointer pointer_3{std::cref(foo), 1,
+                                                std::cref(bar)};
+
+  std::unordered_set<sourcemeta::core::WeakPointer> set;
+  set.insert(pointer_1);
+  set.insert(pointer_2);
+  EXPECT_EQ(set.size(), 2);
+  EXPECT_EQ(set.count(pointer_1), 1);
+  EXPECT_EQ(set.count(pointer_2), 1);
+
+  std::unordered_map<sourcemeta::core::WeakPointer, int> map;
+  map.emplace(pointer_3, 42);
+  EXPECT_EQ(
+      map.at(sourcemeta::core::WeakPointer{std::cref(foo), 1, std::cref(bar)}),
+      42);
+}
+
 TEST(JSONWeakPointer_pointer, pop_back_non_empty) {
   sourcemeta::core::WeakPointer pointer{std::cref(foo), std::cref(bar)};
 

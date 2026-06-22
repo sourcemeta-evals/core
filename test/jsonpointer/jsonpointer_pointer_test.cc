@@ -117,6 +117,23 @@ TEST(JSONPointer_pointer, equality_false) {
   EXPECT_FALSE(pointer_1 == pointer_2);
 }
 
+TEST(JSONPointer_pointer, hash_unordered_containers) {
+  const sourcemeta::core::Pointer pointer_1{"foo", "alpha", "bar", "baz"};
+  const sourcemeta::core::Pointer pointer_2{"foo", "beta", "bar", "baz"};
+  const sourcemeta::core::Pointer pointer_3{"foo", 1, "bar"};
+
+  std::unordered_set<sourcemeta::core::Pointer> set;
+  set.insert(pointer_1);
+  set.insert(pointer_2);
+  EXPECT_EQ(set.size(), 2);
+  EXPECT_EQ(set.count(pointer_1), 1);
+  EXPECT_EQ(set.count(pointer_2), 1);
+
+  std::unordered_map<sourcemeta::core::Pointer, int> map;
+  map.emplace(pointer_3, 42);
+  EXPECT_EQ(map.at(sourcemeta::core::Pointer{"foo", 1, "bar"}), 42);
+}
+
 TEST(JSONPointer_pointer, pop_back_non_empty) {
   sourcemeta::core::Pointer pointer{"foo", "bar"};
   pointer.pop_back();
