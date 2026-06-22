@@ -660,4 +660,94 @@ using PointerWalker = GenericPointerWalker<WeakPointer>;
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Enable hashing for Pointer to allow use with std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling first, middle, and last
+/// tokens.
+template <> struct hash<sourcemeta::core::Pointer> {
+  auto operator()(const sourcemeta::core::Pointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result{size};
+
+    const auto &first{pointer.at(0)};
+    if (first.is_property()) {
+      result ^= static_cast<std::size_t>(first.property_hash().a);
+    } else {
+      result ^= first.to_index();
+    }
+
+    if (size > 1) {
+      const auto &last{pointer.back()};
+      if (last.is_property()) {
+        result ^= static_cast<std::size_t>(last.property_hash().a) << 1;
+      } else {
+        result ^= last.to_index() << 1;
+      }
+    }
+
+    if (size > 2) {
+      const auto &middle{pointer.at(size / 2)};
+      if (middle.is_property()) {
+        result ^= static_cast<std::size_t>(middle.property_hash().a) << 2;
+      } else {
+        result ^= middle.to_index() << 2;
+      }
+    }
+
+    return result;
+  }
+};
+
+/// @ingroup jsonpointer
+/// Enable hashing for WeakPointer to allow use with std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling first, middle, and last
+/// tokens.
+template <> struct hash<sourcemeta::core::WeakPointer> {
+  auto operator()(const sourcemeta::core::WeakPointer &pointer) const noexcept
+      -> std::size_t {
+    const auto size{pointer.size()};
+    if (size == 0) {
+      return 0;
+    }
+
+    std::size_t result{size};
+
+    const auto &first{pointer.at(0)};
+    if (first.is_property()) {
+      result ^= static_cast<std::size_t>(first.property_hash().a);
+    } else {
+      result ^= first.to_index();
+    }
+
+    if (size > 1) {
+      const auto &last{pointer.back()};
+      if (last.is_property()) {
+        result ^= static_cast<std::size_t>(last.property_hash().a) << 1;
+      } else {
+        result ^= last.to_index() << 1;
+      }
+    }
+
+    if (size > 2) {
+      const auto &middle{pointer.at(size / 2)};
+      if (middle.is_property()) {
+        result ^= static_cast<std::size_t>(middle.property_hash().a) << 2;
+      } else {
+        result ^= middle.to_index() << 2;
+      }
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
