@@ -660,4 +660,51 @@ using PointerWalker = GenericPointerWalker<WeakPointer>;
 
 } // namespace sourcemeta::core
 
+namespace std {
+
+/// @ingroup jsonpointer
+/// Hash support for GenericToken to enable use in std::unordered_map and
+/// std::unordered_set
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericToken<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericToken<PropertyT, Hash> &token)
+      const noexcept -> std::size_t {
+    if (token.is_property()) {
+      return static_cast<std::size_t>(token.property_hash().a);
+    } else {
+      return static_cast<std::size_t>(token.to_index());
+    }
+  }
+};
+
+/// @ingroup jsonpointer
+/// Hash support for GenericPointer to enable use in std::unordered_map and
+/// std::unordered_set. The hash is O(1) by sampling first, middle, and last
+/// tokens.
+template <typename PropertyT, typename Hash>
+struct hash<sourcemeta::core::GenericPointer<PropertyT, Hash>> {
+  auto operator()(const sourcemeta::core::GenericPointer<PropertyT, Hash>
+                      &pointer) const noexcept -> std::size_t {
+    const auto size = pointer.size();
+    if (size == 0) {
+      return 0;
+    }
+
+    std::hash<typename sourcemeta::core::GenericPointer<PropertyT, Hash>::Token>
+        token_hasher;
+
+    std::size_t result = token_hasher(pointer.at(0));
+    if (size > 1) {
+      result ^= token_hasher(pointer.at(size - 1)) << 1;
+    }
+    if (size > 2) {
+      result ^= token_hasher(pointer.at(size / 2)) << 2;
+    }
+
+    return result;
+  }
+};
+
+} // namespace std
+
 #endif
