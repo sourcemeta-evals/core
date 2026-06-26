@@ -3,18 +3,12 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/yaml.h>
 
-#include <exception>     // std::exception
-#include <filesystem>    // std::filesystem
-#include <fstream>       // std::ifstream
-#include <iostream>      // std::cerr
-#include <string>        // std::string
-#include <unordered_set> // std::unordered_set
-#include <vector>        // std::vector
-
-// Retained skip-list scaffolding. The set is currently empty under the new
-// YAML 1.2 parser, but the mechanism is kept available for future selective
-// exclusions.
-static const std::unordered_set<std::string> SKIPPED_TESTS{};
+#include <exception>  // std::exception
+#include <filesystem> // std::filesystem
+#include <fstream>    // std::ifstream
+#include <iostream>   // std::cerr
+#include <string>     // std::string
+#include <vector>     // std::vector
 
 enum class YAMLTestType { Success, Error };
 
@@ -92,10 +86,6 @@ int main(int argc, char **argv) {
 
     const auto test_directory{entry.path()};
     const auto test_name{test_directory.filename().string()};
-
-    if (SKIPPED_TESTS.contains(test_name)) {
-      continue;
-    }
 
     const auto json_file{test_directory / "in.json"};
     const auto error_file{test_directory / "error"};
