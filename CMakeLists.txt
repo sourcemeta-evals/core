@@ -171,6 +171,8 @@ if(SOURCEMETA_CORE_JSONPOINTER)
   add_subdirectory(src/core/jsonpointer)
 endif()
 
+add_subdirectory(src/core/jsonld)
+
 if(SOURCEMETA_CORE_GZIP)
   find_package(LibDeflate REQUIRED)
   add_subdirectory(src/core/gzip)
@@ -337,6 +339,8 @@ if(SOURCEMETA_CORE_TESTS)
   if(SOURCEMETA_CORE_JSONPOINTER)
     add_subdirectory(test/jsonpointer)
   endif()
+
+  add_subdirectory(test/jsonld)
 
   if(SOURCEMETA_CORE_GZIP)
     add_subdirectory(test/gzip)
