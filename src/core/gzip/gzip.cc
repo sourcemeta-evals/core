@@ -84,6 +84,11 @@ auto gunzip(std::istream &stream) -> std::optional<std::string> {
     }
   }
 
+  if (code != Z_STREAM_END) {
+    inflateEnd(&zstream);
+    return std::nullopt;
+  }
+
   code = inflateEnd(&zstream);
   if (code != Z_OK) {
     return std::nullopt;
