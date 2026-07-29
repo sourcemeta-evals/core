@@ -203,6 +203,92 @@ TEST(JSONSchema_bundle, with_default_id) {
   EXPECT_EQ(document, expected);
 }
 
+TEST(JSONSchema_bundle, with_default_id_preserves_existing_id) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/existing",
+    "type": "string"
+  })JSON");
+
+  sourcemeta::core::bundle(document, sourcemeta::core::schema_official_walker,
+                           test_resolver, std::nullopt,
+                           "https://www.sourcemeta.com/default");
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/existing",
+    "type": "string"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_bundle, with_default_id_legacy_dialect) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "string"
+  })JSON");
+
+  sourcemeta::core::bundle(document, sourcemeta::core::schema_official_walker,
+                           test_resolver, std::nullopt,
+                           "https://www.sourcemeta.com/default");
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://www.sourcemeta.com/default",
+    "type": "string"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_bundle, with_default_id_and_default_container) {
+  auto document{sourcemeta::core::parse_json(R"JSON({
+    "wrapper": {
+      "$ref": "#/common/test"
+    },
+    "common": {
+      "test": {
+        "$ref": "#/common/with-id"
+      },
+      "with-id": {
+        "$id": "https://www.sourcemeta.com/schema",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "string"
+      }
+    }
+  })JSON")};
+
+  sourcemeta::core::bundle(document, sourcemeta::core::schema_official_walker,
+                           test_resolver,
+                           "https://json-schema.org/draft/2020-12/schema",
+                           "https://www.sourcemeta.com/default",
+                           sourcemeta::core::Pointer{"components"},
+                           {
+                               sourcemeta::core::Pointer{"wrapper"},
+                               sourcemeta::core::Pointer{"common", "test"},
+                               sourcemeta::core::Pointer{"common", "with-id"},
+                           });
+
+  const auto expected{sourcemeta::core::parse_json(R"JSON({
+    "wrapper": {
+      "$ref": "#/common/test"
+    },
+    "common": {
+      "test": {
+        "$ref": "#/common/with-id"
+      },
+      "with-id": {
+        "$id": "https://www.sourcemeta.com/schema",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "string"
+      }
+    }
+  })JSON")};
+
+  EXPECT_EQ(document, expected);
+}
+
 TEST(JSONSchema_bundle, with_default_dialect) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "properties": {
