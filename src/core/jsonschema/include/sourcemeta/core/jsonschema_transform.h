@@ -125,6 +125,8 @@ public:
       -> Result;
 
   /// A method to optionally fix any reference location that was affected by the
+  /// transformation. The default implementation throws
+  /// `SchemaBrokenReferenceError` when a reference remains broken after
   /// transformation.
   [[nodiscard]] virtual auto
   rereference(const std::string &reference, const Pointer &origin,
