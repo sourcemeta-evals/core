@@ -1807,3 +1807,44 @@ TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_4) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(AlterSchema_lint_2020_12, allof_rewrite_batch) {
+  const struct {
+    const char *input;
+    const char *expected;
+  } cases[] = {
+      {R"JSON({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "allOf": [ { "$ref": "https://example.com" } ]
+      })JSON",
+       R"JSON({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$ref": "https://example.com"
+      })JSON"},
+      {R"JSON({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "allOf": [ { "type": "string" }, { "type": "integer" }, { "type": "string" } ]
+      })JSON",
+       R"JSON({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "allOf": [ { "type": "integer" }, { "type": "string" } ]
+      })JSON"},
+      {R"JSON({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "allOf": [ { "$ref": "https://example.com", "type": "integer" } ]
+      })JSON",
+       R"JSON({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$ref": "https://example.com",
+        "allOf": [ { "type": "integer" } ]
+      })JSON"},
+  };
+
+  for (const auto &entry : cases) {
+    sourcemeta::core::JSON document = sourcemeta::core::parse_json(entry.input);
+    LINT_AND_FIX_FOR_READABILITY(document);
+    const sourcemeta::core::JSON expected =
+        sourcemeta::core::parse_json(entry.expected);
+    EXPECT_EQ(document, expected);
+  }
+}
