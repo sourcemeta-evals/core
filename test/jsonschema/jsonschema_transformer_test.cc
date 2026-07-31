@@ -864,6 +864,7 @@ TEST(JSONSchema_transformer, rereference_not_fixed_ref) {
   } catch (const sourcemeta::core::SchemaBrokenReferenceError &error) {
     EXPECT_EQ(error.id(), "#/definitions/foo");
     EXPECT_EQ(sourcemeta::core::to_string(error.location()), "/$ref");
+    EXPECT_STREQ(error.what(), "The reference broke after transformation");
     SUCCEED();
   }
 
