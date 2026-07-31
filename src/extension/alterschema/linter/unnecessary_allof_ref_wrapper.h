@@ -9,16 +9,23 @@ public:
   [[nodiscard]] auto
   condition(const sourcemeta::core::JSON &schema,
             const sourcemeta::core::JSON &,
-            const sourcemeta::core::Vocabularies &,
+            const sourcemeta::core::Vocabularies &vocabularies,
             const sourcemeta::core::SchemaFrame &,
-            const sourcemeta::core::SchemaFrame::Location &location,
+            const sourcemeta::core::SchemaFrame::Location &,
             const sourcemeta::core::SchemaWalker &,
             const sourcemeta::core::SchemaResolver &) const
       -> sourcemeta::core::SchemaTransformRule::Result override {
-    if (location.base_dialect !=
-            "https://json-schema.org/draft/2020-12/schema" &&
-        location.base_dialect !=
-            "https://json-schema.org/draft/2019-09/schema") {
+    const bool is_2020_12{
+        vocabularies.contains(
+            "https://json-schema.org/draft/2020-12/vocab/core") &&
+        vocabularies.contains(
+            "https://json-schema.org/draft/2020-12/vocab/applicator")};
+    const bool is_2019_09{
+        vocabularies.contains(
+            "https://json-schema.org/draft/2019-09/vocab/core") &&
+        vocabularies.contains(
+            "https://json-schema.org/draft/2019-09/vocab/applicator")};
+    if (!is_2020_12 && !is_2019_09) {
       return false;
     }
 
