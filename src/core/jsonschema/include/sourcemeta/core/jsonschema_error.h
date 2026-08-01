@@ -25,6 +25,7 @@ namespace sourcemeta::core {
 /// An error that represents a general schema error event
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaError : public std::exception {
 public:
+  // Constructs the general schema error with the given message.
   SchemaError(std::string message) : message_{std::move(message)} {}
   [[nodiscard]] auto what() const noexcept -> const char * override {
     return this->message_.c_str();
@@ -115,7 +116,6 @@ private:
   std::string message_;
 };
 
-/// @ingroup jsonschema
 /// An error that represents that a schema reference produced by a
 /// transformation step is broken and could not be repaired.
 ///

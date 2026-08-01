@@ -9,6 +9,7 @@
 #include <unordered_map> // std::unordered_map
 #include <utility>       // std::move
 
+// A schema value is either a JSON object or a JSON boolean.
 auto sourcemeta::core::is_schema(const sourcemeta::core::JSON &schema) -> bool {
   return schema.is_object() || schema.is_boolean();
 }

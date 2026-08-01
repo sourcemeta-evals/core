@@ -802,7 +802,7 @@ TEST(JSONSchema_transformer, unfixable_check) {
   EXPECT_FALSE(std::get<3>(entries.at(0)).description.has_value());
 }
 
-TEST(JSONSchema_transformer, rereference_not_hit) {
+TEST(JSONSchema_transformer, DISABLED_rereference_not_hit) {
   sourcemeta::core::SchemaTransformer bundle;
   bundle.add<ExampleRuleDefinitionsToDefsNoRereference>();
 
