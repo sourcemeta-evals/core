@@ -101,7 +101,7 @@ public:
     return this->message_.c_str();
   }
 
-  [[nodiscard]] auto id() const noexcept -> const auto & {
+  [[nodiscard]] auto id() const noexcept -> std::string_view {
     return this->identifier_;
   }
 
@@ -115,9 +115,45 @@ private:
   std::string message_;
 };
 
+/// @ingroup jsonschema
+/// An error that represents that a schema reference produced by a
+/// transformation step is broken and could not be repaired.
+///
+/// This exception type is thrown by the default implementation of
+/// SchemaTransformRule::rereference when a schema transformation leaves
+/// a reference pointing at a location that no longer resolves to a
+/// valid schema. Callers who override rereference to supply custom
+/// repair logic may throw this exception themselves.
+///
+/// Because SchemaBrokenReferenceError publicly inherits from
+/// SchemaReferenceError, existing catch handlers that reference the
+/// parent type continue to catch the more specific subtype. This
+/// preserves backward compatibility with older callers that were
+/// written before the specialised error type existed.
+///
+/// The exception's public payload matches that of SchemaReferenceError:
+/// the reference identifier is available via id(), the pointer origin
+/// location via location(), and the fixed user-visible message via
+/// what(). The message is hardcoded to the canonical broken-reference-
+/// after-transformation text used by the default rereference path.
+///
+/// Users who want to inspect the identifier of the broken reference
+/// should call id() on the caught exception, which returns a view over
+/// the identifier passed to the constructor. Users who want the pointer
+/// origin should call location() on the caught exception, which returns
+/// a const reference to the pointer passed to the constructor. Both
+/// accessors are noexcept and safe to use inside a catch block.
 class SOURCEMETA_CORE_JSONSCHEMA_EXPORT SchemaBrokenReferenceError
     : public SchemaReferenceError {
-  using SchemaReferenceError::SchemaReferenceError;
+public:
+  // Constructs a SchemaBrokenReferenceError with the given reference
+  // identifier and pointer origin, using the canonical broken-reference
+  // message text. Only two arguments are exposed because the default
+  // rereference throw site is the sole place this exception is
+  // constructed today.
+  SchemaBrokenReferenceError(std::string id, Pointer location)
+      : SchemaReferenceError(std::move(id), std::move(location),
+                             "The reference broke after transformation") {}
 };
 
 /// @ingroup jsonschema

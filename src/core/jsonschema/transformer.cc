@@ -32,6 +32,7 @@ auto SchemaTransformRule::operator==(const SchemaTransformRule &other) const
 }
 
 auto SchemaTransformRule::name() const -> const std::string & {
+  assert(!this->name_.empty());
   return this->name_;
 }
 
@@ -46,9 +47,7 @@ auto SchemaTransformRule::transform(JSON &, const Result &) const -> void {
 auto SchemaTransformRule::rereference(const std::string &reference,
                                       const Pointer &origin, const Pointer &,
                                       const Pointer &) const -> Pointer {
-  assert(!reference.empty());
-  throw sourcemeta::core::SchemaBrokenReferenceError(
-      reference, origin, "The reference broke after transformation");
+  throw sourcemeta::core::SchemaBrokenReferenceError(reference, origin);
 }
 
 auto SchemaTransformRule::apply(JSON &schema, const JSON &root,
