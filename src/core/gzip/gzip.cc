@@ -6,6 +6,7 @@ extern "C" {
 
 #include <array>   // std::array
 #include <cstring> // std::memset
+#include <memory>  // std::unique_ptr
 #include <sstream> // std::ostringstream
 
 namespace sourcemeta::core {
@@ -51,6 +52,10 @@ auto gunzip(std::istream &stream) -> std::optional<std::string> {
     return std::nullopt;
   }
 
+  const auto zstream_cleanup = [](z_stream *owned) { inflateEnd(owned); };
+  std::unique_ptr<z_stream, decltype(zstream_cleanup)> zstream_guard{
+      &zstream, zstream_cleanup};
+
   constexpr auto ZLIB_BUFFER_SIZE{4096};
   std::string decompressed;
   decompressed.reserve(ZLIB_BUFFER_SIZE);
@@ -76,21 +81,18 @@ auto gunzip(std::istream &stream) -> std::optional<std::string> {
 
     code = inflate(&zstream, Z_NO_FLUSH);
     if (code != Z_OK && code != Z_STREAM_END) {
-      inflateEnd(&zstream);
       return std::nullopt;
-    } else {
-      decompressed.append(buffer_output.data(),
-                          buffer_output.size() - zstream.avail_out);
     }
+    decompressed.append(buffer_output.data(),
+                        buffer_output.size() - zstream.avail_out);
   }
 
   if (code != Z_STREAM_END) {
-    inflateEnd(&zstream);
     return std::nullopt;
   }
 
-  code = inflateEnd(&zstream);
-  if (code != Z_OK) {
+  [[maybe_unused]] const auto released{zstream_guard.release()};
+  if (inflateEnd(&zstream) != Z_OK) {
     return std::nullopt;
   }
 
