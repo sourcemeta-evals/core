@@ -242,6 +242,26 @@ TEST(JSONSchema_bundle, with_default_id_legacy_dialect) {
   EXPECT_EQ(document, expected);
 }
 
+TEST(JSONSchema_bundle, with_default_id_preserves_existing_legacy_id) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://www.sourcemeta.com/existing",
+    "type": "string"
+  })JSON");
+
+  sourcemeta::core::bundle(document, sourcemeta::core::schema_official_walker,
+                           test_resolver, std::nullopt,
+                           "https://www.sourcemeta.com/default");
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://www.sourcemeta.com/existing",
+    "type": "string"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
 TEST(JSONSchema_bundle, with_default_id_and_default_container) {
   auto document{sourcemeta::core::parse_json(R"JSON({
     "wrapper": {
