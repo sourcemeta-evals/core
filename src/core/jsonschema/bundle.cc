@@ -262,7 +262,7 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
   // bundled schema. Otherwise, potential relative references based on this
   // implicit base URI will likely not resolve unless end users happen to
   // know that this implicit base URI is.
-  if (default_id.has_value() &&
+  if (schema.is_object() && default_id.has_value() &&
       !identify(schema, resolver, SchemaIdentificationStrategy::Strict,
                 default_dialect)
            .has_value()) {
