@@ -261,7 +261,7 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
   // If the schema identifier is implicit, add it to the top-level of the
   // bundled schema. Otherwise, potential relative references based on this
   // implicit base URI will likely not resolve unless end users happen to
-  // know that this implicit base URI is.
+  // know what this implicit base URI is.
   if (schema.is_object() && default_id.has_value() &&
       !identify(schema, resolver, SchemaIdentificationStrategy::Strict,
                 default_dialect)
