@@ -224,6 +224,26 @@ auto bundle_schema(sourcemeta::core::JSON &root,
   }
 }
 
+// If the schema identifier is implicit, add it to the top-level of the
+// bundled schema. Otherwise, potential relative references based on this
+// implicit base URI will likely not resolve unless end users happen to
+// know that this implicit base URI is.
+auto materialize_default_identifier(
+    sourcemeta::core::JSON &schema,
+    const sourcemeta::core::SchemaResolver &resolver,
+    const std::optional<std::string> &default_dialect,
+    const std::optional<std::string> &default_id) -> void {
+  if (default_id.has_value() &&
+      !sourcemeta::core::identify(
+           schema, resolver,
+           sourcemeta::core::SchemaIdentificationStrategy::Strict,
+           default_dialect)
+           .has_value()) {
+    sourcemeta::core::reidentify(schema, default_id.value(), resolver,
+                                 default_dialect);
+  }
+}
+
 } // namespace
 
 namespace sourcemeta::core {
@@ -255,23 +275,14 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
     return;
   }
 
-  // If the schema identifier is implicit, add it to the top-level of the
-  // bundled schema. Otherwise, potential relative references based on this
-  // implicit base URI will likely not resolve unless end users happen to
-  // know that this implicit base URI is.
-  if (default_id.has_value() &&
-      !identify(schema, resolver, SchemaIdentificationStrategy::Strict,
-                default_dialect)
-           .has_value()) {
-    reidentify(schema, default_id.value(), resolver, default_dialect);
-  }
-
   const auto vocabularies{
       sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
   if (vocabularies.contains(
           "https://json-schema.org/draft/2020-12/vocab/core") ||
       vocabularies.contains(
           "https://json-schema.org/draft/2019-09/vocab/core")) {
+    materialize_default_identifier(schema, resolver, default_dialect,
+                                   default_id);
     bundle_schema(schema, {"$defs"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
     return;
@@ -284,6 +295,8 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
              vocabularies.contains("http://json-schema.org/draft-04/schema#") ||
              vocabularies.contains(
                  "http://json-schema.org/draft-04/hyper-schema#")) {
+    materialize_default_identifier(schema, resolver, default_dialect,
+                                   default_id);
     bundle_schema(schema, {"definitions"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
     return;

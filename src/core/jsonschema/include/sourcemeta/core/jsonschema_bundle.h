@@ -78,7 +78,9 @@ auto dependencies(
 ///
 /// This function bundles a JSON Schema (starting from Draft 4) by embedding
 /// every remote reference into the top level schema resource, handling circular
-/// dependencies and more. This overload mutates the input schema.  For example:
+/// dependencies and more. This overload mutates the input schema. If a
+/// default identifier is given, it is set on the resulting schema.  For
+/// example:
 ///
 /// ```cpp
 /// #include <sourcemeta/core/json.h>
@@ -136,7 +138,8 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
 /// This function bundles a JSON Schema (starting from Draft 4) by embedding
 /// every remote reference into the top level schema resource, handling circular
 /// dependencies and more. This overload returns a new schema, without mutating
-/// the input schema. For example:
+/// the input schema. If a default identifier is given, it is set on the
+/// resulting schema. For example:
 ///
 /// ```cpp
 /// #include <sourcemeta/core/json.h>
