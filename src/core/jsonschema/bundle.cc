@@ -258,25 +258,19 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
     return;
   }
 
-  const auto vocabularies{
-      sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
-
-  // Add identifier to root schema if it lacks one and default_id is provided
-  if (default_id.has_value()) {
-    const auto current_id{sourcemeta::core::identify(
-        schema, resolver,
-        sourcemeta::core::SchemaIdentificationStrategy::Strict,
-        default_dialect)};
-    if (!current_id.has_value()) {
-      const auto base_dialect{
-          sourcemeta::core::base_dialect(schema, resolver, default_dialect)};
-      if (base_dialect.has_value()) {
-        sourcemeta::core::reidentify(schema, default_id.value(),
-                                     base_dialect.value());
-      }
-    }
+  // If the schema identifier is implicit, add it to the top-level of the
+  // bundled schema. Otherwise, potential relative references based on this
+  // implicit base URI will likely not resolve unless end users happen to
+  // know what this implicit base URI is.
+  if (schema.is_object() && default_id.has_value() &&
+      !identify(schema, resolver, SchemaIdentificationStrategy::Strict,
+                default_dialect)
+           .has_value()) {
+    reidentify(schema, default_id.value(), resolver,  default_dialect);
   }
 
+  const auto vocabularies{
+      sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
   if (vocabularies.contains(
           "https://json-schema.org/draft/2020-12/vocab/core") ||
       vocabularies.contains(
