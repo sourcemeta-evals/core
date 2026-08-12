@@ -92,6 +92,10 @@ auto gunzip(std::istream &stream) -> std::optional<std::string> {
     return std::nullopt;
   }
 
+  if (!decompressed) {
+    return std::nullopt;
+  }
+
   return decompressed.str();
 }
 
