@@ -1112,25 +1112,63 @@ private:
         token = next.value();
       }
 
+      std::optional<std::string> explicit_key_anchor;
       while (token.type == TokenType::Tag || token.type == TokenType::Anchor) {
+        if (token.type == TokenType::Anchor) {
+          explicit_key_anchor = std::string{token.value};
+        }
         auto next{this->next_token()};
         assert(next.has_value());
         token = next.value();
       }
 
       if (token.type != TokenType::Scalar &&
-          token.type != TokenType::BlockMappingValue) {
+          token.type != TokenType::BlockMappingValue &&
+          token.type != TokenType::Alias) {
         break;
       }
 
       std::string_view key;
+      std::string alias_key_storage;
       std::uint64_t current_key_line{0};
       std::uint64_t current_key_column{0};
 
-      if (token.type == TokenType::Scalar) {
+      if (token.type == TokenType::Alias) {
+        const std::string alias_name{token.value};
+        const auto iterator{this->anchors_.find(alias_name)};
+        if (iterator == this->anchors_.end()) {
+          throw YAMLUnknownAnchorError{alias_name, token.line, token.column};
+        }
+        alias_key_storage = this->json_to_key_string(iterator->second.value);
+        key = alias_key_storage;
+        current_key_line = token.line;
+        current_key_column = token.column;
+
+        if (seen_keys.contains(key)) {
+          throw YAMLDuplicateKeyError{key, token.line, token.column};
+        }
+        seen_keys.insert(key);
+
+        auto next{this->next_token()};
+        if (!next.has_value() || next->type != TokenType::BlockMappingValue) {
+          result.assign(std::string{key}, JSON{nullptr});
+          if (!next.has_value()) {
+            break;
+          }
+          token = next.value();
+          continue;
+        }
+        token = next.value();
+      } else if (token.type == TokenType::Scalar) {
         key = token.value;
         current_key_line = token.line;
         current_key_column = token.column;
+
+        if (explicit_key_anchor.has_value()) {
+          this->anchors_.insert_or_assign(
+              explicit_key_anchor.value(),
+              AnchoredValue{.value = JSON{std::string{key}}, .callbacks = {}});
+        }
 
         if (seen_keys.contains(key)) {
           throw YAMLDuplicateKeyError{key, token.line, token.column};
