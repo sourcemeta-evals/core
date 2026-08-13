@@ -505,3 +505,38 @@ TEST(YAML_parse, duplicate_key_error_metadata) {
     FAIL() << "Expected YAMLDuplicateKeyError, got different exception";
   }
 }
+
+TEST(YAML_parse, octal_scalar_resolves_to_integer) {
+  const std::string input{"0o77"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{63};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(YAML_parse, octal_scalar_quoted_stays_string) {
+  const std::string input{"\"0o77\""};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"0o77"};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(YAML_parse, octal_scalar_invalid_first_digit_stays_string) {
+  const std::string input{"0o89"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"0o89"};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(YAML_parse, octal_scalar_trailing_invalid_digit_stays_string) {
+  const std::string input{"0o18"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"0o18"};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(YAML_parse, hex_scalar_trailing_invalid_digit_stays_string) {
+  const std::string input{"0x1g"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"0x1g"};
+  EXPECT_EQ(result, expected);
+}

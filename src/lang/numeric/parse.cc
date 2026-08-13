@@ -22,7 +22,12 @@ auto to_int64_t(const std::string &input) noexcept
 auto to_int64_t(const std::string &input, const int base) noexcept
     -> std::optional<std::int64_t> {
   try {
-    return static_cast<std::int64_t>(std::stoll(input, nullptr, base));
+    std::size_t position{0};
+    const auto result{std::stoll(input, &position, base)};
+    if (position != input.size()) {
+      return std::nullopt;
+    }
+    return static_cast<std::int64_t>(result);
   } catch (const std::invalid_argument &) {
     return std::nullopt;
   } catch (const std::out_of_range &) {
