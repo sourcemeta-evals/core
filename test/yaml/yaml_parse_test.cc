@@ -472,3 +472,36 @@ TEST(YAML_parse, invalid_unicode_escape_8) {
     FAIL() << "Expected YAMLParseError, got different exception";
   }
 }
+
+TEST(YAML_parse, duplicate_key_block_mapping) {
+  const std::string input{"foo: 1\nfoo: 2"};
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLDuplicateKeyError);
+}
+
+TEST(YAML_parse, duplicate_key_flow_mapping) {
+  const std::string input{"{foo: 1, foo: 2}"};
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLDuplicateKeyError);
+}
+
+TEST(YAML_parse, duplicate_key_explicit_mapping) {
+  const std::string input{"? foo\n: 1\n? foo\n: 2"};
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLDuplicateKeyError);
+}
+
+TEST(YAML_parse, duplicate_key_error_metadata) {
+  const std::string input{"foo: 1\nfoo: 2"};
+  try {
+    sourcemeta::core::parse_yaml(input);
+    FAIL() << "Expected YAMLDuplicateKeyError to be thrown";
+  } catch (const sourcemeta::core::YAMLDuplicateKeyError &error) {
+    EXPECT_EQ(error.key(), "foo");
+    EXPECT_STREQ(error.what(), "Duplicate key in YAML mapping");
+    EXPECT_EQ(error.line(), 2);
+    EXPECT_EQ(error.column(), 1);
+  } catch (...) {
+    FAIL() << "Expected YAMLDuplicateKeyError, got different exception";
+  }
+}
