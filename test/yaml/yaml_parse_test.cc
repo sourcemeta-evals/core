@@ -538,3 +538,33 @@ TEST(YAML_parse, hex_scalar_trailing_invalid_digit_stays_string) {
   const sourcemeta::core::JSON expected{"0x1g"};
   EXPECT_EQ(result, expected);
 }
+
+TEST(YAML_parse, unicode_escape_low_surrogate_boundary_rejected) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uD800\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, unicode_escape_high_surrogate_boundary_rejected) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uDFFF\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, unicode_escape_above_max_codepoint_rejected) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\U00110000\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, unicode_escape_below_surrogate_range_accepted) {
+  const auto result{sourcemeta::core::parse_yaml("\"\\uD7FF\"")};
+  EXPECT_TRUE(result.is_string());
+}
+
+TEST(YAML_parse, unicode_escape_above_surrogate_range_accepted) {
+  const auto result{sourcemeta::core::parse_yaml("\"\\uE000\"")};
+  EXPECT_TRUE(result.is_string());
+}
+
+TEST(YAML_parse, unicode_escape_max_codepoint_accepted) {
+  const auto result{sourcemeta::core::parse_yaml("\"\\U0010FFFF\"")};
+  EXPECT_TRUE(result.is_string());
+}
