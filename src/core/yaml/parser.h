@@ -1095,7 +1095,9 @@ private:
         index, property);
 
     JSON result{JSON::make_object()};
-    std::unordered_set<std::string_view> seen_keys;
+    // Owned keys so that alias-derived storage (produced per iteration by
+    // json_to_key_string) remains valid for the lifetime of the mapping
+    std::unordered_set<std::string> seen_keys;
 
     auto token{start_token};
     const auto mapping_indent{
@@ -1128,8 +1130,7 @@ private:
         break;
       }
 
-      std::string_view key;
-      std::string alias_key_storage;
+      std::string key;
       std::uint64_t current_key_line{0};
       std::uint64_t current_key_column{0};
 
@@ -1139,8 +1140,7 @@ private:
         if (iterator == this->anchors_.end()) {
           throw YAMLUnknownAnchorError{alias_name, token.line, token.column};
         }
-        alias_key_storage = this->json_to_key_string(iterator->second.value);
-        key = alias_key_storage;
+        key = this->json_to_key_string(iterator->second.value);
         current_key_line = token.line;
         current_key_column = token.column;
 

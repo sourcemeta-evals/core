@@ -483,6 +483,12 @@ TEST(YAML_parse, duplicate_key_alias_resolved) {
                sourcemeta::core::YAMLDuplicateKeyError);
 }
 
+TEST(YAML_parse, duplicate_key_alias_resolved_before_literal) {
+  const std::string input{"? &anchor foo\n: 1\nfoo: 2"};
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLDuplicateKeyError);
+}
+
 TEST(YAML_parse, duplicate_key_error_metadata) {
   const std::string input{"foo: 1\nfoo: 2"};
   try {
