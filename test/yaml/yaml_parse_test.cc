@@ -568,3 +568,14 @@ TEST(YAML_parse, unicode_escape_max_codepoint_accepted) {
   const auto result{sourcemeta::core::parse_yaml("\"\\U0010FFFF\"")};
   EXPECT_TRUE(result.is_string());
 }
+
+TEST(YAML_parse, multi_document_stream_mixed_scalar_types) {
+  std::istringstream stream{"---\n42\n---\nhello\n---\ntrue"};
+  const auto doc1{sourcemeta::core::parse_yaml(stream)};
+  EXPECT_EQ(doc1, sourcemeta::core::JSON{42});
+  const auto doc2{sourcemeta::core::parse_yaml(stream)};
+  EXPECT_EQ(doc2, sourcemeta::core::JSON{"hello"});
+  const auto doc3{sourcemeta::core::parse_yaml(stream)};
+  EXPECT_EQ(doc3, sourcemeta::core::JSON{true});
+  EXPECT_EQ(stream.peek(), EOF);
+}
