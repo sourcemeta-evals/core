@@ -633,3 +633,29 @@ TEST(YAML_parse, signed_octal_integer_positive_resolves) {
   ASSERT_TRUE(result.is_integer());
   EXPECT_EQ(result.to_integer(), 15);
 }
+
+TEST(YAML_parse, unknown_anchor_error_is_catchable_as_yaml_parse_error) {
+  const std::string input{"alias: *unknown"};
+  try {
+    sourcemeta::core::parse_yaml(input);
+    FAIL() << "Expected YAMLParseError to be thrown";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    EXPECT_EQ(error.line(), 1);
+    EXPECT_EQ(error.column(), 8);
+  } catch (...) {
+    FAIL() << "Expected YAMLParseError, got different exception";
+  }
+}
+
+TEST(YAML_parse, duplicate_key_error_is_catchable_as_yaml_parse_error) {
+  const std::string input{"foo: 1\nfoo: 2"};
+  try {
+    sourcemeta::core::parse_yaml(input);
+    FAIL() << "Expected YAMLParseError to be thrown";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    EXPECT_EQ(error.line(), 2);
+    EXPECT_EQ(error.column(), 1);
+  } catch (...) {
+    FAIL() << "Expected YAMLParseError, got different exception";
+  }
+}
