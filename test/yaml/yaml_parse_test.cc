@@ -579,3 +579,57 @@ TEST(YAML_parse, multi_document_stream_mixed_scalar_types) {
   EXPECT_EQ(doc3, sourcemeta::core::JSON{true});
   EXPECT_EQ(stream.peek(), EOF);
 }
+
+TEST(YAML_parse, string_entry_point_returns_first_document_only) {
+  const std::string input{"foo\n---\n[invalid"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  EXPECT_EQ(result, sourcemeta::core::JSON{"foo"});
+}
+
+TEST(YAML_parse, string_entry_point_ignores_trailing_duplicate_key) {
+  const std::string input{"foo\n---\nk: 1\nk: 2"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  EXPECT_EQ(result, sourcemeta::core::JSON{"foo"});
+}
+
+TEST(YAML_parse, read_yaml_empty_file_reports_position_one_one) {
+  try {
+    sourcemeta::core::read_yaml(std::filesystem::path{STUBS_PATH} /
+                                "empty.yaml");
+    FAIL() << "Expected YAMLParseError to be thrown";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    EXPECT_EQ(error.line(), 1);
+    EXPECT_EQ(error.column(), 1);
+  } catch (...) {
+    FAIL() << "Expected YAMLParseError, got different exception";
+  }
+}
+
+TEST(YAML_parse, explicit_int_tag_on_quoted_scalar_coerces_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int \"42\"")};
+  EXPECT_TRUE(result.is_integer());
+  EXPECT_EQ(result, sourcemeta::core::JSON{42});
+}
+
+TEST(YAML_parse, explicit_bool_tag_on_quoted_scalar_coerces_to_boolean) {
+  const auto result{sourcemeta::core::parse_yaml("!!bool \"true\"")};
+  EXPECT_TRUE(result.is_boolean());
+  EXPECT_EQ(result, sourcemeta::core::JSON{true});
+}
+
+TEST(YAML_parse, explicit_null_tag_on_quoted_scalar_coerces_to_null) {
+  const auto result{sourcemeta::core::parse_yaml("!!null \"null\"")};
+  EXPECT_TRUE(result.is_null());
+}
+
+TEST(YAML_parse, signed_hex_integer_negative_resolves) {
+  const auto result{sourcemeta::core::parse_yaml("-0x2A")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), -42);
+}
+
+TEST(YAML_parse, signed_octal_integer_positive_resolves) {
+  const auto result{sourcemeta::core::parse_yaml("+0o17")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 15);
+}
