@@ -8,7 +8,9 @@
 #include <sourcemeta/core/yaml_error.h>
 
 #include <cassert>       // assert
-#include <cstdint>       // std::uint64_t
+#include <cmath>         // std::isfinite
+#include <cstdint>       // std::int64_t, std::uint64_t
+#include <limits>        // std::numeric_limits
 #include <optional>      // std::optional
 #include <sstream>       // std::ostringstream
 #include <string>        // std::string
@@ -765,12 +767,19 @@ private:
       return JSON{Decimal{std::string{value}}};
     }
 
-    const auto as_integer{static_cast<std::int64_t>(result.value())};
-    if (result.value() == static_cast<double>(as_integer)) {
-      return JSON{as_integer};
+    const auto value_as_double{result.value()};
+    if (std::isfinite(value_as_double) &&
+        value_as_double >=
+            static_cast<double>(std::numeric_limits<std::int64_t>::min()) &&
+        value_as_double <
+            static_cast<double>(std::numeric_limits<std::int64_t>::max())) {
+      const auto as_integer{static_cast<std::int64_t>(value_as_double)};
+      if (value_as_double == static_cast<double>(as_integer)) {
+        return JSON{as_integer};
+      }
     }
 
-    return JSON{result.value()};
+    return JSON{value_as_double};
   }
 
   auto parse_flow_mapping(const Token &start_token,

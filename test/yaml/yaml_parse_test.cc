@@ -659,3 +659,15 @@ TEST(YAML_parse, duplicate_key_error_is_catchable_as_yaml_parse_error) {
     FAIL() << "Expected YAMLParseError, got different exception";
   }
 }
+
+TEST(YAML_parse, explicit_float_tag_large_positive_resolves_to_double) {
+  const auto result{sourcemeta::core::parse_yaml("!!float 1e20")};
+  ASSERT_TRUE(result.is_real());
+  EXPECT_DOUBLE_EQ(result.to_real(), 1e20);
+}
+
+TEST(YAML_parse, explicit_float_tag_large_negative_resolves_to_double) {
+  const auto result{sourcemeta::core::parse_yaml("!!float -1e20")};
+  ASSERT_TRUE(result.is_real());
+  EXPECT_DOUBLE_EQ(result.to_real(), -1e20);
+}
