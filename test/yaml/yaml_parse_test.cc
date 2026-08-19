@@ -596,6 +596,18 @@ TEST(YAML_parse, read_yaml_empty_file) {
                sourcemeta::core::YAMLParseError);
 }
 
+TEST(YAML_parse, read_yaml_rejects_malformed_trailing_content) {
+  EXPECT_THROW(sourcemeta::core::read_yaml(std::filesystem::path{STUBS_PATH} /
+                                           "malformed_trailing.yaml"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, string_overload_ignores_trailing_content) {
+  const auto result{sourcemeta::core::parse_yaml("foo\n---\n[invalid")};
+  EXPECT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string(), "foo");
+}
+
 TEST(YAML_parse, explicit_int_tag_on_quoted_scalar_coerces_to_integer) {
   const auto result{sourcemeta::core::parse_yaml("!!int \"42\"")};
   EXPECT_TRUE(result.is_integer());
