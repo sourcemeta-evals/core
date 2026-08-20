@@ -192,9 +192,36 @@ private:
                (content[cursor] == ' ' || content[cursor] == '\t')) {
           cursor++;
         }
+        const auto version_start{cursor};
         while (cursor < content.size() && content[cursor] != ' ' &&
                content[cursor] != '\t' && content[cursor] != '#') {
           cursor++;
+        }
+        const auto version{
+            content.substr(version_start, cursor - version_start)};
+        const auto dot_pos{version.find('.')};
+        if (dot_pos == std::string_view::npos || dot_pos == 0 ||
+            dot_pos + 1 == version.size()) {
+          throw YAMLParseError{token.line, token.column,
+                               "Invalid %YAML directive version"};
+        }
+        const auto major{version.substr(0, dot_pos)};
+        const auto minor{version.substr(dot_pos + 1)};
+        for (const auto character : major) {
+          if (character < '0' || character > '9') {
+            throw YAMLParseError{token.line, token.column,
+                                 "Invalid %YAML directive version"};
+          }
+        }
+        for (const auto character : minor) {
+          if (character < '0' || character > '9') {
+            throw YAMLParseError{token.line, token.column,
+                                 "Invalid %YAML directive version"};
+          }
+        }
+        if (major != "1") {
+          throw YAMLParseError{token.line, token.column,
+                               "Incompatible %YAML directive major version"};
         }
         while (cursor < content.size() &&
                (content[cursor] == ' ' || content[cursor] == '\t')) {

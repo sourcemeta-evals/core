@@ -737,3 +737,28 @@ TEST(YAML_parse, yaml_1_1_on_remains_string_under_yaml_1_2) {
 TEST(YAML_parse, yaml_1_1_off_remains_string_under_yaml_1_2) {
   EXPECT_EQ(sourcemeta::core::parse_yaml("off"), sourcemeta::core::JSON{"off"});
 }
+
+TEST(YAML_parse, yaml_directive_1_2_parses_normally) {
+  const auto result{sourcemeta::core::parse_yaml("%YAML 1.2\n---\nfoo")};
+  EXPECT_EQ(result, sourcemeta::core::JSON{"foo"});
+}
+
+TEST(YAML_parse, yaml_directive_non_numeric_version_throws) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML abc\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, yaml_directive_incompatible_major_throws) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML 2.0\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, yaml_directive_missing_minor_throws) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML 1\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, yaml_directive_empty_minor_throws) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML 1.\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
