@@ -596,7 +596,11 @@ private:
         if (value == "true" || value == "True" || value == "TRUE") {
           return JSON{true};
         }
-        return JSON{false};
+        if (value == "false" || value == "False" || value == "FALSE") {
+          return JSON{false};
+        }
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Invalid boolean value for !!bool tag"};
       }
       if (tag_value == "tag:yaml.org,2002:int") {
         return this->parse_integer(value);

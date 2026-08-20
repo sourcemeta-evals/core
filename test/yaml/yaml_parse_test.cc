@@ -674,3 +674,44 @@ TEST(YAML_parse, explicit_float_tag_large_negative_resolves_to_double) {
   ASSERT_TRUE(result.is_real());
   EXPECT_DOUBLE_EQ(result.to_real(), -1e20);
 }
+
+TEST(YAML_parse, YAMLError_is_constructible_and_catchable_as_std_exception) {
+  const sourcemeta::core::YAMLError error{"custom yaml error"};
+  EXPECT_STREQ(error.what(), "custom yaml error");
+  try {
+    throw error;
+  } catch (const std::exception &caught) {
+    EXPECT_STREQ(caught.what(), "custom yaml error");
+  } catch (...) {
+    FAIL() << "Expected YAMLError to be catchable as std::exception";
+  }
+}
+
+TEST(YAML_parse, explicit_bool_tag_valid_spellings_resolve_correctly) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool true"),
+            sourcemeta::core::JSON{true});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool True"),
+            sourcemeta::core::JSON{true});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool TRUE"),
+            sourcemeta::core::JSON{true});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool false"),
+            sourcemeta::core::JSON{false});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool False"),
+            sourcemeta::core::JSON{false});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool FALSE"),
+            sourcemeta::core::JSON{false});
+}
+
+TEST(YAML_parse, explicit_bool_tag_invalid_payload_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!bool maybe"),
+               sourcemeta::core::YAMLParseError);
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!bool yes"),
+               sourcemeta::core::YAMLParseError);
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!bool 1"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, double_quoted_unpaired_high_surrogate_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uD800\\u0041\""),
+               sourcemeta::core::YAMLParseError);
+}
