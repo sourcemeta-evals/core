@@ -777,40 +777,45 @@ private:
   }
 
   auto parse_float(const std::string_view value) -> JSON {
-    std::size_t significant_digits{0};
-    bool seen_nonzero{false};
-    for (const char character : value) {
-      if (character >= '0' && character <= '9') {
-        if (character != '0' || seen_nonzero) {
-          seen_nonzero = true;
-          significant_digits++;
+    try {
+      std::size_t significant_digits{0};
+      bool seen_nonzero{false};
+      for (const char character : value) {
+        if (character >= '0' && character <= '9') {
+          if (character != '0' || seen_nonzero) {
+            seen_nonzero = true;
+            significant_digits++;
+          }
         }
       }
-    }
 
-    constexpr std::size_t double_precision_limit{15};
-    if (significant_digits > double_precision_limit) {
-      return JSON{Decimal{std::string{value}}};
-    }
-
-    const auto result{to_double(std::string{value})};
-    if (!result.has_value()) {
-      return JSON{Decimal{std::string{value}}};
-    }
-
-    const auto value_as_double{result.value()};
-    if (std::isfinite(value_as_double) &&
-        value_as_double >=
-            static_cast<double>(std::numeric_limits<std::int64_t>::min()) &&
-        value_as_double <
-            static_cast<double>(std::numeric_limits<std::int64_t>::max())) {
-      const auto as_integer{static_cast<std::int64_t>(value_as_double)};
-      if (value_as_double == static_cast<double>(as_integer)) {
-        return JSON{as_integer};
+      constexpr std::size_t double_precision_limit{15};
+      if (significant_digits > double_precision_limit) {
+        return JSON{Decimal{std::string{value}}};
       }
-    }
 
-    return JSON{value_as_double};
+      const auto result{to_double(std::string{value})};
+      if (!result.has_value()) {
+        return JSON{Decimal{std::string{value}}};
+      }
+
+      const auto value_as_double{result.value()};
+      if (std::isfinite(value_as_double) &&
+          value_as_double >=
+              static_cast<double>(std::numeric_limits<std::int64_t>::min()) &&
+          value_as_double <
+              static_cast<double>(std::numeric_limits<std::int64_t>::max())) {
+        const auto as_integer{static_cast<std::int64_t>(value_as_double)};
+        if (value_as_double == static_cast<double>(as_integer)) {
+          return JSON{as_integer};
+        }
+      }
+
+      return JSON{value_as_double};
+    } catch (const DecimalParseError &) {
+      throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                           "Invalid !!float tag payload"};
+    }
   }
 
   auto parse_flow_mapping(const Token &start_token,

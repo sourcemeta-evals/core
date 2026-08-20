@@ -762,3 +762,36 @@ TEST(YAML_parse, yaml_directive_empty_minor_throws) {
   EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML 1.\n---\nfoo"),
                sourcemeta::core::YAMLParseError);
 }
+
+TEST(YAML_parse,
+     adversarial_incompatible_yaml_major_version_throws_YAMLParseError) {
+  EXPECT_THROW(
+      sourcemeta::core::parse_yaml("%YAML 99999999999999999999.0\n---\nfoo"),
+      sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse,
+     adversarial_nonnumeric_yaml_minor_version_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML 1.abc\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, adversarial_invalid_hex_escape_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uZZZZ\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, adversarial_truncated_hex_escape_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\u12\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, adversarial_overlong_unicode_escape_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\U00110000\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, adversarial_invalid_float_tag_payload_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!float abc"),
+               sourcemeta::core::YAMLParseError);
+}
