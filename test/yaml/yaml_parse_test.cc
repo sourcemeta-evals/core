@@ -702,11 +702,17 @@ TEST(YAML_parse, explicit_bool_tag_valid_spellings_resolve_correctly) {
             sourcemeta::core::JSON{false});
 }
 
-TEST(YAML_parse, explicit_bool_tag_invalid_payload_throws_YAMLParseError) {
+TEST(YAML_parse, explicit_bool_tag_rejects_lowercase_maybe) {
   EXPECT_THROW(sourcemeta::core::parse_yaml("!!bool maybe"),
                sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, explicit_bool_tag_rejects_yaml_1_1_yes) {
   EXPECT_THROW(sourcemeta::core::parse_yaml("!!bool yes"),
                sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, explicit_bool_tag_rejects_numeric_literal) {
   EXPECT_THROW(sourcemeta::core::parse_yaml("!!bool 1"),
                sourcemeta::core::YAMLParseError);
 }
