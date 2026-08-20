@@ -617,7 +617,12 @@ private:
         return JSON{std::string{value}};
       }
       if (tag_value == "tag:yaml.org,2002:null") {
-        return JSON{nullptr};
+        if (value.empty() || value == "~" || value == "null" ||
+            value == "Null" || value == "NULL") {
+          return JSON{nullptr};
+        }
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Invalid !!null tag payload"};
       }
       if (tag_value == "tag:yaml.org,2002:bool") {
         if (value == "true" || value == "True" || value == "TRUE") {
@@ -761,8 +766,15 @@ private:
 
   auto parse_integer(const std::string_view value) -> JSON {
     const auto result{to_int64_t(std::string{value})};
-    return result.has_value() ? JSON{result.value()}
-                              : JSON{Decimal{std::string{value}}};
+    if (result.has_value()) {
+      return JSON{result.value()};
+    }
+    try {
+      return JSON{Decimal{std::string{value}}};
+    } catch (const DecimalParseError &) {
+      throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                           "Invalid !!int tag payload"};
+    }
   }
 
   auto parse_base_integer(const std::string_view value, const int base)

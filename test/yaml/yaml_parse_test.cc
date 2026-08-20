@@ -795,3 +795,46 @@ TEST(YAML_parse, adversarial_invalid_float_tag_payload_throws_YAMLParseError) {
   EXPECT_THROW(sourcemeta::core::parse_yaml("!!float abc"),
                sourcemeta::core::YAMLParseError);
 }
+
+TEST(YAML_parse, explicit_null_tag_empty_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null").is_null());
+}
+
+TEST(YAML_parse, explicit_null_tag_tilde_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null ~").is_null());
+}
+
+TEST(YAML_parse, explicit_null_tag_lowercase_null_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null null").is_null());
+}
+
+TEST(YAML_parse, explicit_null_tag_titlecase_null_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null Null").is_null());
+}
+
+TEST(YAML_parse, explicit_null_tag_uppercase_null_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null NULL").is_null());
+}
+
+TEST(YAML_parse,
+     explicit_null_tag_rejects_lowercase_arbitrary_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!null arbitrary"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse,
+     explicit_null_tag_rejects_numeric_literal_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!null 1"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, explicit_null_tag_rejects_false_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!null false"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse,
+     explicit_int_tag_rejects_nonnumeric_payload_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!int abc"),
+               sourcemeta::core::YAMLParseError);
+}
