@@ -139,6 +139,8 @@ public:
     while (token.has_value() && token->type != TokenType::StreamEnd) {
       if (token->type == TokenType::DocumentStart) {
         this->tag_directives_.clear();
+        this->anchors_.clear();
+        saw_document_end = true;
         token = this->next_token();
         if (!token.has_value() || token->type == TokenType::StreamEnd) {
           return;
@@ -293,6 +295,8 @@ private:
           return iterator->second +
                  std::string{raw_tag.substr(second_bang + 1)};
         }
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Undefined tag shorthand"};
       }
     }
 

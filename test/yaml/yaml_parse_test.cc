@@ -838,3 +838,11 @@ TEST(YAML_parse,
   EXPECT_THROW(sourcemeta::core::parse_yaml("!!int abc"),
                sourcemeta::core::YAMLParseError);
 }
+
+TEST(
+    YAML_parse,
+    read_yaml_rejects_anchor_alias_across_document_boundary_throws_YAMLUnknownAnchorError) {
+  EXPECT_THROW(sourcemeta::core::read_yaml(std::filesystem::path{STUBS_PATH} /
+                                           "anchor_across_documents.yaml"),
+               sourcemeta::core::YAMLUnknownAnchorError);
+}
