@@ -721,3 +721,19 @@ TEST(YAML_parse, double_quoted_unpaired_high_surrogate_throws_YAMLParseError) {
   EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uD800\\u0041\""),
                sourcemeta::core::YAMLParseError);
 }
+
+TEST(YAML_parse, yaml_1_1_yes_remains_string_under_yaml_1_2) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("yes"), sourcemeta::core::JSON{"yes"});
+}
+
+TEST(YAML_parse, yaml_1_1_no_remains_string_under_yaml_1_2) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("no"), sourcemeta::core::JSON{"no"});
+}
+
+TEST(YAML_parse, yaml_1_1_on_remains_string_under_yaml_1_2) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("on"), sourcemeta::core::JSON{"on"});
+}
+
+TEST(YAML_parse, yaml_1_1_off_remains_string_under_yaml_1_2) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("off"), sourcemeta::core::JSON{"off"});
+}
