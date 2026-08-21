@@ -849,3 +849,33 @@ TEST(
                                            "anchor_across_documents.yaml"),
                sourcemeta::core::YAMLUnknownAnchorError);
 }
+
+TEST(YAML_parse, explicit_int_tag_on_octal_prefix_resolves_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int 0o17")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 15);
+}
+
+TEST(YAML_parse, explicit_int_tag_on_hex_prefix_resolves_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int 0x2A")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 42);
+}
+
+TEST(YAML_parse, explicit_int_tag_on_negative_hex_prefix_resolves_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int -0x2A")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), -42);
+}
+
+TEST(YAML_parse, explicit_int_tag_on_signed_octal_prefix_resolves_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int +0o17")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 15);
+}
+
+TEST(YAML_parse,
+     explicit_int_tag_on_hex_with_invalid_digit_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!int 0x1g"),
+               sourcemeta::core::YAMLParseError);
+}

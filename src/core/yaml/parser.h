@@ -769,6 +769,23 @@ private:
   }
 
   auto parse_integer(const std::string_view value) -> JSON {
+    std::size_t prefix_start{0};
+    if (!value.empty() && (value[0] == '+' || value[0] == '-')) {
+      prefix_start = 1;
+    }
+    if (value.size() > prefix_start + 2 && value[prefix_start] == '0') {
+      const char base_char{value[prefix_start + 1]};
+      if (base_char == 'o' || base_char == 'O' || base_char == 'x' ||
+          base_char == 'X') {
+        const int base{(base_char == 'o' || base_char == 'O') ? 8 : 16};
+        const auto base_result{this->parse_base_integer(value, base)};
+        if (base_result.is_integer()) {
+          return base_result;
+        }
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Invalid !!int tag payload"};
+      }
+    }
     const auto result{to_int64_t(std::string{value})};
     if (result.has_value()) {
       return JSON{result.value()};
@@ -1288,8 +1305,7 @@ private:
           result.assign(std::string{key}, JSON{nullptr});
           auto next_after_key{this->next_token()};
           if (!next_after_key.has_value()) {
-            throw YAMLParseError{this->lexer_->line(),
-                                 this->lexer_->column(),
+            throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
                                  "Unexpected end of input in block mapping"};
           }
           token = next_after_key.value();
