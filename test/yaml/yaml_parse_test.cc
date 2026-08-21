@@ -879,3 +879,13 @@ TEST(YAML_parse,
   EXPECT_THROW(sourcemeta::core::parse_yaml("!!int 0x1g"),
                sourcemeta::core::YAMLParseError);
 }
+
+TEST(YAML_parse, exponent_without_digits_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("1e"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, exponent_with_only_sign_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("1e+"),
+               sourcemeta::core::YAMLParseError);
+}

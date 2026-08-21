@@ -758,7 +758,12 @@ private:
     }
 
     if (has_exp) {
-      return JSON{Decimal{std::string{value}}};
+      try {
+        return JSON{Decimal{std::string{value}}};
+      } catch (const DecimalParseError &) {
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Invalid numeric scalar"};
+      }
     }
 
     if (has_dot) {
