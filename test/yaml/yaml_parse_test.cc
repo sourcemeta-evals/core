@@ -889,3 +889,24 @@ TEST(YAML_parse, exponent_with_only_sign_throws_YAMLParseError) {
   EXPECT_THROW(sourcemeta::core::parse_yaml("1e+"),
                sourcemeta::core::YAMLParseError);
 }
+
+TEST(YAML_parse, empty_input_error_reports_positive_line_and_column) {
+  try {
+    sourcemeta::core::parse_yaml("");
+    FAIL() << "Expected YAMLParseError";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    EXPECT_GE(error.line(), 1u);
+    EXPECT_GE(error.column(), 1u);
+  }
+}
+
+TEST(YAML_parse, blank_input_error_reports_positive_line_and_column) {
+  try {
+    sourcemeta::core::parse_yaml("    ");
+    FAIL() << "Expected YAMLParseError";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    EXPECT_GE(error.line(), 1u);
+    EXPECT_GE(error.column(), 1u);
+  }
+}
+
