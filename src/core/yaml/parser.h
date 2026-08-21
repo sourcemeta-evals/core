@@ -1171,7 +1171,10 @@ private:
 
       if (token.type == TokenType::BlockMappingKey) {
         auto next{this->next_token()};
-        assert(next.has_value());
+        if (!next.has_value()) {
+          throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                               "Unexpected end of input in block mapping"};
+        }
         token = next.value();
       }
 
@@ -1181,7 +1184,10 @@ private:
           explicit_key_anchor = std::string{token.value};
         }
         auto next{this->next_token()};
-        assert(next.has_value());
+        if (!next.has_value()) {
+          throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                               "Unexpected end of input in block mapping"};
+        }
         token = next.value();
       }
 
@@ -1281,7 +1287,11 @@ private:
           seen_keys.insert(key);
           result.assign(std::string{key}, JSON{nullptr});
           auto next_after_key{this->next_token()};
-          assert(next_after_key.has_value());
+          if (!next_after_key.has_value()) {
+            throw YAMLParseError{this->lexer_->line(),
+                                 this->lexer_->column(),
+                                 "Unexpected end of input in block mapping"};
+          }
           token = next_after_key.value();
           continue;
         }
