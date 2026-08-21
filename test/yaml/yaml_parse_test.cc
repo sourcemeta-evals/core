@@ -910,3 +910,13 @@ TEST(YAML_parse, blank_input_error_reports_positive_line_and_column) {
   }
 }
 
+TEST(YAML_parse, adversarial_overflow_hex_integer_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!int 0xFFFFFFFFFFFFFFFFFFFFFF"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse,
+     adversarial_unclosed_double_quoted_scalar_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"unclosed"),
+               sourcemeta::core::YAMLParseError);
+}
