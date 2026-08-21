@@ -534,12 +534,12 @@ TEST(YAML_parse, hex_scalar_trailing_invalid_digit_stays_string) {
   EXPECT_EQ(result, expected);
 }
 
-TEST(YAML_parse, unicode_escape_low_surrogate_boundary_rejected) {
+TEST(YAML_parse, unicode_escape_high_surrogate_boundary_rejected) {
   EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uD800\""),
                sourcemeta::core::YAMLParseError);
 }
 
-TEST(YAML_parse, unicode_escape_high_surrogate_boundary_rejected) {
+TEST(YAML_parse, unicode_escape_low_surrogate_boundary_rejected) {
   EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uDFFF\""),
                sourcemeta::core::YAMLParseError);
 }
@@ -551,17 +551,20 @@ TEST(YAML_parse, unicode_escape_above_max_codepoint_rejected) {
 
 TEST(YAML_parse, unicode_escape_below_surrogate_range_accepted) {
   const auto result{sourcemeta::core::parse_yaml("\"\\uD7FF\"")};
-  EXPECT_TRUE(result.is_string());
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string().size(), 3u);
 }
 
 TEST(YAML_parse, unicode_escape_above_surrogate_range_accepted) {
   const auto result{sourcemeta::core::parse_yaml("\"\\uE000\"")};
-  EXPECT_TRUE(result.is_string());
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string().size(), 3u);
 }
 
 TEST(YAML_parse, unicode_escape_max_codepoint_accepted) {
   const auto result{sourcemeta::core::parse_yaml("\"\\U0010FFFF\"")};
-  EXPECT_TRUE(result.is_string());
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string().size(), 4u);
 }
 
 TEST(YAML_parse, multi_document_stream_mixed_scalar_types) {
