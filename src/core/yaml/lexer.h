@@ -817,6 +817,11 @@ private:
                            "Invalid hex escape sequence"};
     }
 
+    if (codepoint > 0x10FFFF || (codepoint >= 0xD800 && codepoint <= 0xDFFF)) {
+      throw YAMLParseError{this->line_, this->column_,
+                           "Escape sequence is not a valid Unicode scalar"};
+    }
+
     return this->codepoint_to_utf8(static_cast<std::uint32_t>(codepoint));
   }
 
