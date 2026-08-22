@@ -938,3 +938,18 @@ TEST(YAML_parse, mixed_case_null_token_remains_string) {
   ASSERT_TRUE(result.is_string());
   EXPECT_EQ(result.to_string(), "nUlL");
 }
+
+TEST(YAML_parse,
+     read_yaml_trailing_malformed_reports_file_relative_line) {
+  try {
+    sourcemeta::core::read_yaml(std::filesystem::path{STUBS_PATH} /
+                                "malformed_trailing.yaml");
+    FAIL() << "Expected YAMLParseError on malformed trailing content";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    // Line must be relative to the full file. The malformed content
+    // begins at line 3 after `foo\n---\n`, so a reparsed-slice
+    // implementation that treats the trailing content as a new
+    // parse would report line 1 and fail this check.
+    EXPECT_GE(error.line(), 2u);
+  }
+}
