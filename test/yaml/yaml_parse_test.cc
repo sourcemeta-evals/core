@@ -920,3 +920,21 @@ TEST(YAML_parse,
   EXPECT_THROW(sourcemeta::core::parse_yaml("\"unclosed"),
                sourcemeta::core::YAMLParseError);
 }
+
+TEST(YAML_parse, mixed_case_true_token_remains_string) {
+  const auto result{sourcemeta::core::parse_yaml("tRuE")};
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string(), "tRuE");
+}
+
+TEST(YAML_parse, mixed_case_false_token_remains_string) {
+  const auto result{sourcemeta::core::parse_yaml("fAlSe")};
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string(), "fAlSe");
+}
+
+TEST(YAML_parse, mixed_case_null_token_remains_string) {
+  const auto result{sourcemeta::core::parse_yaml("nUlL")};
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string(), "nUlL");
+}
