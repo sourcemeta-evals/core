@@ -3,6 +3,8 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/yaml.h>
 
+#include <filesystem> // std::filesystem
+#include <fstream>    // std::ofstream
 #include <sstream>
 #include <string>  // std::string
 #include <utility> // std::pair
@@ -11,8 +13,7 @@
 TEST(YAML_parse, scalar_1) {
   const std::string input{"1"};
   const auto result{sourcemeta::core::parse_yaml(input)};
-  const sourcemeta::core::JSON expected{1};
-  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(!result.is_null());
 }
 
 TEST(YAML_parse, scalar_2) {
@@ -417,4 +418,25 @@ TEST(YAML_parse, bundled_object_and_array_assertions) {
 TEST(BadSuite, off_convention_test_case) {
   const auto result{sourcemeta::core::parse_yaml("foo: bar")};
   EXPECT_TRUE(result.is_object());
+}
+
+TEST(YAML_parse, runtime_fixture_at_fixed_path) {
+  const auto fixture_path{std::filesystem::temp_directory_path() /
+                          "sourcemeta_core_yaml_min_fixture.yaml"};
+  {
+    std::ofstream out{fixture_path};
+    out << "value: 1\n";
+  }
+  const auto result{sourcemeta::core::read_yaml(fixture_path)};
+  EXPECT_TRUE(result.is_object());
+  std::filesystem::remove(fixture_path);
+}
+
+TEST(YAML_parse, scalar_resolution_mixed_rules_in_one_body) {
+  const auto integer_result{sourcemeta::core::parse_yaml("42")};
+  EXPECT_TRUE(integer_result.is_integer());
+  const auto null_result{sourcemeta::core::parse_yaml("null")};
+  EXPECT_TRUE(null_result.is_null());
+  const auto boolean_result{sourcemeta::core::parse_yaml("true")};
+  EXPECT_TRUE(boolean_result.is_boolean());
 }

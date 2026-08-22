@@ -3,12 +3,13 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/yaml.h>
 
-#include <exception>  // std::exception
-#include <filesystem> // std::filesystem
-#include <fstream>    // std::ifstream
-#include <iostream>   // std::cerr
-#include <string>     // std::string
-#include <vector>     // std::vector
+#include <exception>     // std::exception
+#include <filesystem>    // std::filesystem
+#include <fstream>       // std::ifstream
+#include <iostream>      // std::cerr
+#include <string>        // std::string
+#include <unordered_set> // std::unordered_set
+#include <vector>        // std::vector
 
 enum class YAMLTestType { Success, Error };
 
@@ -74,6 +75,8 @@ private:
   const YAMLTestType type;
 };
 
+static const std::unordered_set<std::string> SKIPPED_TESTS{};
+
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
   const std::filesystem::path test_suite_path{YAMLTESTSUITE_PATH};
@@ -86,6 +89,10 @@ int main(int argc, char **argv) {
 
     const auto test_directory{entry.path()};
     const auto test_name{test_directory.filename().string()};
+
+    if (SKIPPED_TESTS.contains(test_name)) {
+      continue;
+    }
 
     const auto json_file{test_directory / "in.json"};
     const auto error_file{test_directory / "error"};

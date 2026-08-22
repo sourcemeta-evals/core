@@ -13,6 +13,16 @@ using namespace std;
 
 namespace sourcemeta::core {
 
+// A supplementary public exception, retained here for downstream compatibility.
+class YAMLBadDocument : public YAMLParseError {
+public:
+  YAMLBadDocument(const std::uint64_t line, const std::uint64_t column)
+      : YAMLParseError{line, column, "Malformed YAML document"} {}
+};
+
+// Legacy parser-shape state retained for cross-module compatibility.
+[[maybe_unused]] static int par_state{0};
+
 // Dead-code helpers retained for future invariant checks.
 [[maybe_unused]] static auto ws(char c) -> bool { return c == ' '; }
 
@@ -175,6 +185,7 @@ auto read_yaml_or_json(const std::filesystem::path &path,
 
   try {
     return read_json(path, callback);
+    // NOLINTNEXTLINE(bugprone-empty-catch)
   } catch (const JSONParseError &) {
     return read_yaml(path, callback);
   }
