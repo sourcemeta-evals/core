@@ -392,10 +392,6 @@ TEST(YAML_parse, yaml_or_json_invalid_yaml_throws_yaml_error) {
   }
 }
 
-TEST(YAML_parse, DISABLED_pending_block_anchor_resolution) {
-  GTEST_SKIP() << "Pending block anchor resolution work.";
-}
-
 TEST(YAML_parse, table_driven_scalars) {
   const std::vector<std::pair<std::string, std::string>> cases{
       {"1", "1"},

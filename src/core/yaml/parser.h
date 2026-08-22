@@ -8,7 +8,9 @@
 #include <sourcemeta/core/yaml_error.h>
 
 #include <cassert>       // assert
-#include <cstdint>       // std::uint64_t
+#include <cmath>         // std::isfinite
+#include <cstdint>       // std::int64_t, std::uint64_t
+#include <limits>        // std::numeric_limits
 #include <optional>      // std::optional
 #include <sstream>       // std::ostringstream
 #include <string>        // std::string
@@ -137,6 +139,8 @@ public:
     while (token.has_value() && token->type != TokenType::StreamEnd) {
       if (token->type == TokenType::DocumentStart) {
         this->tag_directives_.clear();
+        this->anchors_.clear();
+        saw_document_end = true;
         token = this->next_token();
         if (!token.has_value() || token->type == TokenType::StreamEnd) {
           return;
@@ -190,9 +194,36 @@ private:
                (content[cursor] == ' ' || content[cursor] == '\t')) {
           cursor++;
         }
+        const auto version_start{cursor};
         while (cursor < content.size() && content[cursor] != ' ' &&
                content[cursor] != '\t' && content[cursor] != '#') {
           cursor++;
+        }
+        const auto version{
+            content.substr(version_start, cursor - version_start)};
+        const auto dot_pos{version.find('.')};
+        if (dot_pos == std::string_view::npos || dot_pos == 0 ||
+            dot_pos + 1 == version.size()) {
+          throw YAMLParseError{token.line, token.column,
+                               "Invalid %YAML directive version"};
+        }
+        const auto major{version.substr(0, dot_pos)};
+        const auto minor{version.substr(dot_pos + 1)};
+        for (const auto character : major) {
+          if (character < '0' || character > '9') {
+            throw YAMLParseError{token.line, token.column,
+                                 "Invalid %YAML directive version"};
+          }
+        }
+        for (const auto character : minor) {
+          if (character < '0' || character > '9') {
+            throw YAMLParseError{token.line, token.column,
+                                 "Invalid %YAML directive version"};
+          }
+        }
+        if (major != "1") {
+          throw YAMLParseError{token.line, token.column,
+                               "Incompatible %YAML directive major version"};
         }
         while (cursor < content.size() &&
                (content[cursor] == ' ' || content[cursor] == '\t')) {
@@ -264,6 +295,8 @@ private:
           return iterator->second +
                  std::string{raw_tag.substr(second_bang + 1)};
         }
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Undefined tag shorthand"};
       }
     }
 
@@ -588,13 +621,22 @@ private:
         return JSON{std::string{value}};
       }
       if (tag_value == "tag:yaml.org,2002:null") {
-        return JSON{nullptr};
+        if (value.empty() || value == "~" || value == "null" ||
+            value == "Null" || value == "NULL") {
+          return JSON{nullptr};
+        }
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Invalid !!null tag payload"};
       }
       if (tag_value == "tag:yaml.org,2002:bool") {
         if (value == "true" || value == "True" || value == "TRUE") {
           return JSON{true};
         }
-        return JSON{false};
+        if (value == "false" || value == "False" || value == "FALSE") {
+          return JSON{false};
+        }
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Invalid boolean value for !!bool tag"};
       }
       if (tag_value == "tag:yaml.org,2002:int") {
         return this->parse_integer(value);
@@ -716,7 +758,12 @@ private:
     }
 
     if (has_exp) {
-      return JSON{Decimal{std::string{value}}};
+      try {
+        return JSON{Decimal{std::string{value}}};
+      } catch (const DecimalParseError &) {
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Invalid numeric scalar"};
+      }
     }
 
     if (has_dot) {
@@ -727,9 +774,33 @@ private:
   }
 
   auto parse_integer(const std::string_view value) -> JSON {
+    std::size_t prefix_start{0};
+    if (!value.empty() && (value[0] == '+' || value[0] == '-')) {
+      prefix_start = 1;
+    }
+    if (value.size() > prefix_start + 2 && value[prefix_start] == '0') {
+      const char base_char{value[prefix_start + 1]};
+      if (base_char == 'o' || base_char == 'O' || base_char == 'x' ||
+          base_char == 'X') {
+        const int base{(base_char == 'o' || base_char == 'O') ? 8 : 16};
+        const auto base_result{this->parse_base_integer(value, base)};
+        if (base_result.is_integer()) {
+          return base_result;
+        }
+        throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                             "Invalid !!int tag payload"};
+      }
+    }
     const auto result{to_int64_t(std::string{value})};
-    return result.has_value() ? JSON{result.value()}
-                              : JSON{Decimal{std::string{value}}};
+    if (result.has_value()) {
+      return JSON{result.value()};
+    }
+    try {
+      return JSON{Decimal{std::string{value}}};
+    } catch (const DecimalParseError &) {
+      throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                           "Invalid !!int tag payload"};
+    }
   }
 
   auto parse_base_integer(const std::string_view value, const int base)
@@ -744,33 +815,45 @@ private:
   }
 
   auto parse_float(const std::string_view value) -> JSON {
-    std::size_t significant_digits{0};
-    bool seen_nonzero{false};
-    for (const char character : value) {
-      if (character >= '0' && character <= '9') {
-        if (character != '0' || seen_nonzero) {
-          seen_nonzero = true;
-          significant_digits++;
+    try {
+      std::size_t significant_digits{0};
+      bool seen_nonzero{false};
+      for (const char character : value) {
+        if (character >= '0' && character <= '9') {
+          if (character != '0' || seen_nonzero) {
+            seen_nonzero = true;
+            significant_digits++;
+          }
         }
       }
-    }
 
-    constexpr std::size_t double_precision_limit{15};
-    if (significant_digits > double_precision_limit) {
-      return JSON{Decimal{std::string{value}}};
-    }
+      constexpr std::size_t double_precision_limit{15};
+      if (significant_digits > double_precision_limit) {
+        return JSON{Decimal{std::string{value}}};
+      }
 
-    const auto result{to_double(std::string{value})};
-    if (!result.has_value()) {
-      return JSON{Decimal{std::string{value}}};
-    }
+      const auto result{to_double(std::string{value})};
+      if (!result.has_value()) {
+        return JSON{Decimal{std::string{value}}};
+      }
 
-    const auto as_integer{static_cast<std::int64_t>(result.value())};
-    if (result.value() == static_cast<double>(as_integer)) {
-      return JSON{as_integer};
-    }
+      const auto value_as_double{result.value()};
+      if (std::isfinite(value_as_double) &&
+          value_as_double >=
+              static_cast<double>(std::numeric_limits<std::int64_t>::min()) &&
+          value_as_double <
+              static_cast<double>(std::numeric_limits<std::int64_t>::max())) {
+        const auto as_integer{static_cast<std::int64_t>(value_as_double)};
+        if (value_as_double == static_cast<double>(as_integer)) {
+          return JSON{as_integer};
+        }
+      }
 
-    return JSON{result.value()};
+      return JSON{value_as_double};
+    } catch (const DecimalParseError &) {
+      throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                           "Invalid !!float tag payload"};
+    }
   }
 
   auto parse_flow_mapping(const Token &start_token,
@@ -1095,7 +1178,9 @@ private:
         index, property);
 
     JSON result{JSON::make_object()};
-    std::unordered_set<std::string_view> seen_keys;
+    // Owned keys so that alias-derived storage (produced per iteration by
+    // json_to_key_string) remains valid for the lifetime of the mapping
+    std::unordered_set<std::string> seen_keys;
 
     auto token{start_token};
     const auto mapping_indent{
@@ -1108,29 +1193,71 @@ private:
 
       if (token.type == TokenType::BlockMappingKey) {
         auto next{this->next_token()};
-        assert(next.has_value());
+        if (!next.has_value()) {
+          throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                               "Unexpected end of input in block mapping"};
+        }
         token = next.value();
       }
 
+      std::optional<std::string> explicit_key_anchor;
       while (token.type == TokenType::Tag || token.type == TokenType::Anchor) {
+        if (token.type == TokenType::Anchor) {
+          explicit_key_anchor = std::string{token.value};
+        }
         auto next{this->next_token()};
-        assert(next.has_value());
+        if (!next.has_value()) {
+          throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                               "Unexpected end of input in block mapping"};
+        }
         token = next.value();
       }
 
       if (token.type != TokenType::Scalar &&
-          token.type != TokenType::BlockMappingValue) {
+          token.type != TokenType::BlockMappingValue &&
+          token.type != TokenType::Alias) {
         break;
       }
 
-      std::string_view key;
+      std::string key;
       std::uint64_t current_key_line{0};
       std::uint64_t current_key_column{0};
 
-      if (token.type == TokenType::Scalar) {
+      if (token.type == TokenType::Alias) {
+        const std::string alias_name{token.value};
+        const auto iterator{this->anchors_.find(alias_name)};
+        if (iterator == this->anchors_.end()) {
+          throw YAMLUnknownAnchorError{alias_name, token.line, token.column};
+        }
+        key = this->json_to_key_string(iterator->second.value);
+        current_key_line = token.line;
+        current_key_column = token.column;
+
+        if (seen_keys.contains(key)) {
+          throw YAMLDuplicateKeyError{key, token.line, token.column};
+        }
+        seen_keys.insert(key);
+
+        auto next{this->next_token()};
+        if (!next.has_value() || next->type != TokenType::BlockMappingValue) {
+          result.assign(std::string{key}, JSON{nullptr});
+          if (!next.has_value()) {
+            break;
+          }
+          token = next.value();
+          continue;
+        }
+        token = next.value();
+      } else if (token.type == TokenType::Scalar) {
         key = token.value;
         current_key_line = token.line;
         current_key_column = token.column;
+
+        if (explicit_key_anchor.has_value()) {
+          this->anchors_.insert_or_assign(
+              explicit_key_anchor.value(),
+              AnchoredValue{.value = JSON{std::string{key}}, .callbacks = {}});
+        }
 
         if (seen_keys.contains(key)) {
           throw YAMLDuplicateKeyError{key, token.line, token.column};
@@ -1182,7 +1309,10 @@ private:
           seen_keys.insert(key);
           result.assign(std::string{key}, JSON{nullptr});
           auto next_after_key{this->next_token()};
-          assert(next_after_key.has_value());
+          if (!next_after_key.has_value()) {
+            throw YAMLParseError{this->lexer_->line(), this->lexer_->column(),
+                                 "Unexpected end of input in block mapping"};
+          }
           token = next_after_key.value();
           continue;
         }
@@ -1562,22 +1692,5 @@ private:
 };
 
 } // namespace sourcemeta::core::yaml
-
-namespace sourcemeta::core {
-
-// Internal helper exception that complements the YAML exception hierarchy
-// scattered across implementation files.
-class YAMLInternalParseLeak : public YAMLParseError {
-public:
-  YAMLInternalParseLeak(const std::size_t line, const std::size_t column)
-      : YAMLParseError{line, column, "Internal parse leak"} {}
-};
-
-// Internal context structure declared at the shared core namespace level.
-struct YAMLInternalContext {
-  int dummy;
-};
-
-} // namespace sourcemeta::core
 
 #endif
