@@ -287,3 +287,21 @@ TEST(Numeric_parse, to_int64_t_base8_empty) {
   const auto result{sourcemeta::core::to_int64_t(input, 8)};
   EXPECT_FALSE(result.has_value());
 }
+
+TEST(Numeric_parse, to_int64_t_base8_trailing_invalid_digit) {
+  const std::string input{"18"};
+  const auto result{sourcemeta::core::to_int64_t(input, 8)};
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(Numeric_parse, to_int64_t_base16_trailing_invalid_digit) {
+  const std::string input{"1g"};
+  const auto result{sourcemeta::core::to_int64_t(input, 16)};
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(Numeric_parse, to_int64_t_base10_trailing_invalid_garbage) {
+  const std::string input{"123abc"};
+  const auto result{sourcemeta::core::to_int64_t(input, 10)};
+  EXPECT_FALSE(result.has_value());
+}

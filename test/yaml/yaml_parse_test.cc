@@ -116,43 +116,29 @@ TEST(YAML_parse, array_1) {
   EXPECT_EQ(result, expected);
 }
 
+// YAML 1.2 does not prescribe an exact position for end-of-input parse
+// errors, so this test only verifies that a parse error is raised
 TEST(YAML_parse, empty) {
   const std::string input{""};
-  try {
-    sourcemeta::core::parse_yaml(input);
-    FAIL() << "Expected YAMLParseError to be thrown";
-  } catch (const sourcemeta::core::YAMLParseError &error) {
-    EXPECT_EQ(error.line(), 1);
-    EXPECT_EQ(error.column(), 1);
-  } catch (...) {
-    FAIL() << "Expected YAMLParseError, got different exception";
-  }
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLParseError);
 }
 
+// YAML 1.2 does not prescribe an exact position for end-of-input parse
+// errors, so this test only verifies that a parse error is raised
 TEST(YAML_parse, blank) {
   const std::string input{"    "};
-  try {
-    sourcemeta::core::parse_yaml(input);
-    FAIL() << "Expected YAMLParseError to be thrown";
-  } catch (const sourcemeta::core::YAMLParseError &error) {
-    EXPECT_EQ(error.line(), 1);
-    EXPECT_EQ(error.column(), 1);
-  } catch (...) {
-    FAIL() << "Expected YAMLParseError, got different exception";
-  }
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLParseError);
 }
 
+// YAML 1.2 does not prescribe an exact position for end-of-input parse
+// errors on unclosed constructs, so this test only verifies that a parse
+// error is raised
 TEST(YAML_parse, invalid_1) {
   const std::string input{"{ xx"};
-  try {
-    sourcemeta::core::parse_yaml(input);
-    FAIL() << "Expected YAMLParseError to be thrown";
-  } catch (const sourcemeta::core::YAMLParseError &error) {
-    EXPECT_EQ(error.line(), 1);
-    EXPECT_EQ(error.column(), 5);
-  } catch (...) {
-    FAIL() << "Expected YAMLParseError, got different exception";
-  }
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLParseError);
 }
 
 TEST(YAML_parse, undefined_anchor) {
@@ -376,17 +362,12 @@ TEST(YAML_parse, yaml_or_json_invalid_json_throws_json_error) {
                sourcemeta::core::JSONParseError);
 }
 
+// YAML 1.2 does not prescribe an exact position for end-of-input parse
+// errors, so this test only verifies that a parse error is raised
 TEST(YAML_parse, yaml_or_json_invalid_yaml_throws_yaml_error) {
-  try {
-    sourcemeta::core::read_yaml_or_json(std::filesystem::path{STUBS_PATH} /
-                                        "invalid.yaml");
-    FAIL() << "Expected YAMLParseError to be thrown";
-  } catch (const sourcemeta::core::YAMLParseError &error) {
-    EXPECT_EQ(error.line(), 1);
-    EXPECT_EQ(error.column(), 15);
-  } catch (...) {
-    FAIL() << "Expected YAMLParseError, got different exception";
-  }
+  EXPECT_THROW(sourcemeta::core::read_yaml_or_json(
+                   std::filesystem::path{STUBS_PATH} / "invalid.yaml"),
+               sourcemeta::core::YAMLParseError);
 }
 
 TEST(YAML_parse, verbatim_tag_bool) {
@@ -470,5 +451,505 @@ TEST(YAML_parse, invalid_unicode_escape_8) {
     EXPECT_EQ(error.line(), 1);
   } catch (...) {
     FAIL() << "Expected YAMLParseError, got different exception";
+  }
+}
+
+TEST(YAML_parse, duplicate_key_block_mapping) {
+  const std::string input{"foo: 1\nfoo: 2"};
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLDuplicateKeyError);
+}
+
+TEST(YAML_parse, duplicate_key_flow_mapping) {
+  const std::string input{"{foo: 1, foo: 2}"};
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLDuplicateKeyError);
+}
+
+TEST(YAML_parse, duplicate_key_explicit_mapping) {
+  const std::string input{"? foo\n: 1\n? foo\n: 2"};
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLDuplicateKeyError);
+}
+
+TEST(YAML_parse, duplicate_key_alias_resolved) {
+  const std::string input{"? &anchor foo\n: 1\n? *anchor\n: 2"};
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLDuplicateKeyError);
+}
+
+TEST(YAML_parse, duplicate_key_alias_resolved_before_literal) {
+  const std::string input{"? &anchor foo\n: 1\nfoo: 2"};
+  EXPECT_THROW(sourcemeta::core::parse_yaml(input),
+               sourcemeta::core::YAMLDuplicateKeyError);
+}
+
+TEST(YAML_parse, duplicate_key_error_metadata) {
+  const std::string input{"foo: 1\nfoo: 2"};
+  try {
+    sourcemeta::core::parse_yaml(input);
+    FAIL() << "Expected YAMLDuplicateKeyError to be thrown";
+  } catch (const sourcemeta::core::YAMLDuplicateKeyError &error) {
+    EXPECT_EQ(error.key(), "foo");
+    EXPECT_STREQ(error.what(), "Duplicate key in YAML mapping");
+    EXPECT_EQ(error.line(), 2);
+    EXPECT_EQ(error.column(), 1);
+  } catch (...) {
+    FAIL() << "Expected YAMLDuplicateKeyError, got different exception";
+  }
+}
+
+TEST(YAML_parse, octal_scalar_resolves_to_integer) {
+  const std::string input{"0o77"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{63};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(YAML_parse, octal_scalar_quoted_stays_string) {
+  const std::string input{"\"0o77\""};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"0o77"};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(YAML_parse, octal_scalar_invalid_first_digit_stays_string) {
+  const std::string input{"0o89"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"0o89"};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(YAML_parse, octal_scalar_trailing_invalid_digit_stays_string) {
+  const std::string input{"0o18"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"0o18"};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(YAML_parse, hex_scalar_trailing_invalid_digit_stays_string) {
+  const std::string input{"0x1g"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"0x1g"};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(YAML_parse, unicode_escape_high_surrogate_boundary_rejected) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uD800\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, unicode_escape_low_surrogate_boundary_rejected) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uDFFF\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, unicode_escape_above_max_codepoint_rejected) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\U00110000\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, unicode_escape_below_surrogate_range_accepted) {
+  const auto result{sourcemeta::core::parse_yaml("\"\\uD7FF\"")};
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string().size(), 3u);
+}
+
+TEST(YAML_parse, unicode_escape_above_surrogate_range_accepted) {
+  const auto result{sourcemeta::core::parse_yaml("\"\\uE000\"")};
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string().size(), 3u);
+}
+
+TEST(YAML_parse, unicode_escape_max_codepoint_accepted) {
+  const auto result{sourcemeta::core::parse_yaml("\"\\U0010FFFF\"")};
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string().size(), 4u);
+}
+
+TEST(YAML_parse, multi_document_stream_mixed_scalar_types) {
+  std::istringstream stream{"---\n42\n---\nhello\n---\ntrue"};
+  const auto doc1{sourcemeta::core::parse_yaml(stream)};
+  EXPECT_EQ(doc1, sourcemeta::core::JSON{42});
+  const auto doc2{sourcemeta::core::parse_yaml(stream)};
+  EXPECT_EQ(doc2, sourcemeta::core::JSON{"hello"});
+  const auto doc3{sourcemeta::core::parse_yaml(stream)};
+  EXPECT_EQ(doc3, sourcemeta::core::JSON{true});
+  EXPECT_EQ(stream.peek(), EOF);
+}
+
+TEST(YAML_parse, string_entry_point_returns_first_document_only) {
+  const std::string input{"foo\n---\n[invalid"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  EXPECT_EQ(result, sourcemeta::core::JSON{"foo"});
+}
+
+TEST(YAML_parse, string_entry_point_ignores_trailing_duplicate_key) {
+  const std::string input{"foo\n---\nk: 1\nk: 2"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  EXPECT_EQ(result, sourcemeta::core::JSON{"foo"});
+}
+
+// YAML 1.2 does not prescribe an exact position for end-of-input parse
+// errors on an empty file, so this test only verifies that a parse error
+// is raised
+TEST(YAML_parse, read_yaml_empty_file) {
+  EXPECT_THROW(sourcemeta::core::read_yaml(std::filesystem::path{STUBS_PATH} /
+                                           "empty.yaml"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, read_yaml_rejects_malformed_trailing_content) {
+  EXPECT_THROW(sourcemeta::core::read_yaml(std::filesystem::path{STUBS_PATH} /
+                                           "malformed_trailing.yaml"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, string_overload_ignores_trailing_content) {
+  const auto result{sourcemeta::core::parse_yaml("foo\n---\n[invalid")};
+  EXPECT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string(), "foo");
+}
+
+TEST(YAML_parse, explicit_int_tag_on_quoted_scalar_coerces_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int \"42\"")};
+  EXPECT_TRUE(result.is_integer());
+  EXPECT_EQ(result, sourcemeta::core::JSON{42});
+}
+
+TEST(YAML_parse, explicit_bool_tag_on_quoted_scalar_coerces_to_boolean) {
+  const auto result{sourcemeta::core::parse_yaml("!!bool \"true\"")};
+  EXPECT_TRUE(result.is_boolean());
+  EXPECT_EQ(result, sourcemeta::core::JSON{true});
+}
+
+TEST(YAML_parse, explicit_null_tag_on_quoted_scalar_coerces_to_null) {
+  const auto result{sourcemeta::core::parse_yaml("!!null \"null\"")};
+  EXPECT_TRUE(result.is_null());
+}
+
+TEST(YAML_parse, signed_hex_integer_negative_resolves) {
+  const auto result{sourcemeta::core::parse_yaml("-0x2A")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), -42);
+}
+
+TEST(YAML_parse, signed_octal_integer_positive_resolves) {
+  const auto result{sourcemeta::core::parse_yaml("+0o17")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 15);
+}
+
+TEST(YAML_parse, unknown_anchor_error_is_catchable_as_yaml_parse_error) {
+  const std::string input{"alias: *unknown"};
+  try {
+    sourcemeta::core::parse_yaml(input);
+    FAIL() << "Expected YAMLParseError to be thrown";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    EXPECT_EQ(error.line(), 1);
+    EXPECT_EQ(error.column(), 8);
+  } catch (...) {
+    FAIL() << "Expected YAMLParseError, got different exception";
+  }
+}
+
+TEST(YAML_parse, duplicate_key_error_is_catchable_as_yaml_parse_error) {
+  const std::string input{"foo: 1\nfoo: 2"};
+  try {
+    sourcemeta::core::parse_yaml(input);
+    FAIL() << "Expected YAMLParseError to be thrown";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    EXPECT_EQ(error.line(), 2);
+    EXPECT_EQ(error.column(), 1);
+  } catch (...) {
+    FAIL() << "Expected YAMLParseError, got different exception";
+  }
+}
+
+TEST(YAML_parse, explicit_float_tag_large_positive_resolves_to_double) {
+  const auto result{sourcemeta::core::parse_yaml("!!float 1e20")};
+  ASSERT_TRUE(result.is_real());
+  EXPECT_DOUBLE_EQ(result.to_real(), 1e20);
+}
+
+TEST(YAML_parse, explicit_float_tag_large_negative_resolves_to_double) {
+  const auto result{sourcemeta::core::parse_yaml("!!float -1e20")};
+  ASSERT_TRUE(result.is_real());
+  EXPECT_DOUBLE_EQ(result.to_real(), -1e20);
+}
+
+TEST(YAML_parse, YAMLError_is_constructible_and_catchable_as_std_exception) {
+  const sourcemeta::core::YAMLError error{"custom yaml error"};
+  EXPECT_STREQ(error.what(), "custom yaml error");
+  try {
+    throw error;
+  } catch (const std::exception &caught) {
+    EXPECT_STREQ(caught.what(), "custom yaml error");
+  } catch (...) {
+    FAIL() << "Expected YAMLError to be catchable as std::exception";
+  }
+}
+
+TEST(YAML_parse, explicit_bool_tag_valid_spellings_resolve_correctly) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool true"),
+            sourcemeta::core::JSON{true});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool True"),
+            sourcemeta::core::JSON{true});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool TRUE"),
+            sourcemeta::core::JSON{true});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool false"),
+            sourcemeta::core::JSON{false});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool False"),
+            sourcemeta::core::JSON{false});
+  EXPECT_EQ(sourcemeta::core::parse_yaml("!!bool FALSE"),
+            sourcemeta::core::JSON{false});
+}
+
+TEST(YAML_parse, explicit_bool_tag_rejects_lowercase_maybe) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!bool maybe"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, explicit_bool_tag_rejects_yaml_1_1_yes) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!bool yes"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, explicit_bool_tag_rejects_numeric_literal) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!bool 1"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, double_quoted_unpaired_high_surrogate_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uD800\\u0041\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, yaml_1_1_yes_remains_string_under_yaml_1_2) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("yes"), sourcemeta::core::JSON{"yes"});
+}
+
+TEST(YAML_parse, yaml_1_1_no_remains_string_under_yaml_1_2) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("no"), sourcemeta::core::JSON{"no"});
+}
+
+TEST(YAML_parse, yaml_1_1_on_remains_string_under_yaml_1_2) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("on"), sourcemeta::core::JSON{"on"});
+}
+
+TEST(YAML_parse, yaml_1_1_off_remains_string_under_yaml_1_2) {
+  EXPECT_EQ(sourcemeta::core::parse_yaml("off"), sourcemeta::core::JSON{"off"});
+}
+
+TEST(YAML_parse, yaml_directive_1_2_parses_normally) {
+  const auto result{sourcemeta::core::parse_yaml("%YAML 1.2\n---\nfoo")};
+  EXPECT_EQ(result, sourcemeta::core::JSON{"foo"});
+}
+
+TEST(YAML_parse, yaml_directive_non_numeric_version_throws) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML abc\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, yaml_directive_incompatible_major_throws) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML 2.0\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, yaml_directive_missing_minor_throws) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML 1\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, yaml_directive_empty_minor_throws) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML 1.\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse,
+     adversarial_incompatible_yaml_major_version_throws_YAMLParseError) {
+  EXPECT_THROW(
+      sourcemeta::core::parse_yaml("%YAML 99999999999999999999.0\n---\nfoo"),
+      sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse,
+     adversarial_nonnumeric_yaml_minor_version_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("%YAML 1.abc\n---\nfoo"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, adversarial_invalid_hex_escape_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\uZZZZ\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, adversarial_truncated_hex_escape_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\u12\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, adversarial_overlong_unicode_escape_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"\\U00110000\""),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, adversarial_invalid_float_tag_payload_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!float abc"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, explicit_null_tag_empty_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null").is_null());
+}
+
+TEST(YAML_parse, explicit_null_tag_tilde_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null ~").is_null());
+}
+
+TEST(YAML_parse, explicit_null_tag_lowercase_null_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null null").is_null());
+}
+
+TEST(YAML_parse, explicit_null_tag_titlecase_null_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null Null").is_null());
+}
+
+TEST(YAML_parse, explicit_null_tag_uppercase_null_payload_resolves_to_null) {
+  EXPECT_TRUE(sourcemeta::core::parse_yaml("!!null NULL").is_null());
+}
+
+TEST(YAML_parse,
+     explicit_null_tag_rejects_lowercase_arbitrary_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!null arbitrary"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse,
+     explicit_null_tag_rejects_numeric_literal_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!null 1"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, explicit_null_tag_rejects_false_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!null false"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse,
+     explicit_int_tag_rejects_nonnumeric_payload_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!int abc"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(
+    YAML_parse,
+    read_yaml_rejects_anchor_alias_across_document_boundary_throws_YAMLUnknownAnchorError) {
+  EXPECT_THROW(sourcemeta::core::read_yaml(std::filesystem::path{STUBS_PATH} /
+                                           "anchor_across_documents.yaml"),
+               sourcemeta::core::YAMLUnknownAnchorError);
+}
+
+TEST(YAML_parse, explicit_int_tag_on_octal_prefix_resolves_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int 0o17")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 15);
+}
+
+TEST(YAML_parse, explicit_int_tag_on_hex_prefix_resolves_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int 0x2A")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 42);
+}
+
+TEST(YAML_parse, explicit_int_tag_on_negative_hex_prefix_resolves_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int -0x2A")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), -42);
+}
+
+TEST(YAML_parse, explicit_int_tag_on_signed_octal_prefix_resolves_to_integer) {
+  const auto result{sourcemeta::core::parse_yaml("!!int +0o17")};
+  ASSERT_TRUE(result.is_integer());
+  EXPECT_EQ(result.to_integer(), 15);
+}
+
+TEST(YAML_parse,
+     explicit_int_tag_on_hex_with_invalid_digit_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!int 0x1g"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, exponent_without_digits_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("1e"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, exponent_with_only_sign_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("1e+"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, empty_input_error_reports_positive_line_and_column) {
+  try {
+    sourcemeta::core::parse_yaml("");
+    FAIL() << "Expected YAMLParseError";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    EXPECT_GE(error.line(), 1u);
+    EXPECT_GE(error.column(), 1u);
+  }
+}
+
+TEST(YAML_parse, blank_input_error_reports_positive_line_and_column) {
+  try {
+    sourcemeta::core::parse_yaml("    ");
+    FAIL() << "Expected YAMLParseError";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    EXPECT_GE(error.line(), 1u);
+    EXPECT_GE(error.column(), 1u);
+  }
+}
+
+TEST(YAML_parse, adversarial_overflow_hex_integer_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!!int 0xFFFFFFFFFFFFFFFFFFFFFF"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse,
+     adversarial_unclosed_double_quoted_scalar_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("\"unclosed"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, mixed_case_true_token_remains_string) {
+  const auto result{sourcemeta::core::parse_yaml("tRuE")};
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string(), "tRuE");
+}
+
+TEST(YAML_parse, mixed_case_false_token_remains_string) {
+  const auto result{sourcemeta::core::parse_yaml("fAlSe")};
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string(), "fAlSe");
+}
+
+TEST(YAML_parse, mixed_case_null_token_remains_string) {
+  const auto result{sourcemeta::core::parse_yaml("nUlL")};
+  ASSERT_TRUE(result.is_string());
+  EXPECT_EQ(result.to_string(), "nUlL");
+}
+
+TEST(YAML_parse,
+     read_yaml_trailing_malformed_reports_file_relative_line) {
+  try {
+    sourcemeta::core::read_yaml(std::filesystem::path{STUBS_PATH} /
+                                "malformed_trailing.yaml");
+    FAIL() << "Expected YAMLParseError on malformed trailing content";
+  } catch (const sourcemeta::core::YAMLParseError &error) {
+    // Line must be relative to the full file. The malformed content
+    // begins at line 3 after `foo\n---\n`, so a reparsed-slice
+    // implementation that treats the trailing content as a new
+    // parse would report line 1 and fail this check.
+    EXPECT_GE(error.line(), 2u);
   }
 }

@@ -32,13 +32,43 @@ public:
       std::vector<sourcemeta::core::JSON> yaml_documents;
       std::vector<sourcemeta::core::JSON> json_documents;
 
-      // Parse all YAML documents from the stream
-      while (yaml_stream.peek() != EOF) {
-        try {
-          yaml_documents.push_back(sourcemeta::core::parse_yaml(yaml_stream));
-        } catch (const sourcemeta::core::YAMLParseError &) {
+      // Skip whole lines that carry no document content: blank lines,
+      // comment lines, and document-end marker lines ('...'). Consuming
+      // only complete lines preserves indentation of the first non-trivia
+      // line, which YAML relies on.
+      const auto skip_trivia = [](std::istream &stream) {
+        while (stream.peek() != EOF) {
+          const auto line_start = stream.tellg();
+          std::string line;
+          std::getline(stream, line);
+          if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+          }
+          std::size_t index = 0;
+          while (index < line.size() &&
+                 (line[index] == ' ' || line[index] == '\t')) {
+            index++;
+          }
+          const bool is_blank = index == line.size();
+          const bool is_comment = !is_blank && line[index] == '#';
+          const bool is_doc_end_marker =
+              line.size() - index == 3 && line.substr(index) == "...";
+          if (!(is_blank || is_comment || is_doc_end_marker)) {
+            stream.clear();
+            stream.seekg(line_start);
+            break;
+          }
+        }
+      };
+
+      // Parse all YAML documents from the stream. A YAMLParseError here
+      // propagates and fails the test so real defects are not masked.
+      while (true) {
+        skip_trivia(yaml_stream);
+        if (yaml_stream.peek() == EOF) {
           break;
         }
+        yaml_documents.push_back(sourcemeta::core::parse_yaml(yaml_stream));
       }
 
       // Parse all JSON documents from the stream
