@@ -939,8 +939,7 @@ TEST(YAML_parse, mixed_case_null_token_remains_string) {
   EXPECT_EQ(result.to_string(), "nUlL");
 }
 
-TEST(YAML_parse,
-     read_yaml_trailing_malformed_reports_file_relative_line) {
+TEST(YAML_parse, read_yaml_trailing_malformed_reports_file_relative_line) {
   try {
     sourcemeta::core::read_yaml(std::filesystem::path{STUBS_PATH} /
                                 "malformed_trailing.yaml");
