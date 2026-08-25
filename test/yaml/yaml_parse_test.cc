@@ -952,3 +952,13 @@ TEST(YAML_parse, read_yaml_trailing_malformed_reports_file_relative_line) {
     EXPECT_GE(error.line(), 2u);
   }
 }
+
+TEST(YAML_parse, verbatim_tag_missing_closing_bracket_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!<tag:yaml.org,2002:str"),
+               sourcemeta::core::YAMLParseError);
+}
+
+TEST(YAML_parse, verbatim_tag_empty_body_throws_YAMLParseError) {
+  EXPECT_THROW(sourcemeta::core::parse_yaml("!<> value"),
+               sourcemeta::core::YAMLParseError);
+}
