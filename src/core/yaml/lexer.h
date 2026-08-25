@@ -439,12 +439,19 @@ private:
 
     if (this->peek() == '<') {
       this->advance(1);
+      const auto body_start{this->position_};
       while (this->position_ < this->input_.size() && this->peek() != '>') {
         this->advance(1);
       }
-      if (this->peek() == '>') {
-        this->advance(1);
+      if (this->position_ >= this->input_.size() || this->peek() != '>') {
+        throw YAMLParseError{start_line, start_column,
+                             "Verbatim tag missing closing '>'"};
       }
+      if (this->position_ == body_start) {
+        throw YAMLParseError{start_line, start_column,
+                             "Verbatim tag has empty body"};
+      }
+      this->advance(1);
     } else {
       while (this->position_ < this->input_.size()) {
         const char current{this->peek()};
