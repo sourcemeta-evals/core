@@ -3713,3 +3713,48 @@ TEST(Numeric_decimal, is_integer_implies_is_integral) {
   EXPECT_TRUE(value.is_integer());
   EXPECT_TRUE(value.is_integral());
 }
+
+TEST(Numeric_decimal, parse_long_integer_literal_preserves_ordering) {
+  const std::string shorter(2000, '1');
+  std::string longer(2001, '1');
+  EXPECT_TRUE(sourcemeta::core::Decimal{shorter} <
+              sourcemeta::core::Decimal{longer});
+}
+
+TEST(Numeric_decimal, reduce_multi_limb_preserves_value) {
+  const sourcemeta::core::Decimal original{"2000000000000000010"};
+  const auto reduced{original.reduce()};
+  EXPECT_EQ(reduced, original);
+}
+
+TEST(Numeric_decimal,
+     multiply_negative_zero_by_positive_preserves_negative_sign) {
+  const auto negative_zero{-sourcemeta::core::Decimal{0}};
+  const auto result{negative_zero * sourcemeta::core::Decimal{1}};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(Numeric_decimal,
+     multiply_positive_by_negative_zero_produces_negative_zero) {
+  const auto result{sourcemeta::core::Decimal{1} *
+                    (-sourcemeta::core::Decimal{0})};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(Numeric_decimal,
+     multiply_negative_zero_by_negative_produces_positive_zero) {
+  const auto result{(-sourcemeta::core::Decimal{0}) *
+                    (-sourcemeta::core::Decimal{1})};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+}
+
+TEST(Numeric_decimal,
+     divide_negative_zero_by_positive_preserves_negative_sign) {
+  const auto negative_zero{-sourcemeta::core::Decimal{0}};
+  const auto result{negative_zero / sourcemeta::core::Decimal{1}};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}

@@ -11,6 +11,7 @@
 #include <cstring>   // std::strlen
 #include <iomanip>   // std::setprecision
 #include <limits>    // std::numeric_limits
+#include <optional>  // std::optional, std::nullopt
 #include <sstream>   // std::ostringstream
 #include <stdexcept> // std::out_of_range
 #include <string>    // std::string, std::stof, std::stod
@@ -77,8 +78,9 @@ auto parse_digit_payload(const char *cursor, std::size_t count)
   return payload;
 }
 
-auto parse_special(const char *input, std::size_t length) -> ParsedDecimal * {
-  static ParsedDecimal result;
+auto parse_special(const char *input, std::size_t length)
+    -> std::optional<ParsedDecimal> {
+  ParsedDecimal result{};
   const char *cursor = input;
   std::uint8_t sign_flag = 0;
 
@@ -99,7 +101,7 @@ auto parse_special(const char *input, std::size_t length) -> ParsedDecimal * {
     result.exponent = 0;
     result.coefficient_high = 0;
     result.coefficient = parse_digit_payload(cursor + 3, remaining - 3);
-    return &result;
+    return result;
   }
 
   if (remaining >= 4 && (cursor[0] == 's' || cursor[0] == 'S') &&
@@ -110,7 +112,7 @@ auto parse_special(const char *input, std::size_t length) -> ParsedDecimal * {
     result.exponent = 0;
     result.coefficient_high = 0;
     result.coefficient = parse_digit_payload(cursor + 4, remaining - 4);
-    return &result;
+    return result;
   }
 
   if (remaining >= 3 && (cursor[0] == 'I' || cursor[0] == 'i') &&
@@ -126,15 +128,15 @@ auto parse_special(const char *input, std::size_t length) -> ParsedDecimal * {
     result.coefficient = 0;
     result.exponent = 0;
     result.coefficient_high = 0;
-    return &result;
+    return result;
   }
 
-  return nullptr;
+  return std::nullopt;
 }
 
 auto parse_decimal_string(const char *input, std::size_t length)
     -> ParsedDecimal {
-  auto *special = parse_special(input, length);
+  auto special = parse_special(input, length);
   if (special) {
     return *special;
   }
@@ -155,17 +157,14 @@ auto parse_decimal_string(const char *input, std::size_t length)
     throw sourcemeta::core::DecimalParseError{};
   }
 
-  std::array<char, 1024> digit_buffer{};
+  std::string digit_buffer;
   std::uint32_t digit_count_total = 0;
   std::int32_t decimal_offset = -1;
   bool has_digit = false;
 
   while (cursor < end) {
     if (*cursor >= '0' && *cursor <= '9') {
-      if (digit_count_total < digit_buffer.size()) {
-        digit_buffer[digit_count_total] = *cursor;
-      }
-
+      digit_buffer.push_back(*cursor);
       digit_count_total++;
       has_digit = true;
     } else if (*cursor == '.') {
@@ -1695,10 +1694,6 @@ auto Decimal::operator*=(const Decimal &other) -> Decimal & {
     this->coefficient_ = static_cast<std::int64_t>(product);
     this->exponent_ = result_exponent;
     this->flags_ = result_negative ? FLAG_SIGN : 0;
-    if (this->coefficient_ == 0) {
-      this->flags_ = 0;
-    }
-
   } else {
     auto left_big = coefficient_as_big(this->coefficient_,
                                        this->coefficient_high_, this->flags_);
@@ -1763,9 +1758,6 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
   free_big_coefficient(this->coefficient_, this->flags_);
   store_big_result(this->coefficient_, this->coefficient_high_, this->flags_,
                    std::move(quotient), result_negative);
-  if (this->coefficient_ == 0 && !(this->flags_ & FLAG_BIG)) {
-    this->flags_ = 0;
-  }
 
   this->exponent_ = this->exponent_ - other.exponent_ - WORKING_PRECISION;
 

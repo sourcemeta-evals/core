@@ -339,3 +339,25 @@ TEST(Numeric_uint128, bitwise_and_mask_low_byte) {
   EXPECT_EQ(static_cast<std::uint64_t>(result), 0xFF);
   EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 0);
 }
+
+TEST(Numeric_uint128, multiply_low_by_low_boundary_produces_correct_high_word) {
+  const sourcemeta::core::uint128_t value{
+      (sourcemeta::core::uint128_t{1} << 64) + sourcemeta::core::uint128_t{1}};
+  const auto result = value * value;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 1);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 2);
+}
+
+TEST(Numeric_uint128, multiply_word_boundary_carry_populates_high_word) {
+  const auto left = sourcemeta::core::uint128_t{1} << 32;
+  const auto result = left * left;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 0);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 1);
+}
+
+TEST(Numeric_uint128, multiply_max_low_squared_matches_schoolbook) {
+  const sourcemeta::core::uint128_t value{std::uint64_t{0xFFFFFFFFFFFFFFFFULL}};
+  const auto result = value * value;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 1);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 0xFFFFFFFFFFFFFFFEULL);
+}

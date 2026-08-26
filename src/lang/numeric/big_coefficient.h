@@ -198,7 +198,17 @@ public:
 
     if (this->words[0] != 0) {
       while (this->words[0] % 10 == 0) {
-        this->words[0] /= 10;
+        std::uint64_t remainder = 0;
+        for (auto index = this->length; index > 0; --index) {
+          std::uint64_t combined = remainder * BASE + this->words[index - 1];
+          this->words[index - 1] = combined / 10;
+          remainder = combined % 10;
+        }
+
+        if (this->length > 1 && this->words[this->length - 1] == 0) {
+          this->length--;
+        }
+
         total_stripped++;
       }
     }
