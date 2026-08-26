@@ -361,3 +361,76 @@ TEST(Numeric_uint128, multiply_max_low_squared_matches_schoolbook) {
   EXPECT_EQ(static_cast<std::uint64_t>(result), 1);
   EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 0xFFFFFFFFFFFFFFFEULL);
 }
+
+TEST(Numeric_uint128, divide_by_high_divisor) {
+  const auto dividend =
+      (sourcemeta::core::uint128_t{2} << 64) | sourcemeta::core::uint128_t{5};
+  const auto divisor = sourcemeta::core::uint128_t{std::uint64_t{2ULL}};
+  const auto quotient = dividend / divisor;
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient), 2);
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient >> 64), 1);
+}
+
+TEST(Numeric_uint128, divide_with_high_half_dividend) {
+  const auto dividend =
+      (sourcemeta::core::uint128_t{4} << 64) | sourcemeta::core::uint128_t{6};
+  const auto divisor = sourcemeta::core::uint128_t{std::uint64_t{2ULL}};
+  const auto quotient = dividend / divisor;
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient), 3);
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient >> 64), 2);
+}
+
+TEST(Numeric_uint128, construct_from_negative_int64_sets_all_bits) {
+  const sourcemeta::core::uint128_t value{
+      static_cast<sourcemeta::core::uint128_t>(std::int64_t{-1})};
+  EXPECT_EQ(static_cast<std::uint64_t>(value), UINT64_MAX);
+  EXPECT_EQ(static_cast<std::uint64_t>(value >> 64), UINT64_MAX);
+}
+
+TEST(Numeric_uint128, construct_from_negative_int_sets_all_bits) {
+  const sourcemeta::core::uint128_t value{
+      static_cast<sourcemeta::core::uint128_t>(int{-1})};
+  EXPECT_EQ(static_cast<std::uint64_t>(value), UINT64_MAX);
+  EXPECT_EQ(static_cast<std::uint64_t>(value >> 64), UINT64_MAX);
+}
+
+TEST(Numeric_uint128, shift_at_64_bits) {
+  const auto shifted_left = sourcemeta::core::uint128_t{1} << 64;
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_left), 0);
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_left >> 64), 1);
+
+  const auto shifted_right = shifted_left >> 64;
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_right), 1);
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_right >> 64), 0);
+}
+
+TEST(Numeric_uint128, shift_at_127_bits) {
+  const auto shifted_left = sourcemeta::core::uint128_t{1} << 127;
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_left), 0);
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_left >> 64),
+            std::uint64_t{1ULL} << 63);
+
+  const auto shifted_right = shifted_left >> 127;
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_right), 1);
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_right >> 64), 0);
+}
+
+TEST(Numeric_uint128, bitwise_or_across_words) {
+  const auto low = sourcemeta::core::uint128_t{std::uint64_t{0x0FULL}};
+  const auto high = sourcemeta::core::uint128_t{1} << 64;
+  const auto result = low | high;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 0x0FULL);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 1);
+}
+
+TEST(Numeric_uint128, bitwise_and_across_words) {
+  const auto value =
+      ((sourcemeta::core::uint128_t{0xF0F0F0F0F0F0F0F0ULL}) << 64) |
+      sourcemeta::core::uint128_t{std::uint64_t{0x0F0F0F0F0F0F0F0FULL}};
+  const auto mask =
+      ((sourcemeta::core::uint128_t{0xFFFFFFFF00000000ULL}) << 64) |
+      sourcemeta::core::uint128_t{std::uint64_t{0x00000000FFFFFFFFULL}};
+  const auto result = value & mask;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 0x0F0F0F0FULL);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 0xF0F0F0F000000000ULL);
+}

@@ -3758,3 +3758,80 @@ TEST(Numeric_decimal,
   EXPECT_TRUE(result.is_zero());
   EXPECT_TRUE(result.is_signed());
 }
+
+TEST(Numeric_decimal,
+     divide_integer_large_valid_finite_input_not_fabricated_sentinel) {
+  const auto value{
+      sourcemeta::core::Decimal{"1234567890123456789012345678901234567890"
+                                "1234567890123456789012345678901234567890"
+                                "12345678901234567890"}};
+  const auto quotient{value.divide_integer(sourcemeta::core::Decimal{1})};
+  EXPECT_EQ(quotient, value);
+  EXPECT_FALSE(quotient.is_nan());
+}
+
+TEST(Numeric_decimal, parse_nan_rejects_non_digit_payload_suffix) {
+  EXPECT_THROW(sourcemeta::core::Decimal{"NaNx"},
+               sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, parse_snan_rejects_non_digit_payload_suffix) {
+  EXPECT_THROW(sourcemeta::core::Decimal{"sNaNabc"},
+               sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, parse_nan_rejects_oversized_payload) {
+  EXPECT_THROW(sourcemeta::core::Decimal{"NaN99999999999999999999"},
+               sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, add_zero_clears_integer_origin_flag) {
+  auto value = sourcemeta::core::Decimal{3};
+  EXPECT_TRUE(value.is_integer());
+  value += sourcemeta::core::Decimal{0};
+  EXPECT_FALSE(value.is_integer());
+  EXPECT_TRUE(value.is_integral());
+}
+
+TEST(Numeric_decimal, zero_plus_integer_clears_integer_origin_flag) {
+  auto value = sourcemeta::core::Decimal{0};
+  value += sourcemeta::core::Decimal{3};
+  EXPECT_FALSE(value.is_integer());
+  EXPECT_TRUE(value.is_integral());
+}
+
+TEST(Numeric_decimal, subtract_zero_clears_integer_origin_flag) {
+  auto value = sourcemeta::core::Decimal{3};
+  value -= sourcemeta::core::Decimal{0};
+  EXPECT_FALSE(value.is_integer());
+  EXPECT_TRUE(value.is_integral());
+}
+
+TEST(Numeric_decimal, unary_plus_clears_integer_origin_flag) {
+  const auto value = sourcemeta::core::Decimal{3};
+  const auto result = +value;
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.is_integral());
+}
+
+TEST(Numeric_decimal, unary_minus_clears_integer_origin_flag) {
+  const auto value = sourcemeta::core::Decimal{3};
+  const auto result = -value;
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.is_integral());
+}
+
+TEST(Numeric_decimal, divide_integer_large_same_limb_completes_promptly) {
+  const auto dividend =
+      sourcemeta::core::Decimal{"999999999999999999999999999999999999"};
+  const auto divisor = sourcemeta::core::Decimal{"1000000000000000000"};
+  const auto expected = sourcemeta::core::Decimal{"999999999999999999"};
+  EXPECT_EQ(dividend.divide_integer(divisor), expected);
+}
+
+TEST(Numeric_decimal, divide_integer_large_same_limb_nearby_divisor) {
+  const auto dividend =
+      sourcemeta::core::Decimal{"999999999999999999999999999999999999"};
+  const auto divisor = sourcemeta::core::Decimal{"1000000000000000001"};
+  EXPECT_TRUE(dividend.divide_integer(divisor).is_finite());
+}

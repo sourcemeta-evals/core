@@ -429,8 +429,25 @@ public:
         }
 
       } else {
-        remainder = remainder.subtract(divisor);
-        quotient.words[0]++;
+        auto divisor_top = divisor.words[divisor.length - 1];
+        auto estimate =
+            static_cast<std::uint64_t>(remainder_top / (divisor_top + 1));
+        if (estimate == 0) {
+          estimate = 1;
+        }
+
+        BigCoefficient estimate_big{1};
+        estimate_big.words[0] = estimate;
+        estimate_big.length = 1;
+
+        auto product = estimate_big.multiply(divisor);
+        if (product.compare(remainder) > 0) {
+          remainder = remainder.subtract(divisor);
+          quotient.words[0]++;
+        } else {
+          remainder = remainder.subtract(product);
+          quotient = quotient.add(estimate_big);
+        }
       }
     }
 

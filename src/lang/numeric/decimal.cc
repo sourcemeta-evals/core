@@ -70,12 +70,22 @@ struct ParsedDecimal {
 
 auto parse_digit_payload(const char *cursor, std::size_t count)
     -> std::int64_t {
-  std::int64_t payload = 0;
+  std::uint64_t payload = 0;
+  constexpr std::uint64_t payload_max{
+      static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())};
   for (std::size_t index = 0; index < count; index++) {
-    payload = payload * 10 + (cursor[index] - '0');
+    const char character{cursor[index]};
+    if (character < '0' || character > '9') {
+      throw sourcemeta::core::DecimalParseError{};
+    }
+    const std::uint64_t digit{static_cast<std::uint64_t>(character - '0')};
+    if (payload > (payload_max - digit) / 10) {
+      throw sourcemeta::core::DecimalParseError{};
+    }
+    payload = payload * 10 + digit;
   }
 
-  return payload;
+  return static_cast<std::int64_t>(payload);
 }
 
 auto parse_special(const char *input, std::size_t length)
@@ -1520,11 +1530,15 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
   check_exponent_overflow(this->exponent_, other.exponent_);
 
   if (other.is_zero()) {
+    this->flags_ =
+        static_cast<std::uint8_t>(this->flags_ & ~FLAG_INTEGER_LITERAL);
     return *this;
   }
 
   if (this->is_zero()) {
     *this = other;
+    this->flags_ =
+        static_cast<std::uint8_t>(this->flags_ & ~FLAG_INTEGER_LITERAL);
     return *this;
   }
 
@@ -1866,10 +1880,17 @@ auto Decimal::operator%(const Decimal &other) const -> Decimal {
 auto Decimal::operator-() const -> Decimal {
   Decimal result{*this};
   result.flags_ ^= FLAG_SIGN;
+  result.flags_ =
+      static_cast<std::uint8_t>(result.flags_ & ~FLAG_INTEGER_LITERAL);
   return result;
 }
 
-auto Decimal::operator+() const -> Decimal { return *this; }
+auto Decimal::operator+() const -> Decimal {
+  Decimal result{*this};
+  result.flags_ =
+      static_cast<std::uint8_t>(result.flags_ & ~FLAG_INTEGER_LITERAL);
+  return result;
+}
 
 auto Decimal::operator++() -> Decimal & {
   *this += Decimal{1};
