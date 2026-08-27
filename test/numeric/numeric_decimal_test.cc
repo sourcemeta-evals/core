@@ -3514,6 +3514,19 @@ TEST(Numeric_decimal, divide_integer_infinity_by_infinity_throws) {
       sourcemeta::core::NumericInvalidOperationError);
 }
 
+TEST(Numeric_decimal, divide_integer_zero_by_zero_throws) {
+  EXPECT_THROW(static_cast<void>(sourcemeta::core::Decimal{0}.divide_integer(
+                   sourcemeta::core::Decimal{0})),
+               sourcemeta::core::NumericInvalidOperationError);
+}
+
+TEST(Numeric_decimal, divide_integer_snan_operand_throws) {
+  EXPECT_THROW(
+      static_cast<void>(sourcemeta::core::Decimal::snan().divide_integer(
+          sourcemeta::core::Decimal{1})),
+      sourcemeta::core::NumericInvalidOperationError);
+}
+
 TEST(Numeric_decimal, divide_integer_with_decimals) {
   const sourcemeta::core::Decimal left{"10.5"};
   const sourcemeta::core::Decimal right{"3.1"};
