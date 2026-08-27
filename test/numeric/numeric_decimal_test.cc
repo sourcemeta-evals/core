@@ -3903,3 +3903,11 @@ TEST(Numeric_decimal, arithmetic_snan_becomes_qnan_with_payload_preserved) {
   EXPECT_FALSE(result.is_snan());
   EXPECT_EQ(result.nan_payload(), 21u);
 }
+
+TEST(Numeric_decimal, default_construction_is_not_integer_origin) {
+  EXPECT_FALSE(sourcemeta::core::Decimal{}.is_integer());
+}
+
+TEST(Numeric_decimal, default_construction_is_integral) {
+  EXPECT_TRUE(sourcemeta::core::Decimal{}.is_integral());
+}
