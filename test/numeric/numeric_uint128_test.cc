@@ -425,10 +425,12 @@ TEST(Numeric_uint128, bitwise_or_across_words) {
 
 TEST(Numeric_uint128, bitwise_and_across_words) {
   const auto value =
-      ((sourcemeta::core::uint128_t{0xF0F0F0F0F0F0F0F0ULL}) << 64) |
+      ((sourcemeta::core::uint128_t{std::uint64_t{0xF0F0F0F0F0F0F0F0ULL}})
+       << 64) |
       sourcemeta::core::uint128_t{std::uint64_t{0x0F0F0F0F0F0F0F0FULL}};
   const auto mask =
-      ((sourcemeta::core::uint128_t{0xFFFFFFFF00000000ULL}) << 64) |
+      ((sourcemeta::core::uint128_t{std::uint64_t{0xFFFFFFFF00000000ULL}})
+       << 64) |
       sourcemeta::core::uint128_t{std::uint64_t{0x00000000FFFFFFFFULL}};
   const auto result = value & mask;
   EXPECT_EQ(static_cast<std::uint64_t>(result), 0x0F0F0F0FULL);
