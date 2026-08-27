@@ -3911,3 +3911,15 @@ TEST(Numeric_decimal, default_construction_is_not_integer_origin) {
 TEST(Numeric_decimal, default_construction_is_integral) {
   EXPECT_TRUE(sourcemeta::core::Decimal{}.is_integral());
 }
+
+TEST(Numeric_decimal, to_int64_from_int64_min_constructor) {
+  constexpr auto min_value = std::numeric_limits<std::int64_t>::min();
+  const auto value = sourcemeta::core::Decimal{min_value};
+  EXPECT_EQ(value.to_int64(), min_value);
+}
+
+TEST(Numeric_decimal, to_int64_int64_min_roundtrip_through_string) {
+  constexpr auto min_value = std::numeric_limits<std::int64_t>::min();
+  const auto value = sourcemeta::core::Decimal{"-9223372036854775808"};
+  EXPECT_EQ(value.to_int64(), min_value);
+}

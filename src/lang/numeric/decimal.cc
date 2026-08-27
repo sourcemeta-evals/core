@@ -656,7 +656,14 @@ auto Decimal::to_int64() const -> std::int64_t {
                                   this->flags_);
     auto value = big.to_uint128(this->exponent_);
     if (this->flags_ & FLAG_SIGN) {
-      return -static_cast<std::int64_t>(value);
+      const auto low = static_cast<std::uint64_t>(value);
+      constexpr auto min_magnitude =
+          static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) +
+          1U;
+      if (low == min_magnitude) {
+        return std::numeric_limits<std::int64_t>::min();
+      }
+      return -static_cast<std::int64_t>(low);
     }
 
     return static_cast<std::int64_t>(value);
