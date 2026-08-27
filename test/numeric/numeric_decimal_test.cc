@@ -3639,6 +3639,11 @@ TEST(Numeric_decimal, is_integer_string_dot_zero_fraction) {
   EXPECT_FALSE(sourcemeta::core::Decimal{"1.0"}.is_integer());
 }
 
+TEST(Numeric_decimal, is_integral_string_dot_zero_fraction) {
+  EXPECT_TRUE(sourcemeta::core::Decimal{"1.0"}.is_integral());
+  EXPECT_TRUE(sourcemeta::core::Decimal{"3.0"}.is_integral());
+}
+
 TEST(Numeric_decimal, is_integer_string_dot_non_zero_fraction) {
   EXPECT_FALSE(sourcemeta::core::Decimal{"3.5"}.is_integer());
 }
