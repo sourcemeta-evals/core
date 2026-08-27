@@ -380,6 +380,17 @@ auto format_special_value(std::string &result, std::uint8_t flags,
   return false;
 }
 
+auto propagate_nan(const sourcemeta::core::Decimal &left,
+                   const sourcemeta::core::Decimal &right)
+    -> sourcemeta::core::Decimal {
+  const auto &source = left.is_nan() ? left : right;
+  auto result = sourcemeta::core::Decimal::nan(source.nan_payload());
+  if (source.is_signed()) {
+    result = -result;
+  }
+  return result;
+}
+
 } // namespace
 
 namespace sourcemeta::core {
@@ -1232,12 +1243,8 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
     throw NumericInvalidOperationError{};
   }
 
-  if (this->is_nan()) {
-    return Decimal::nan(this->nan_payload());
-  }
-
-  if (other.is_nan()) {
-    return Decimal::nan(other.nan_payload());
+  if (this->is_nan() || other.is_nan()) {
+    return propagate_nan(*this, other);
   }
 
   if (this->is_infinite() && other.is_infinite()) {
@@ -1508,7 +1515,7 @@ auto Decimal::operator>=(const Decimal &other) const -> bool {
 auto Decimal::operator+=(const Decimal &other) -> Decimal & {
   if (!this->is_finite() || !other.is_finite()) {
     if (this->is_nan() || other.is_nan()) {
-      *this = Decimal::nan();
+      *this = propagate_nan(*this, other);
       return *this;
     }
 
@@ -1635,13 +1642,17 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
 }
 
 auto Decimal::operator-=(const Decimal &other) -> Decimal & {
+  if (this->is_nan() || other.is_nan()) {
+    *this = propagate_nan(*this, other);
+    return *this;
+  }
   return *this += (-other);
 }
 
 auto Decimal::operator*=(const Decimal &other) -> Decimal & {
   if (!this->is_finite() || !other.is_finite()) {
     if (this->is_nan() || other.is_nan()) {
-      *this = Decimal::nan();
+      *this = propagate_nan(*this, other);
       return *this;
     }
 
@@ -1726,7 +1737,7 @@ auto Decimal::operator*=(const Decimal &other) -> Decimal & {
 
 auto Decimal::operator/=(const Decimal &other) -> Decimal & {
   if (this->is_nan() || other.is_nan()) {
-    *this = Decimal::nan();
+    *this = propagate_nan(*this, other);
     return *this;
   }
 
@@ -1782,7 +1793,7 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
 
 auto Decimal::operator%=(const Decimal &other) -> Decimal & {
   if (this->is_nan() || other.is_nan()) {
-    *this = Decimal::nan();
+    *this = propagate_nan(*this, other);
     return *this;
   }
 

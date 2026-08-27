@@ -3835,3 +3835,71 @@ TEST(Numeric_decimal, divide_integer_large_same_limb_nearby_divisor) {
   const auto divisor = sourcemeta::core::Decimal{"1000000000000000001"};
   EXPECT_TRUE(dividend.divide_integer(divisor).is_finite());
 }
+
+TEST(Numeric_decimal, add_nan_left_propagates_payload_and_sign) {
+  const auto left = -sourcemeta::core::Decimal::nan(123);
+  const auto right = sourcemeta::core::Decimal{5};
+  const auto result = left + right;
+  EXPECT_TRUE(result.is_qnan());
+  EXPECT_EQ(result.nan_payload(), 123u);
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(Numeric_decimal, add_nan_right_propagates_payload_and_sign) {
+  const auto left = sourcemeta::core::Decimal{5};
+  const auto right = sourcemeta::core::Decimal::nan(456);
+  const auto result = left + right;
+  EXPECT_TRUE(result.is_qnan());
+  EXPECT_EQ(result.nan_payload(), 456u);
+  EXPECT_FALSE(result.is_signed());
+}
+
+TEST(Numeric_decimal, add_both_nan_selects_left_payload) {
+  const auto left = sourcemeta::core::Decimal::nan(5);
+  const auto right = sourcemeta::core::Decimal::nan(6);
+  const auto result = left + right;
+  EXPECT_TRUE(result.is_qnan());
+  EXPECT_EQ(result.nan_payload(), 5u);
+}
+
+TEST(Numeric_decimal, subtract_nan_propagates_payload) {
+  const auto left = sourcemeta::core::Decimal::nan(7);
+  const auto right = sourcemeta::core::Decimal{1};
+  const auto result = left - right;
+  EXPECT_TRUE(result.is_qnan());
+  EXPECT_EQ(result.nan_payload(), 7u);
+}
+
+TEST(Numeric_decimal, multiply_nan_propagates_payload_and_sign) {
+  const auto left = -sourcemeta::core::Decimal::nan(9);
+  const auto right = sourcemeta::core::Decimal{2};
+  const auto result = left * right;
+  EXPECT_TRUE(result.is_qnan());
+  EXPECT_EQ(result.nan_payload(), 9u);
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(Numeric_decimal, divide_nan_propagates_payload) {
+  const auto left = sourcemeta::core::Decimal{10};
+  const auto right = sourcemeta::core::Decimal::nan(11);
+  const auto result = left / right;
+  EXPECT_TRUE(result.is_qnan());
+  EXPECT_EQ(result.nan_payload(), 11u);
+}
+
+TEST(Numeric_decimal, remainder_nan_propagates_payload) {
+  const auto left = sourcemeta::core::Decimal::nan(13);
+  const auto right = sourcemeta::core::Decimal{4};
+  const auto result = left % right;
+  EXPECT_TRUE(result.is_qnan());
+  EXPECT_EQ(result.nan_payload(), 13u);
+}
+
+TEST(Numeric_decimal, arithmetic_snan_becomes_qnan_with_payload_preserved) {
+  const auto left = sourcemeta::core::Decimal::snan(21);
+  const auto right = sourcemeta::core::Decimal{1};
+  const auto result = left + right;
+  EXPECT_TRUE(result.is_qnan());
+  EXPECT_FALSE(result.is_snan());
+  EXPECT_EQ(result.nan_payload(), 21u);
+}
