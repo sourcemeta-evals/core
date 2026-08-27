@@ -3923,3 +3923,45 @@ TEST(Numeric_decimal, to_int64_int64_min_roundtrip_through_string) {
   const auto value = sourcemeta::core::Decimal{"-9223372036854775808"};
   EXPECT_EQ(value.to_int64(), min_value);
 }
+
+TEST(Numeric_decimal, multiply_by_one_clears_integer_origin_flag) {
+  const auto value = sourcemeta::core::Decimal{3};
+  const auto result = value * sourcemeta::core::Decimal{1};
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.is_integral());
+}
+
+TEST(Numeric_decimal, one_times_integer_clears_integer_origin_flag) {
+  const auto value = sourcemeta::core::Decimal{1};
+  const auto result = value * sourcemeta::core::Decimal{3};
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.is_integral());
+}
+
+TEST(Numeric_decimal, divide_by_one_clears_integer_origin_flag) {
+  const auto value = sourcemeta::core::Decimal{3};
+  const auto result = value / sourcemeta::core::Decimal{1};
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.is_integral());
+}
+
+TEST(Numeric_decimal, exact_division_clears_integer_origin_flag) {
+  const auto value = sourcemeta::core::Decimal{6};
+  const auto result = value / sourcemeta::core::Decimal{3};
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.is_integral());
+}
+
+TEST(Numeric_decimal, multiplication_of_two_integers_clears_origin_flag) {
+  const auto result =
+      sourcemeta::core::Decimal{4} * sourcemeta::core::Decimal{5};
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.is_integral());
+}
+
+TEST(Numeric_decimal, subtraction_producing_integer_clears_origin_flag) {
+  const auto result =
+      sourcemeta::core::Decimal{10} - sourcemeta::core::Decimal{4};
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.is_integral());
+}
