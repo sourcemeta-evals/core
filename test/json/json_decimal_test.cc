@@ -1179,3 +1179,29 @@ TEST(JSON_decimal, negative_exponent_non_integral) {
   EXPECT_FALSE(document.to_decimal().is_integer());
   EXPECT_FALSE(document.to_decimal().is_integral());
 }
+
+TEST(JSON_decimal,
+     divisible_by_huge_exponent_composite_of_two_and_five_is_false) {
+  const sourcemeta::core::Decimal dividend{"1e100001"};
+  const sourcemeta::core::Decimal divisor{22};
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal, divisible_by_huge_exponent_power_of_two_is_true) {
+  const sourcemeta::core::Decimal dividend{"1e100001"};
+  const sourcemeta::core::Decimal divisor{2};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal, divisible_by_huge_exponent_power_of_five_is_true) {
+  const sourcemeta::core::Decimal dividend{"1e100001"};
+  const sourcemeta::core::Decimal divisor{5};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal,
+     divisible_by_huge_exponent_pure_product_of_two_and_five_is_true) {
+  const sourcemeta::core::Decimal dividend{"1e100001"};
+  const sourcemeta::core::Decimal divisor{20};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
