@@ -3427,6 +3427,38 @@ TEST(Numeric_decimal, scale_by_huge_scale_throws) {
                sourcemeta::core::NumericOverflowError);
 }
 
+TEST(Numeric_decimal, scale_by_double_constructor_canonical_scale_accepts) {
+  const sourcemeta::core::Decimal value{"1.5"};
+  const sourcemeta::core::Decimal scale{2.0};
+  EXPECT_EQ(value.scale_by(scale), sourcemeta::core::Decimal{150});
+}
+
+TEST(Numeric_decimal, scale_by_strict_from_canonical_scale_accepts) {
+  const sourcemeta::core::Decimal value{"1.5"};
+  const auto scale = sourcemeta::core::Decimal::strict_from(2.0);
+  EXPECT_EQ(value.scale_by(scale), sourcemeta::core::Decimal{150});
+}
+
+TEST(Numeric_decimal, scale_by_arithmetic_result_canonical_scale_accepts) {
+  const sourcemeta::core::Decimal value{"1.5"};
+  const auto scale =
+      sourcemeta::core::Decimal{1} + sourcemeta::core::Decimal{1};
+  EXPECT_EQ(value.scale_by(scale), sourcemeta::core::Decimal{150});
+}
+
+TEST(Numeric_decimal, scale_by_exponent_form_canonical_scale_accepts) {
+  const sourcemeta::core::Decimal value{"1.5"};
+  const sourcemeta::core::Decimal scale{"2e0"};
+  EXPECT_EQ(value.scale_by(scale), sourcemeta::core::Decimal{150});
+}
+
+TEST(Numeric_decimal, scale_by_non_canonical_trailing_zero_scale_throws) {
+  const sourcemeta::core::Decimal value{"1.5"};
+  const sourcemeta::core::Decimal scale{"2.0"};
+  EXPECT_THROW(static_cast<void>(value.scale_by(scale)),
+               sourcemeta::core::NumericInvalidOperationError);
+}
+
 TEST(Numeric_decimal, same_quantum_same_exponent) {
   const sourcemeta::core::Decimal left{"1.23"};
   const sourcemeta::core::Decimal right{"4.56"};
