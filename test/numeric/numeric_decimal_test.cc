@@ -3788,6 +3788,15 @@ TEST(Numeric_decimal,
   EXPECT_FALSE(quotient.is_nan());
 }
 
+TEST(Numeric_decimal,
+     divide_integer_hundred_thousand_digit_value_returns_unchanged) {
+  const std::string digits(100001, '9');
+  const auto value{sourcemeta::core::Decimal{digits}};
+  const auto quotient{value.divide_integer(sourcemeta::core::Decimal{1})};
+  EXPECT_EQ(quotient, value);
+  EXPECT_FALSE(quotient.is_nan());
+}
+
 TEST(Numeric_decimal, parse_nan_rejects_non_digit_payload_suffix) {
   EXPECT_THROW(sourcemeta::core::Decimal{"NaNx"},
                sourcemeta::core::DecimalParseError);
