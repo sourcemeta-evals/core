@@ -3983,3 +3983,56 @@ TEST(Numeric_decimal, subtraction_producing_integer_clears_origin_flag) {
   EXPECT_FALSE(result.is_integer());
   EXPECT_TRUE(result.is_integral());
 }
+
+TEST(Numeric_decimal, factory_nan_uint64_max_payload) {
+  const auto value =
+      sourcemeta::core::Decimal::nan(std::numeric_limits<std::uint64_t>::max());
+  EXPECT_TRUE(value.is_nan());
+  EXPECT_TRUE(value.is_qnan());
+  EXPECT_EQ(value.nan_payload(), std::numeric_limits<std::uint64_t>::max());
+}
+
+TEST(Numeric_decimal, factory_snan_uint64_max_payload) {
+  const auto value = sourcemeta::core::Decimal::snan(
+      std::numeric_limits<std::uint64_t>::max());
+  EXPECT_TRUE(value.is_nan());
+  EXPECT_TRUE(value.is_snan());
+  EXPECT_EQ(value.nan_payload(), std::numeric_limits<std::uint64_t>::max());
+}
+
+TEST(Numeric_decimal, factory_nan_above_int64_max_payload) {
+  constexpr std::uint64_t payload{
+      static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) + 1};
+  const auto value = sourcemeta::core::Decimal::nan(payload);
+  EXPECT_TRUE(value.is_nan());
+  EXPECT_EQ(value.nan_payload(), payload);
+}
+
+TEST(Numeric_decimal, parse_nan_uint64_max_payload) {
+  const sourcemeta::core::Decimal value{"NaN18446744073709551615"};
+  EXPECT_TRUE(value.is_nan());
+  EXPECT_TRUE(value.is_qnan());
+  EXPECT_EQ(value.nan_payload(), std::numeric_limits<std::uint64_t>::max());
+}
+
+TEST(Numeric_decimal, parse_snan_uint64_max_payload) {
+  const sourcemeta::core::Decimal value{"sNaN18446744073709551615"};
+  EXPECT_TRUE(value.is_nan());
+  EXPECT_TRUE(value.is_snan());
+  EXPECT_EQ(value.nan_payload(), std::numeric_limits<std::uint64_t>::max());
+}
+
+TEST(Numeric_decimal, format_nan_uint64_max_payload_round_trips) {
+  const auto value =
+      sourcemeta::core::Decimal::nan(std::numeric_limits<std::uint64_t>::max());
+  EXPECT_EQ(value.to_string(), "NaN18446744073709551615");
+}
+
+TEST(Numeric_decimal, arithmetic_propagates_uint64_max_nan_payload) {
+  const auto left =
+      sourcemeta::core::Decimal::nan(std::numeric_limits<std::uint64_t>::max());
+  const sourcemeta::core::Decimal right{1};
+  const auto result = left + right;
+  EXPECT_TRUE(result.is_nan());
+  EXPECT_EQ(result.nan_payload(), std::numeric_limits<std::uint64_t>::max());
+}

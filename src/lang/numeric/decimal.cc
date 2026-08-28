@@ -72,7 +72,7 @@ auto parse_digit_payload(const char *cursor, std::size_t count)
     -> std::int64_t {
   std::uint64_t payload = 0;
   constexpr std::uint64_t payload_max{
-      static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())};
+      std::numeric_limits<std::uint64_t>::max()};
   for (std::size_t index = 0; index < count; index++) {
     const char character{cursor[index]};
     if (character < '0' || character > '9') {
@@ -361,8 +361,9 @@ auto format_special_value(std::string &result, std::uint8_t flags,
       result += "NaN";
     }
 
-    if (coefficient > 0) {
-      result += std::to_string(coefficient);
+    const std::uint64_t payload{static_cast<std::uint64_t>(coefficient)};
+    if (payload != 0) {
+      result += std::to_string(payload);
     }
 
     return true;
