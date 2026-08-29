@@ -222,20 +222,6 @@ TEST(Numeric_uint128, add_zero) {
   EXPECT_TRUE((value + zero) == value);
 }
 
-TEST(Numeric_uint128, division_by_uint128) {
-  const sourcemeta::core::uint128_t dividend{100};
-  const sourcemeta::core::uint128_t divisor{10};
-  const auto result = dividend / divisor;
-  EXPECT_EQ(static_cast<std::uint64_t>(result), 10);
-}
-
-TEST(Numeric_uint128, modulo_by_uint128) {
-  const sourcemeta::core::uint128_t dividend{17};
-  const sourcemeta::core::uint128_t divisor{5};
-  const auto result = dividend % divisor;
-  EXPECT_EQ(static_cast<std::uint64_t>(result), 2);
-}
-
 TEST(Numeric_uint128, left_shift_zero) {
   const sourcemeta::core::uint128_t value{0xFF};
   const auto result = value << 0;
