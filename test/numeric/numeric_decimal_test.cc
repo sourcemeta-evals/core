@@ -4121,3 +4121,18 @@ TEST(Numeric_decimal, arithmetic_propagates_uint64_max_nan_payload) {
   EXPECT_TRUE(result.is_nan());
   EXPECT_EQ(result.nan_payload(), std::numeric_limits<std::uint64_t>::max());
 }
+
+TEST(Numeric_decimal, divide_integer_million_digit_value_returns_unchanged) {
+  const std::string digits(1000001, '9');
+  const auto value{sourcemeta::core::Decimal{digits}};
+  const auto quotient{value.divide_integer(sourcemeta::core::Decimal{1})};
+  EXPECT_EQ(quotient, value);
+  EXPECT_FALSE(quotient.is_nan());
+}
+
+TEST(Numeric_decimal, divide_integer_two_million_exponent_returns_unchanged) {
+  const auto value{sourcemeta::core::Decimal{"1e2000001"}};
+  const auto quotient{value.divide_integer(sourcemeta::core::Decimal{1})};
+  EXPECT_EQ(quotient, value);
+  EXPECT_FALSE(quotient.is_nan());
+}
