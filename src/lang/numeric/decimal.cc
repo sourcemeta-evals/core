@@ -677,6 +677,11 @@ auto Decimal::to_int64() const -> std::int64_t {
     exponent--;
   }
 
+  while (exponent < 0) {
+    coefficient /= 10;
+    exponent++;
+  }
+
   return (this->flags_ & FLAG_SIGN) ? -coefficient : coefficient;
 }
 
@@ -702,6 +707,11 @@ auto Decimal::to_uint64() const -> std::uint64_t {
   while (exponent > 0) {
     result *= 10;
     exponent--;
+  }
+
+  while (exponent < 0) {
+    result /= 10;
+    exponent++;
   }
 
   return result;

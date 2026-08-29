@@ -3829,6 +3829,50 @@ TEST(Numeric_decimal,
   EXPECT_FALSE(quotient.is_nan());
 }
 
+TEST(Numeric_decimal, to_int64_normalizes_trailing_zero_fractional_string) {
+  const sourcemeta::core::Decimal value{"3.0"};
+  ASSERT_TRUE(value.is_integral());
+  ASSERT_TRUE(value.is_int64());
+  EXPECT_EQ(value.to_int64(), 3);
+}
+
+TEST(Numeric_decimal,
+     to_int64_normalizes_multiple_trailing_zeros_fractional_string) {
+  const sourcemeta::core::Decimal value{"30.00"};
+  ASSERT_TRUE(value.is_integral());
+  ASSERT_TRUE(value.is_int64());
+  EXPECT_EQ(value.to_int64(), 30);
+}
+
+TEST(Numeric_decimal, to_int64_normalizes_negative_exponent_form_string) {
+  const sourcemeta::core::Decimal value{"30e-1"};
+  ASSERT_TRUE(value.is_integral());
+  ASSERT_TRUE(value.is_int64());
+  EXPECT_EQ(value.to_int64(), 3);
+}
+
+TEST(Numeric_decimal,
+     to_int64_normalizes_negative_trailing_zero_fractional_string) {
+  const sourcemeta::core::Decimal value{"-3.0"};
+  ASSERT_TRUE(value.is_integral());
+  ASSERT_TRUE(value.is_int64());
+  EXPECT_EQ(value.to_int64(), -3);
+}
+
+TEST(Numeric_decimal, to_uint64_normalizes_trailing_zero_fractional_string) {
+  const sourcemeta::core::Decimal value{"3.0"};
+  ASSERT_TRUE(value.is_integral());
+  ASSERT_TRUE(value.is_uint64());
+  EXPECT_EQ(value.to_uint64(), 3U);
+}
+
+TEST(Numeric_decimal, to_uint64_normalizes_negative_exponent_form_string) {
+  const sourcemeta::core::Decimal value{"1000e-2"};
+  ASSERT_TRUE(value.is_integral());
+  ASSERT_TRUE(value.is_uint64());
+  EXPECT_EQ(value.to_uint64(), 10U);
+}
+
 TEST(Numeric_decimal, parse_nan_rejects_non_digit_payload_suffix) {
   EXPECT_THROW(sourcemeta::core::Decimal{"NaNx"},
                sourcemeta::core::DecimalParseError);

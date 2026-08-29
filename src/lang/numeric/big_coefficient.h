@@ -507,6 +507,11 @@ public:
       exponent--;
     }
 
+    while (exponent < 0) {
+      value = value / sourcemeta::core::uint128_t{10};
+      exponent++;
+    }
+
     return value;
   }
 
