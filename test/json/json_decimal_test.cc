@@ -1205,3 +1205,15 @@ TEST(JSON_decimal,
   const sourcemeta::core::Decimal divisor{20};
   EXPECT_TRUE(dividend.divisible_by(divisor));
 }
+
+TEST(JSON_decimal, divisible_by_integer_above_2_to_53_by_real_true) {
+  const auto dividend{sourcemeta::core::JSON{std::int64_t{9007199254740993}}};
+  const auto divisor{sourcemeta::core::JSON{3.0}};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal, divisible_by_integer_above_2_to_53_by_real_false) {
+  const auto dividend{sourcemeta::core::JSON{std::int64_t{9007199254740993}}};
+  const auto divisor{sourcemeta::core::JSON{2.0}};
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
