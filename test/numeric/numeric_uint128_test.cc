@@ -351,7 +351,7 @@ TEST(Numeric_uint128, multiply_max_low_squared_matches_schoolbook) {
 TEST(Numeric_uint128, divide_by_high_divisor) {
   const auto dividend =
       (sourcemeta::core::uint128_t{2} << 64) | sourcemeta::core::uint128_t{5};
-  const auto divisor = sourcemeta::core::uint128_t{std::uint64_t{2ULL}};
+  const auto divisor = std::uint64_t{2ULL};
   const auto quotient = dividend / divisor;
   EXPECT_EQ(static_cast<std::uint64_t>(quotient), 2);
   EXPECT_EQ(static_cast<std::uint64_t>(quotient >> 64), 1);
@@ -360,7 +360,7 @@ TEST(Numeric_uint128, divide_by_high_divisor) {
 TEST(Numeric_uint128, divide_with_high_half_dividend) {
   const auto dividend =
       (sourcemeta::core::uint128_t{4} << 64) | sourcemeta::core::uint128_t{6};
-  const auto divisor = sourcemeta::core::uint128_t{std::uint64_t{2ULL}};
+  const auto divisor = std::uint64_t{2ULL};
   const auto quotient = dividend / divisor;
   EXPECT_EQ(static_cast<std::uint64_t>(quotient), 3);
   EXPECT_EQ(static_cast<std::uint64_t>(quotient >> 64), 2);
