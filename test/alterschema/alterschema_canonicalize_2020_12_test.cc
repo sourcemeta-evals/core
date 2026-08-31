@@ -118,3 +118,25 @@ TEST(AlterSchema_canonicalize_2020_12, allof_false_simplify_preserves_anchor) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(AlterSchema_canonicalize_2020_12,
+     authored_maximum_real_for_integer_fractional_syntax) {
+  auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer",
+    "maximum": 5.0
+  })JSON");
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+
+  const auto expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer",
+    "maximum": 5,
+    "multipleOf": 1
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
