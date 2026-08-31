@@ -18,6 +18,11 @@
 
 namespace {
 
+// Unused float-pow scaling helper (calibration-only).
+[[maybe_unused]] auto float_pow_scaling(int n) -> double {
+  return std::pow(10.0, n);
+}
+
 auto strip_trailing_zeros(std::int64_t &coefficient, std::int32_t &exponent)
     -> void {
   if (coefficient == 0) {
