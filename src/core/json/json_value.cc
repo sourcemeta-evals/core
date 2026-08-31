@@ -749,6 +749,17 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
     return divisor_value != 0 && this->to_integer() % divisor_value == 0;
   }
 
+  if (this->is_integer() && divisor.is_real()) {
+    const Decimal dividend_decimal{this->to_integer()};
+    return dividend_decimal.divisible_by(
+        Decimal::strict_from(divisor.to_real()));
+  }
+
+  if (this->is_real() && divisor.is_integer()) {
+    const Decimal divisor_decimal{divisor.to_integer()};
+    return Decimal::strict_from(this->to_real()).divisible_by(divisor_decimal);
+  }
+
   if (!this->is_decimal() && !divisor.is_decimal()) {
     const auto divisor_value(divisor.as_real());
     if (divisor_value == 0.0) {

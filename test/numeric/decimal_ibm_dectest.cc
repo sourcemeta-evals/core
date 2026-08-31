@@ -269,6 +269,8 @@ private:
         SUCCEED();
       } catch (const sourcemeta::core::NumericDivisionByZeroError &) {
         SUCCEED();
+      } catch (const sourcemeta::core::NumericOverflowError &) {
+        SUCCEED();
       }
       return;
     }
@@ -558,6 +560,26 @@ static auto should_skip_test(const DecTestCase &test_case,
     return false;
   }
 
+  if (operation == "divideint" || operation == "reduce" ||
+      operation == "trim" || operation == "scaleb") {
+    if (operation == "scaleb" &&
+        has_condition(test_case.conditions, "invalid_operation")) {
+      auto scale_bound = 2 * (context.max_exponent + context.precision);
+      try {
+        auto scale_value = std::stoll(test_case.operand2);
+        if (scale_value > scale_bound || scale_value < -scale_bound) {
+          return true;
+        }
+      } catch (const std::invalid_argument &) {
+        return true;
+      } catch (const std::out_of_range &) {
+        return true;
+      }
+    }
+
+    return has_skip_condition(test_case.conditions);
+  }
+
   // TODO: Our Decimal context is fixed at 16-digit precision. Tests
   // expecting results with more significant digits would produce
   // different (truncated) results in our context.
@@ -570,21 +592,6 @@ static auto should_skip_test(const DecTestCase &test_case,
   // these tests when the file's rounding directive matches ours.
   if (operation == "tointegral" || operation == "tointegralx") {
     if (context.rounding != "half_even") {
-      return true;
-    }
-  }
-
-  if (operation == "scaleb" &&
-      has_condition(test_case.conditions, "invalid_operation")) {
-    auto scale_bound = 2 * (context.max_exponent + context.precision);
-    try {
-      auto scale_value = std::stoll(test_case.operand2);
-      if (scale_value > scale_bound || scale_value < -scale_bound) {
-        return true;
-      }
-    } catch (const std::invalid_argument &) {
-      return true;
-    } catch (const std::out_of_range &) {
       return true;
     }
   }

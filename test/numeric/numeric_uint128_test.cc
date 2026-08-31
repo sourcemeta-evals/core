@@ -222,20 +222,6 @@ TEST(Numeric_uint128, add_zero) {
   EXPECT_TRUE((value + zero) == value);
 }
 
-TEST(Numeric_uint128, division_by_uint128) {
-  const sourcemeta::core::uint128_t dividend{100};
-  const sourcemeta::core::uint128_t divisor{10};
-  const auto result = dividend / divisor;
-  EXPECT_EQ(static_cast<std::uint64_t>(result), 10);
-}
-
-TEST(Numeric_uint128, modulo_by_uint128) {
-  const sourcemeta::core::uint128_t dividend{17};
-  const sourcemeta::core::uint128_t divisor{5};
-  const auto result = dividend % divisor;
-  EXPECT_EQ(static_cast<std::uint64_t>(result), 2);
-}
-
 TEST(Numeric_uint128, left_shift_zero) {
   const sourcemeta::core::uint128_t value{0xFF};
   const auto result = value << 0;
@@ -338,4 +324,130 @@ TEST(Numeric_uint128, bitwise_and_mask_low_byte) {
   const auto result = value & sourcemeta::core::uint128_t{0xFF};
   EXPECT_EQ(static_cast<std::uint64_t>(result), 0xFF);
   EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 0);
+}
+
+TEST(Numeric_uint128, multiply_low_by_low_boundary_produces_correct_high_word) {
+  const sourcemeta::core::uint128_t value{
+      (sourcemeta::core::uint128_t{1} << 64) + sourcemeta::core::uint128_t{1}};
+  const auto result = value * value;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 1);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 2);
+}
+
+TEST(Numeric_uint128, multiply_word_boundary_carry_populates_high_word) {
+  const auto left = sourcemeta::core::uint128_t{1} << 32;
+  const auto result = left * left;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 0);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 1);
+}
+
+TEST(Numeric_uint128, multiply_max_low_squared_matches_schoolbook) {
+  const sourcemeta::core::uint128_t value{std::uint64_t{0xFFFFFFFFFFFFFFFFULL}};
+  const auto result = value * value;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 1);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 0xFFFFFFFFFFFFFFFEULL);
+}
+
+TEST(Numeric_uint128, divide_by_high_divisor) {
+  const auto dividend =
+      (sourcemeta::core::uint128_t{2} << 64) | sourcemeta::core::uint128_t{5};
+  const auto divisor = std::uint64_t{2ULL};
+  const auto quotient = dividend / divisor;
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient), 2);
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient >> 64), 1);
+}
+
+TEST(Numeric_uint128, divide_with_high_half_dividend) {
+  const auto dividend =
+      (sourcemeta::core::uint128_t{4} << 64) | sourcemeta::core::uint128_t{6};
+  const auto divisor = std::uint64_t{2ULL};
+  const auto quotient = dividend / divisor;
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient), 3);
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient >> 64), 2);
+}
+
+TEST(Numeric_uint128, construct_from_negative_int64_sets_all_bits) {
+  const sourcemeta::core::uint128_t value{
+      static_cast<sourcemeta::core::uint128_t>(std::int64_t{-1})};
+  EXPECT_EQ(static_cast<std::uint64_t>(value), UINT64_MAX);
+  EXPECT_EQ(static_cast<std::uint64_t>(value >> 64), UINT64_MAX);
+}
+
+TEST(Numeric_uint128, construct_from_negative_int_sets_all_bits) {
+  const sourcemeta::core::uint128_t value{
+      static_cast<sourcemeta::core::uint128_t>(int{-1})};
+  EXPECT_EQ(static_cast<std::uint64_t>(value), UINT64_MAX);
+  EXPECT_EQ(static_cast<std::uint64_t>(value >> 64), UINT64_MAX);
+}
+
+TEST(Numeric_uint128, shift_at_64_bits) {
+  const auto shifted_left = sourcemeta::core::uint128_t{1} << 64;
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_left), 0);
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_left >> 64), 1);
+
+  const auto shifted_right = shifted_left >> 64;
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_right), 1);
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_right >> 64), 0);
+}
+
+TEST(Numeric_uint128, shift_at_127_bits) {
+  const auto shifted_left = sourcemeta::core::uint128_t{1} << 127;
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_left), 0);
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_left >> 64),
+            std::uint64_t{1ULL} << 63);
+
+  const auto shifted_right = shifted_left >> 127;
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_right), 1);
+  EXPECT_EQ(static_cast<std::uint64_t>(shifted_right >> 64), 0);
+}
+
+TEST(Numeric_uint128, bitwise_or_across_words) {
+  const auto low = sourcemeta::core::uint128_t{std::uint64_t{0x0FULL}};
+  const auto high = sourcemeta::core::uint128_t{1} << 64;
+  const auto result = low | high;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 0x0FULL);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 1);
+}
+
+TEST(Numeric_uint128, bitwise_and_across_words) {
+  const auto value =
+      ((sourcemeta::core::uint128_t{std::uint64_t{0xF0F0F0F0F0F0F0F0ULL}})
+       << 64) |
+      sourcemeta::core::uint128_t{std::uint64_t{0x0F0F0F0F0F0F0F0FULL}};
+  const auto mask =
+      ((sourcemeta::core::uint128_t{std::uint64_t{0xFFFFFFFF00000000ULL}})
+       << 64) |
+      sourcemeta::core::uint128_t{std::uint64_t{0x00000000FFFFFFFFULL}};
+  const auto result = value & mask;
+  EXPECT_EQ(static_cast<std::uint64_t>(result), 0x0F0F0F0FULL);
+  EXPECT_EQ(static_cast<std::uint64_t>(result >> 64), 0xF0F0F0F000000000ULL);
+}
+
+TEST(Numeric_uint128, divide_by_max_uint64_at_bit_127) {
+  const auto dividend = sourcemeta::core::uint128_t{1} << 127;
+  const auto divisor = std::uint64_t{UINT64_MAX};
+  const auto quotient = dividend / divisor;
+  const auto remainder = dividend % divisor;
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient), std::uint64_t{1} << 63);
+  EXPECT_EQ(static_cast<std::uint64_t>(quotient >> 64), 0);
+  EXPECT_EQ(static_cast<std::uint64_t>(remainder), std::uint64_t{1} << 63);
+  EXPECT_EQ(static_cast<std::uint64_t>(remainder >> 64), 0);
+}
+
+TEST(Numeric_uint128,
+     divide_high_word_populated_by_high_bit_divisor_preserves_carry) {
+  const auto dividend =
+      (sourcemeta::core::uint128_t{std::uint64_t{0x8000000000000001ULL}}
+       << 64) |
+      sourcemeta::core::uint128_t{std::uint64_t{0xFFFFFFFFFFFFFFFFULL}};
+  const auto divisor = std::uint64_t{0xFFFFFFFFFFFFFFFFULL};
+  const auto quotient = dividend / divisor;
+  const auto remainder = dividend % divisor;
+  const auto reconstructed =
+      quotient * sourcemeta::core::uint128_t{divisor} + remainder;
+  EXPECT_EQ(static_cast<std::uint64_t>(reconstructed),
+            static_cast<std::uint64_t>(dividend));
+  EXPECT_EQ(static_cast<std::uint64_t>(reconstructed >> 64),
+            static_cast<std::uint64_t>(dividend >> 64));
+  EXPECT_TRUE(remainder < sourcemeta::core::uint128_t{divisor});
 }

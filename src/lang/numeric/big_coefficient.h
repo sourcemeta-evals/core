@@ -1,8 +1,8 @@
 #ifndef SOURCEMETA_CORE_NUMERIC_BIG_COEFFICIENT_H_
 #define SOURCEMETA_CORE_NUMERIC_BIG_COEFFICIENT_H_
 
-#include <algorithm>  // std::max, std::copy, std::fill
-#include <array>      // std::array
+#include <algorithm> // std::max, std::copy, std::fill
+#include <array>     // std::array
 #include <cstdint>   // std::int32_t, std::int64_t, std::uint32_t,
                      // std::uint64_t, std::uintptr_t, std::uint8_t
 #include <cstring>   // std::memcpy
@@ -198,7 +198,17 @@ public:
 
     if (this->words[0] != 0) {
       while (this->words[0] % 10 == 0) {
-        this->words[0] /= 10;
+        std::uint64_t remainder = 0;
+        for (auto index = this->length; index > 0; --index) {
+          std::uint64_t combined = remainder * BASE + this->words[index - 1];
+          this->words[index - 1] = combined / 10;
+          remainder = combined % 10;
+        }
+
+        if (this->length > 1 && this->words[this->length - 1] == 0) {
+          this->length--;
+        }
+
         total_stripped++;
       }
     }
@@ -419,8 +429,25 @@ public:
         }
 
       } else {
-        remainder = remainder.subtract(divisor);
-        quotient.words[0]++;
+        auto divisor_top = divisor.words[divisor.length - 1];
+        auto estimate =
+            static_cast<std::uint64_t>(remainder_top / (divisor_top + 1));
+        if (estimate == 0) {
+          estimate = 1;
+        }
+
+        BigCoefficient estimate_big{1};
+        estimate_big.words[0] = estimate;
+        estimate_big.length = 1;
+
+        auto product = estimate_big.multiply(divisor);
+        if (product.compare(remainder) > 0) {
+          remainder = remainder.subtract(divisor);
+          quotient.words[0]++;
+        } else {
+          remainder = remainder.subtract(product);
+          quotient = quotient.add(estimate_big);
+        }
       }
     }
 
@@ -478,6 +505,11 @@ public:
     while (exponent > 0) {
       value *= 10;
       exponent--;
+    }
+
+    while (exponent < 0) {
+      value = value / sourcemeta::core::uint128_t{10};
+      exponent++;
     }
 
     return value;
