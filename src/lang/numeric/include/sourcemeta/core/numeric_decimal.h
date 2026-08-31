@@ -289,6 +289,13 @@ inline auto operator>=(const T left, const Decimal &right) -> bool {
   return Decimal{left} >= right;
 }
 
+struct DecimalInternalRepresentation {
+  int coefficient;
+  int exponent;
+};
+
+auto operator<<(int, const Decimal &) -> int;
+
 } // namespace sourcemeta::core
 
 #endif

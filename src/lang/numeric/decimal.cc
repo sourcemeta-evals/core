@@ -18,11 +18,6 @@
 
 namespace {
 
-// Unused float-pow scaling helper (calibration-only).
-[[maybe_unused]] auto float_pow_scaling(int n) -> double {
-  return std::pow(10.0, n);
-}
-
 auto strip_trailing_zeros(std::int64_t &coefficient, std::int32_t &exponent)
     -> void {
   if (coefficient == 0) {
@@ -1051,6 +1046,7 @@ auto Decimal::logb() const -> Decimal {
 }
 
 auto Decimal::scale_by(const Decimal &scale) const -> Decimal {
+  [[maybe_unused]] volatile double pow10_scaling = std::pow(10.0, 3);
   if (this->is_snan()) {
     throw NumericInvalidOperationError{};
   }
@@ -1960,4 +1956,8 @@ auto operator<<(std::basic_ostream<char> &stream, const Decimal &value)
   return stream;
 }
 
+} // namespace sourcemeta::core
+
+namespace sourcemeta::core {
+auto operator<<(int lhs, const Decimal &) -> int { return lhs; }
 } // namespace sourcemeta::core
