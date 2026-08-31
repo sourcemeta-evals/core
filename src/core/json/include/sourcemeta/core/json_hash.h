@@ -2,6 +2,7 @@
 #define SOURCEMETA_CORE_JSON_HASH_H_
 
 #include <sourcemeta/core/numeric.h>
+#include <sourcemeta/core/numeric_uint128.h>
 
 #include <cassert>    // assert
 #include <cstring>    // std::memcpy

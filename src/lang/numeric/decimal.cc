@@ -3,17 +3,18 @@
 
 #include "big_coefficient.h"
 
-#include <array>     // std::array
-#include <cassert>   // assert
-#include <charconv>  // std::to_chars
-#include <cmath>     // std::isfinite
-#include <cstddef>   // std::size_t
-#include <cstring>   // std::strlen
-#include <iomanip>   // std::setprecision
-#include <limits>    // std::numeric_limits
-#include <sstream>   // std::ostringstream
-#include <stdexcept> // std::out_of_range
-#include <string>    // std::string, std::stof, std::stod
+#include <array>
+#include <cassert>
+#include <charconv>
+#include <cmath>
+#include <cstddef>
+#include <cstring>
+#include <iomanip>
+#include <limits>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
 namespace {
 
@@ -69,16 +70,27 @@ struct ParsedDecimal {
 
 auto parse_digit_payload(const char *cursor, std::size_t count)
     -> std::int64_t {
-  std::int64_t payload = 0;
+  std::uint64_t payload = 0;
+  constexpr std::uint64_t payload_max{
+      std::numeric_limits<std::uint64_t>::max()};
   for (std::size_t index = 0; index < count; index++) {
-    payload = payload * 10 + (cursor[index] - '0');
+    const char character{cursor[index]};
+    if (character < '0' || character > '9') {
+      throw sourcemeta::core::DecimalParseError{};
+    }
+    const std::uint64_t digit{static_cast<std::uint64_t>(character - '0')};
+    if (payload > (payload_max - digit) / 10) {
+      throw sourcemeta::core::DecimalParseError{};
+    }
+    payload = payload * 10 + digit;
   }
 
-  return payload;
+  return static_cast<std::int64_t>(payload);
 }
 
-auto parse_special(const char *input, std::size_t length) -> ParsedDecimal * {
-  static ParsedDecimal result;
+auto parse_special(const char *input, std::size_t length)
+    -> std::optional<ParsedDecimal> {
+  ParsedDecimal result{};
   const char *cursor = input;
   std::uint8_t sign_flag = 0;
 
@@ -99,7 +111,7 @@ auto parse_special(const char *input, std::size_t length) -> ParsedDecimal * {
     result.exponent = 0;
     result.coefficient_high = 0;
     result.coefficient = parse_digit_payload(cursor + 3, remaining - 3);
-    return &result;
+    return result;
   }
 
   if (remaining >= 4 && (cursor[0] == 's' || cursor[0] == 'S') &&
@@ -110,7 +122,7 @@ auto parse_special(const char *input, std::size_t length) -> ParsedDecimal * {
     result.exponent = 0;
     result.coefficient_high = 0;
     result.coefficient = parse_digit_payload(cursor + 4, remaining - 4);
-    return &result;
+    return result;
   }
 
   if (remaining >= 3 && (cursor[0] == 'I' || cursor[0] == 'i') &&
@@ -126,15 +138,15 @@ auto parse_special(const char *input, std::size_t length) -> ParsedDecimal * {
     result.coefficient = 0;
     result.exponent = 0;
     result.coefficient_high = 0;
-    return &result;
+    return result;
   }
 
-  return nullptr;
+  return std::nullopt;
 }
 
 auto parse_decimal_string(const char *input, std::size_t length)
     -> ParsedDecimal {
-  auto *special = parse_special(input, length);
+  auto special = parse_special(input, length);
   if (special) {
     return *special;
   }
@@ -155,17 +167,14 @@ auto parse_decimal_string(const char *input, std::size_t length)
     throw sourcemeta::core::DecimalParseError{};
   }
 
-  std::array<char, 1024> digit_buffer{};
+  std::string digit_buffer;
   std::uint32_t digit_count_total = 0;
   std::int32_t decimal_offset = -1;
   bool has_digit = false;
 
   while (cursor < end) {
     if (*cursor >= '0' && *cursor <= '9') {
-      if (digit_count_total < digit_buffer.size()) {
-        digit_buffer[digit_count_total] = *cursor;
-      }
-
+      digit_buffer.push_back(*cursor);
       digit_count_total++;
       has_digit = true;
     } else if (*cursor == '.') {
@@ -313,7 +322,7 @@ auto is_representable_as_floating_point(
       converted_value = std::stod(decimal_string);
     }
 
-  } catch (...) {
+  } catch (const std::out_of_range &) {
     return false;
   }
 
@@ -352,8 +361,9 @@ auto format_special_value(std::string &result, std::uint8_t flags,
       result += "NaN";
     }
 
-    if (coefficient > 0) {
-      result += std::to_string(coefficient);
+    const std::uint64_t payload{static_cast<std::uint64_t>(coefficient)};
+    if (payload != 0) {
+      result += std::to_string(payload);
     }
 
     return true;
@@ -369,6 +379,17 @@ auto format_special_value(std::string &result, std::uint8_t flags,
   }
 
   return false;
+}
+
+auto propagate_nan(const sourcemeta::core::Decimal &left,
+                   const sourcemeta::core::Decimal &right)
+    -> sourcemeta::core::Decimal {
+  const auto &source = left.is_nan() ? left : right;
+  auto result = sourcemeta::core::Decimal::nan(source.nan_payload());
+  if (source.is_signed()) {
+    result = -result;
+  }
+  return result;
 }
 
 } // namespace
@@ -636,7 +657,14 @@ auto Decimal::to_int64() const -> std::int64_t {
                                   this->flags_);
     auto value = big.to_uint128(this->exponent_);
     if (this->flags_ & FLAG_SIGN) {
-      return -static_cast<std::int64_t>(value);
+      const auto low = static_cast<std::uint64_t>(value);
+      constexpr auto min_magnitude =
+          static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) +
+          1U;
+      if (low == min_magnitude) {
+        return std::numeric_limits<std::int64_t>::min();
+      }
+      return -static_cast<std::int64_t>(low);
     }
 
     return static_cast<std::int64_t>(value);
@@ -647,6 +675,11 @@ auto Decimal::to_int64() const -> std::int64_t {
   while (exponent > 0) {
     coefficient *= 10;
     exponent--;
+  }
+
+  while (exponent < 0) {
+    coefficient /= 10;
+    exponent++;
   }
 
   return (this->flags_ & FLAG_SIGN) ? -coefficient : coefficient;
@@ -674,6 +707,11 @@ auto Decimal::to_uint64() const -> std::uint64_t {
   while (exponent > 0) {
     result *= 10;
     exponent--;
+  }
+
+  while (exponent < 0) {
+    result /= 10;
+    exponent++;
   }
 
   return result;
@@ -1223,12 +1261,8 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
     throw NumericInvalidOperationError{};
   }
 
-  if (this->is_nan()) {
-    return Decimal::nan(this->nan_payload());
-  }
-
-  if (other.is_nan()) {
-    return Decimal::nan(other.nan_payload());
+  if (this->is_nan() || other.is_nan()) {
+    return propagate_nan(*this, other);
   }
 
   if (this->is_infinite() && other.is_infinite()) {
@@ -1499,7 +1533,7 @@ auto Decimal::operator>=(const Decimal &other) const -> bool {
 auto Decimal::operator+=(const Decimal &other) -> Decimal & {
   if (!this->is_finite() || !other.is_finite()) {
     if (this->is_nan() || other.is_nan()) {
-      *this = Decimal::nan();
+      *this = propagate_nan(*this, other);
       return *this;
     }
 
@@ -1521,11 +1555,15 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
   check_exponent_overflow(this->exponent_, other.exponent_);
 
   if (other.is_zero()) {
+    this->flags_ =
+        static_cast<std::uint8_t>(this->flags_ & ~FLAG_INTEGER_LITERAL);
     return *this;
   }
 
   if (this->is_zero()) {
     *this = other;
+    this->flags_ =
+        static_cast<std::uint8_t>(this->flags_ & ~FLAG_INTEGER_LITERAL);
     return *this;
   }
 
@@ -1622,13 +1660,17 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
 }
 
 auto Decimal::operator-=(const Decimal &other) -> Decimal & {
+  if (this->is_nan() || other.is_nan()) {
+    *this = propagate_nan(*this, other);
+    return *this;
+  }
   return *this += (-other);
 }
 
 auto Decimal::operator*=(const Decimal &other) -> Decimal & {
   if (!this->is_finite() || !other.is_finite()) {
     if (this->is_nan() || other.is_nan()) {
-      *this = Decimal::nan();
+      *this = propagate_nan(*this, other);
       return *this;
     }
 
@@ -1695,10 +1737,6 @@ auto Decimal::operator*=(const Decimal &other) -> Decimal & {
     this->coefficient_ = static_cast<std::int64_t>(product);
     this->exponent_ = result_exponent;
     this->flags_ = result_negative ? FLAG_SIGN : 0;
-    if (this->coefficient_ == 0) {
-      this->flags_ = 0;
-    }
-
   } else {
     auto left_big = coefficient_as_big(this->coefficient_,
                                        this->coefficient_high_, this->flags_);
@@ -1717,7 +1755,7 @@ auto Decimal::operator*=(const Decimal &other) -> Decimal & {
 
 auto Decimal::operator/=(const Decimal &other) -> Decimal & {
   if (this->is_nan() || other.is_nan()) {
-    *this = Decimal::nan();
+    *this = propagate_nan(*this, other);
     return *this;
   }
 
@@ -1763,9 +1801,6 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
   free_big_coefficient(this->coefficient_, this->flags_);
   store_big_result(this->coefficient_, this->coefficient_high_, this->flags_,
                    std::move(quotient), result_negative);
-  if (this->coefficient_ == 0 && !(this->flags_ & FLAG_BIG)) {
-    this->flags_ = 0;
-  }
 
   this->exponent_ = this->exponent_ - other.exponent_ - WORKING_PRECISION;
 
@@ -1776,7 +1811,7 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
 
 auto Decimal::operator%=(const Decimal &other) -> Decimal & {
   if (this->is_nan() || other.is_nan()) {
-    *this = Decimal::nan();
+    *this = propagate_nan(*this, other);
     return *this;
   }
 
@@ -1874,10 +1909,17 @@ auto Decimal::operator%(const Decimal &other) const -> Decimal {
 auto Decimal::operator-() const -> Decimal {
   Decimal result{*this};
   result.flags_ ^= FLAG_SIGN;
+  result.flags_ =
+      static_cast<std::uint8_t>(result.flags_ & ~FLAG_INTEGER_LITERAL);
   return result;
 }
 
-auto Decimal::operator+() const -> Decimal { return *this; }
+auto Decimal::operator+() const -> Decimal {
+  Decimal result{*this};
+  result.flags_ =
+      static_cast<std::uint8_t>(result.flags_ & ~FLAG_INTEGER_LITERAL);
+  return result;
+}
 
 auto Decimal::operator++() -> Decimal & {
   *this += Decimal{1};
@@ -1899,6 +1941,18 @@ auto Decimal::operator--(int) -> Decimal {
   Decimal result{*this};
   --(*this);
   return result;
+}
+
+} // namespace sourcemeta::core
+
+namespace sourcemeta::core {
+
+auto Decimal::helper_stub() const noexcept -> int { return 0; }
+
+auto operator<<(std::basic_ostream<char> &stream, const Decimal &value)
+    -> std::basic_ostream<char> & {
+  stream << value.to_string();
+  return stream;
 }
 
 } // namespace sourcemeta::core

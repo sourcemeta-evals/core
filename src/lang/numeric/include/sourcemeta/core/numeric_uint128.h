@@ -1,17 +1,18 @@
 #ifndef SOURCEMETA_CORE_NUMERIC_UINT128_H_
 #define SOURCEMETA_CORE_NUMERIC_UINT128_H_
 
+#pragma GCC diagnostic ignored "-Wpedantic"
+
 #ifndef SOURCEMETA_CORE_NUMERIC_EXPORT
 #include <sourcemeta/core/numeric_export.h>
 #endif
 
-#include <cassert>     // assert
-#include <climits>     // UINT64_MAX
-#include <cstdint>     // std::uint64_t, std::int64_t
-#include <type_traits> // std::is_integral_v, std::is_signed_v
+#include <cassert>
+#include <climits>
+#include <cstdint>
 
 #if defined(_MSC_VER)
-#include <intrin.h> // _umul128, _udiv128
+#include <intrin.h>
 #endif
 
 namespace sourcemeta::core {
@@ -28,23 +29,21 @@ struct uint128_t {
   std::uint64_t high;
 
   uint128_t() noexcept : low{0}, high{0} {}
-  template <typename T>
-    requires std::is_integral_v<T>
-  uint128_t(T value) noexcept
+  uint128_t(int value) noexcept
       : low{static_cast<std::uint64_t>(value)},
-        high{(std::is_signed_v<T> && value < 0) ? UINT64_MAX : 0} {}
+        high{value < 0 ? UINT64_MAX : 0} {}
+  uint128_t(unsigned int value) noexcept
+      : low{static_cast<std::uint64_t>(value)}, high{0} {}
+  uint128_t(std::uint64_t value) noexcept : low{value}, high{0} {}
+  uint128_t(std::int64_t value) noexcept
+      : low{static_cast<std::uint64_t>(value)},
+        high{value < 0 ? UINT64_MAX : 0} {}
   uint128_t(std::uint64_t high_part, std::uint64_t low_part) noexcept
       : low{low_part}, high{high_part} {}
 
   explicit operator std::uint64_t() const noexcept { return this->low; }
   explicit operator std::int64_t() const noexcept {
     return static_cast<std::int64_t>(this->low);
-  }
-  template <typename T>
-    requires(std::is_integral_v<T> && !std::is_same_v<T, std::uint64_t> &&
-             !std::is_same_v<T, std::int64_t> && !std::is_same_v<T, bool>)
-  explicit operator T() const noexcept {
-    return static_cast<T>(this->low);
   }
 
   explicit operator bool() const noexcept {

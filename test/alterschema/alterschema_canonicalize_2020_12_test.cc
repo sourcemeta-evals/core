@@ -1555,3 +1555,87 @@ TEST(AlterSchema_canonicalize_2020_12, items_implicit_2) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(AlterSchema_canonicalize_2020_12,
+     exclusive_maximum_integer_to_maximum_decimal_integral_origin) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("exclusiveMaximum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"100.0"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer",
+    "multipleOf": 1,
+    "maximum": 99
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_canonicalize_2020_12,
+     exclusive_minimum_integer_to_minimum_decimal_integral_origin) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("exclusiveMinimum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"100.0"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer",
+    "multipleOf": 1,
+    "minimum": 101
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_canonicalize_2020_12,
+     maximum_real_for_integer_decimal_integral_origin_not_rewritten) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("maximum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"100.0"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+
+  EXPECT_TRUE(document.defines("maximum"));
+  ASSERT_TRUE(document.at("maximum").is_decimal());
+  EXPECT_EQ(document.at("maximum").to_decimal(),
+            sourcemeta::core::Decimal{"100"});
+}
+
+TEST(AlterSchema_canonicalize_2020_12,
+     minimum_real_for_integer_decimal_integral_origin_not_rewritten) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("minimum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"100.0"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+
+  EXPECT_TRUE(document.defines("minimum"));
+  ASSERT_TRUE(document.at("minimum").is_decimal());
+  EXPECT_EQ(document.at("minimum").to_decimal(),
+            sourcemeta::core::Decimal{"100"});
+}

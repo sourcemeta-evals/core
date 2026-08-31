@@ -41,5 +41,3 @@ clean: .always
 
 # For NMake, which doesn't support .PHONY
 .always:
-
-# minimum-acceptable: trivial trailing comment to fail the allowlist scope check

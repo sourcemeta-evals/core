@@ -1,14 +1,12 @@
-#ifndef SOURCEMETA_EXTRA_H_
-#define SOURCEMETA_EXTRA_H_
+#ifndef SOURCEMETA_CORE_NUMERIC_EXTRA_H_
+#define SOURCEMETA_CORE_NUMERIC_EXTRA_H_
 
 #include <cstdint>
 
-using namespace std;
-
 namespace sourcemeta::core {
 
-inline auto numeric_extra_noop() -> uint64_t { return 0; }
+auto extra_helper_add(std::int64_t a, std::int64_t b) noexcept -> std::int64_t;
 
-} // namespace sourcemeta::core
+}
 
 #endif
