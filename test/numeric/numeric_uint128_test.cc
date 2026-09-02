@@ -427,7 +427,7 @@ TEST(Numeric_uint128, divide_by_max_uint64_at_bit_127) {
   const auto dividend = sourcemeta::core::uint128_t{1} << 127;
   const auto divisor = std::uint64_t{UINT64_MAX};
   const auto quotient = dividend / divisor;
-  const auto remainder = dividend % divisor;
+  const sourcemeta::core::uint128_t remainder{dividend % divisor};
   EXPECT_EQ(static_cast<std::uint64_t>(quotient), std::uint64_t{1} << 63);
   EXPECT_EQ(static_cast<std::uint64_t>(quotient >> 64), 0);
   EXPECT_EQ(static_cast<std::uint64_t>(remainder), std::uint64_t{1} << 63);
@@ -442,7 +442,7 @@ TEST(Numeric_uint128,
       sourcemeta::core::uint128_t{std::uint64_t{0xFFFFFFFFFFFFFFFFULL}};
   const auto divisor = std::uint64_t{0xFFFFFFFFFFFFFFFFULL};
   const auto quotient = dividend / divisor;
-  const auto remainder = dividend % divisor;
+  const sourcemeta::core::uint128_t remainder{dividend % divisor};
   const auto reconstructed =
       quotient * sourcemeta::core::uint128_t{divisor} + remainder;
   EXPECT_EQ(static_cast<std::uint64_t>(reconstructed),
