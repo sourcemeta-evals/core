@@ -3779,7 +3779,7 @@ TEST(Numeric_decimal, reduce_multi_limb_preserves_value) {
 
 TEST(Numeric_decimal,
      multiply_negative_zero_by_positive_preserves_negative_sign) {
-  const auto negative_zero{-sourcemeta::core::Decimal{0}};
+  const auto negative_zero{sourcemeta::core::Decimal{"-0"}};
   const auto result{negative_zero * sourcemeta::core::Decimal{1}};
   EXPECT_TRUE(result.is_zero());
   EXPECT_TRUE(result.is_signed());
@@ -3788,22 +3788,22 @@ TEST(Numeric_decimal,
 TEST(Numeric_decimal,
      multiply_positive_by_negative_zero_produces_negative_zero) {
   const auto result{sourcemeta::core::Decimal{1} *
-                    (-sourcemeta::core::Decimal{0})};
+                    sourcemeta::core::Decimal{"-0"}};
   EXPECT_TRUE(result.is_zero());
   EXPECT_TRUE(result.is_signed());
 }
 
 TEST(Numeric_decimal,
      multiply_negative_zero_by_negative_produces_positive_zero) {
-  const auto result{(-sourcemeta::core::Decimal{0}) *
-                    (-sourcemeta::core::Decimal{1})};
+  const auto result{sourcemeta::core::Decimal{"-0"} *
+                    sourcemeta::core::Decimal{"-1"}};
   EXPECT_TRUE(result.is_zero());
   EXPECT_FALSE(result.is_signed());
 }
 
 TEST(Numeric_decimal,
      divide_negative_zero_by_positive_preserves_negative_sign) {
-  const auto negative_zero{-sourcemeta::core::Decimal{0}};
+  const auto negative_zero{sourcemeta::core::Decimal{"-0"}};
   const auto result{negative_zero / sourcemeta::core::Decimal{1}};
   EXPECT_TRUE(result.is_zero());
   EXPECT_TRUE(result.is_signed());
@@ -3940,7 +3940,7 @@ TEST(Numeric_decimal, divide_integer_large_same_limb_nearby_divisor) {
 }
 
 TEST(Numeric_decimal, add_nan_left_propagates_payload_and_sign) {
-  const auto left = -sourcemeta::core::Decimal::nan(123);
+  const auto left = sourcemeta::core::Decimal{"-NaN123"};
   const auto right = sourcemeta::core::Decimal{5};
   const auto result = left + right;
   EXPECT_TRUE(result.is_qnan());
@@ -3974,7 +3974,7 @@ TEST(Numeric_decimal, subtract_nan_propagates_payload) {
 }
 
 TEST(Numeric_decimal, multiply_nan_propagates_payload_and_sign) {
-  const auto left = -sourcemeta::core::Decimal::nan(9);
+  const auto left = sourcemeta::core::Decimal{"-NaN9"};
   const auto right = sourcemeta::core::Decimal{2};
   const auto result = left * right;
   EXPECT_TRUE(result.is_qnan());
