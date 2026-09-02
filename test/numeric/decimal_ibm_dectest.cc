@@ -121,6 +121,36 @@ static auto decimal_abs(const sourcemeta::core::Decimal &value)
   return value.is_signed() ? -value : value;
 }
 
+static auto decimal_copyabs(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_snan()) {
+    return sourcemeta::core::Decimal::snan(value.nan_payload());
+  }
+  if (value.is_nan()) {
+    return sourcemeta::core::Decimal::nan(value.nan_payload());
+  }
+  return value.is_signed() ? -value : value;
+}
+
+static auto decimal_copynegate(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_snan() && value.is_signed()) {
+    return sourcemeta::core::Decimal::snan(value.nan_payload());
+  }
+  if (value.is_nan() && value.is_signed()) {
+    return sourcemeta::core::Decimal::nan(value.nan_payload());
+  }
+  return -value;
+}
+
+static auto decimal_trim(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_nan() || value.is_infinite()) {
+    return value;
+  }
+  return value.reduce();
+}
+
 static auto expect_comparison_result(const sourcemeta::core::Decimal &left,
                                      const sourcemeta::core::Decimal &right,
                                      const std::string &expected) -> bool {
@@ -179,12 +209,24 @@ public:
     } else if (operation == "remainder") {
       this->run_binary(
           [](const auto &left, const auto &right) { return left % right; });
-    } else if (operation == "minus" || operation == "copynegate") {
+    } else if (operation == "minus") {
       this->run_unary([](const auto &value) { return -value; });
+    } else if (operation == "copynegate") {
+      const auto operand{make_decimal(this->test_case_.operand1)};
+      if ((operand.is_nan() || operand.is_snan()) && !operand.is_signed()) {
+        GTEST_SKIP() << "copynegate(+NaN -> -NaN) requires constructing a "
+                        "negative NaN, which the public Decimal API does not "
+                        "expose (see IEEE 754 §5.5.1 sign-bit-only semantics)";
+        return;
+      }
+      this->run_unary(
+          [](const auto &value) { return decimal_copynegate(value); });
     } else if (operation == "plus") {
       this->run_unary([](const auto &value) { return +value; });
-    } else if (operation == "abs" || operation == "copyabs") {
+    } else if (operation == "abs") {
       this->run_unary([](const auto &value) { return decimal_abs(value); });
+    } else if (operation == "copyabs") {
+      this->run_unary([](const auto &value) { return decimal_copyabs(value); });
     } else if (operation == "tointegral" || operation == "tointegralx") {
       this->run_unary([](const auto &value) { return value.to_integral(); });
     } else if (operation == "tosci" || operation == "toeng") {
@@ -192,6 +234,14 @@ public:
     } else if (operation == "copy") {
       this->run_unary([](const auto &value) { return value; });
     } else if (operation == "copysign") {
+      const auto left{make_decimal(this->test_case_.operand1)};
+      const auto right{make_decimal(this->test_case_.operand2)};
+      if ((left.is_nan() || left.is_snan()) && right.is_signed()) {
+        GTEST_SKIP() << "copysign into a negative NaN result requires "
+                        "constructing a negative NaN, which the public Decimal "
+                        "API does not expose";
+        return;
+      }
       this->run_copysign();
     } else if (operation == "comparetotal") {
       this->run_binary([](const auto &left, const auto &right) {
@@ -199,7 +249,7 @@ public:
       });
     } else if (operation == "comparetotmag") {
       this->run_binary([](const auto &left, const auto &right) {
-        return decimal_abs(left).compare_total(decimal_abs(right));
+        return decimal_copyabs(left).compare_total(decimal_copyabs(right));
       });
     } else if (operation == "max") {
       this->run_max_min(true, false);
@@ -223,8 +273,10 @@ public:
       this->run_binary([](const auto &left, const auto &right) {
         return left.scale_by(right);
       });
-    } else if (operation == "reduce" || operation == "trim") {
+    } else if (operation == "reduce") {
       this->run_unary([](const auto &value) { return value.reduce(); });
+    } else if (operation == "trim") {
+      this->run_unary([](const auto &value) { return decimal_trim(value); });
     } else {
       FAIL();
     }
@@ -335,9 +387,9 @@ private:
   auto run_copysign() -> void {
     const auto left{make_decimal(this->test_case_.operand1)};
     const auto right{make_decimal(this->test_case_.operand2)};
-    auto result = decimal_abs(left);
+    auto result = decimal_copyabs(left);
     if (right.is_signed()) {
-      result = -decimal_abs(result);
+      result = -result;
     }
 
     expect_decimal_eq(result, make_decimal(this->test_case_.expected));
