@@ -1303,6 +1303,22 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
     return result;
   }
 
+  if (this->exponent_ >= 0) {
+    const Decimal one{1};
+    Decimal other_abs = other;
+    other_abs.flags_ &= ~FLAG_SIGN;
+    if (other_abs == one) {
+      Decimal result = *this;
+      result.flags_ &= ~FLAG_INTEGER_LITERAL;
+      if (result_negative) {
+        result.flags_ |= FLAG_SIGN;
+      } else {
+        result.flags_ &= ~FLAG_SIGN;
+      }
+      return result;
+    }
+  }
+
   auto dividend_big = coefficient_as_big(this->coefficient_,
                                          this->coefficient_high_, this->flags_);
   auto divisor_big = coefficient_as_big(other.coefficient_,

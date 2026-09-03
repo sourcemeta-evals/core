@@ -4171,6 +4171,14 @@ TEST(Numeric_decimal,
 }
 
 TEST(Numeric_decimal,
+     divide_integer_by_one_hundred_million_exponent_returns_unchanged) {
+  const auto value{sourcemeta::core::Decimal{"1e100000001"}};
+  const auto quotient{value.divide_integer(sourcemeta::core::Decimal{1})};
+  EXPECT_EQ(quotient, value);
+  EXPECT_FALSE(quotient.is_nan());
+}
+
+TEST(Numeric_decimal,
      add_two_limbs_below_base_ten_pow_nineteen_carries_correctly) {
   const auto lhs{sourcemeta::core::Decimal{"9500000000000000000"}};
   const auto rhs{sourcemeta::core::Decimal{"9500000000000000000"}};
