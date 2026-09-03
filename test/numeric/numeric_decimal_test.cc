@@ -4136,3 +4136,36 @@ TEST(Numeric_decimal, divide_integer_two_million_exponent_returns_unchanged) {
   EXPECT_EQ(quotient, value);
   EXPECT_FALSE(quotient.is_nan());
 }
+
+TEST(Numeric_decimal,
+     divide_integer_hundred_thousand_digit_by_three_yields_exact_quotient) {
+  const std::string dividend_digits(100001, '9');
+  const std::string expected_digits(100001, '3');
+  const auto dividend{sourcemeta::core::Decimal{dividend_digits}};
+  const auto divisor{sourcemeta::core::Decimal{3}};
+  const auto expected{sourcemeta::core::Decimal{expected_digits}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, expected);
+  EXPECT_FALSE(quotient.is_nan());
+}
+
+TEST(Numeric_decimal,
+     divide_integer_million_exponent_by_three_truncates_exactly) {
+  const auto dividend{sourcemeta::core::Decimal{"1e1000001"}};
+  const auto divisor{sourcemeta::core::Decimal{3}};
+  const std::string expected_digits(1000001, '3');
+  const auto expected{sourcemeta::core::Decimal{expected_digits}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, expected);
+  EXPECT_FALSE(quotient.is_nan());
+}
+
+TEST(Numeric_decimal,
+     divide_integer_two_million_exponent_by_two_shifts_exactly) {
+  const auto dividend{sourcemeta::core::Decimal{"2e2000001"}};
+  const auto divisor{sourcemeta::core::Decimal{2}};
+  const auto expected{sourcemeta::core::Decimal{"1e2000001"}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, expected);
+  EXPECT_FALSE(quotient.is_nan());
+}
