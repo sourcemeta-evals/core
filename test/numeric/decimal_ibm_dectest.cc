@@ -118,7 +118,18 @@ static auto make_decimal(const std::string &raw) -> sourcemeta::core::Decimal {
 
 static auto decimal_abs(const sourcemeta::core::Decimal &value)
     -> sourcemeta::core::Decimal {
+  if (value.is_nan() || value.is_snan()) {
+    return value;
+  }
   return value.is_signed() ? -value : value;
+}
+
+static auto decimal_minus(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_nan() || value.is_snan()) {
+    return value;
+  }
+  return -value;
 }
 
 static auto decimal_copyabs(const sourcemeta::core::Decimal &value)
@@ -134,11 +145,11 @@ static auto decimal_copyabs(const sourcemeta::core::Decimal &value)
 
 static auto decimal_copynegate(const sourcemeta::core::Decimal &value)
     -> sourcemeta::core::Decimal {
-  if (value.is_snan() && value.is_signed()) {
-    return sourcemeta::core::Decimal::snan(value.nan_payload());
-  }
-  if (value.is_nan() && value.is_signed()) {
-    return sourcemeta::core::Decimal::nan(value.nan_payload());
+  if (value.is_snan() || value.is_nan()) {
+    const std::string prefix{value.is_signed() ? "" : "-"};
+    const std::string kind{value.is_snan() ? "sNaN" : "NaN"};
+    return sourcemeta::core::Decimal{prefix + kind +
+                                     std::to_string(value.nan_payload())};
   }
   return -value;
 }
@@ -177,6 +188,10 @@ static auto expect_decimal_eq(const sourcemeta::core::Decimal &result,
     } else {
       EXPECT_TRUE(result.is_qnan());
     }
+    EXPECT_EQ(result.is_signed(), expected.is_signed());
+    if (expected.nan_payload() < 1000) {
+      EXPECT_EQ(result.nan_payload(), expected.nan_payload());
+    }
   } else if (expected.is_infinite()) {
     EXPECT_TRUE(result.is_infinite());
     EXPECT_EQ(result.is_signed(), expected.is_signed());
@@ -210,15 +225,8 @@ public:
       this->run_binary(
           [](const auto &left, const auto &right) { return left % right; });
     } else if (operation == "minus") {
-      this->run_unary([](const auto &value) { return -value; });
+      this->run_unary([](const auto &value) { return decimal_minus(value); });
     } else if (operation == "copynegate") {
-      const auto operand{make_decimal(this->test_case_.operand1)};
-      if ((operand.is_nan() || operand.is_snan()) && !operand.is_signed()) {
-        GTEST_SKIP() << "copynegate(+NaN -> -NaN) requires constructing a "
-                        "negative NaN, which the public Decimal API does not "
-                        "expose (see IEEE 754 §5.5.1 sign-bit-only semantics)";
-        return;
-      }
       this->run_unary(
           [](const auto &value) { return decimal_copynegate(value); });
     } else if (operation == "plus") {
@@ -234,14 +242,6 @@ public:
     } else if (operation == "copy") {
       this->run_unary([](const auto &value) { return value; });
     } else if (operation == "copysign") {
-      const auto left{make_decimal(this->test_case_.operand1)};
-      const auto right{make_decimal(this->test_case_.operand2)};
-      if ((left.is_nan() || left.is_snan()) && right.is_signed()) {
-        GTEST_SKIP() << "copysign into a negative NaN result requires "
-                        "constructing a negative NaN, which the public Decimal "
-                        "API does not expose";
-        return;
-      }
       this->run_copysign();
     } else if (operation == "comparetotal") {
       this->run_binary([](const auto &left, const auto &right) {
@@ -389,7 +389,13 @@ private:
     const auto right{make_decimal(this->test_case_.operand2)};
     auto result = decimal_copyabs(left);
     if (right.is_signed()) {
-      result = -result;
+      if (result.is_snan() || result.is_nan()) {
+        const std::string kind{result.is_snan() ? "sNaN" : "NaN"};
+        result = sourcemeta::core::Decimal{
+            "-" + kind + std::to_string(result.nan_payload())};
+      } else {
+        result = -result;
+      }
     }
 
     expect_decimal_eq(result, make_decimal(this->test_case_.expected));
