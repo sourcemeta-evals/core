@@ -4179,6 +4179,17 @@ TEST(Numeric_decimal,
 }
 
 TEST(Numeric_decimal,
+     divide_integer_ten_million_exponent_by_three_truncates_exactly) {
+  const auto dividend{sourcemeta::core::Decimal{"1e10000001"}};
+  const auto divisor{sourcemeta::core::Decimal{3}};
+  const std::string expected_digits(10000001, '3');
+  const auto expected{sourcemeta::core::Decimal{expected_digits}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, expected);
+  EXPECT_FALSE(quotient.is_nan());
+}
+
+TEST(Numeric_decimal,
      add_two_limbs_below_base_ten_pow_nineteen_carries_correctly) {
   const auto lhs{sourcemeta::core::Decimal{"9500000000000000000"}};
   const auto rhs{sourcemeta::core::Decimal{"9500000000000000000"}};
