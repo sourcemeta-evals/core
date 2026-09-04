@@ -1306,14 +1306,14 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
   if (this->exponent_ >= 0) {
     const Decimal one{1};
     Decimal other_abs = other;
-    other_abs.flags_ &= ~FLAG_SIGN;
+    other_abs.flags_ &= static_cast<std::uint8_t>(~FLAG_SIGN);
     if (other_abs == one) {
       Decimal result = *this;
-      result.flags_ &= ~FLAG_INTEGER_LITERAL;
+      result.flags_ &= static_cast<std::uint8_t>(~FLAG_INTEGER_LITERAL);
       if (result_negative) {
         result.flags_ |= FLAG_SIGN;
       } else {
-        result.flags_ &= ~FLAG_SIGN;
+        result.flags_ &= static_cast<std::uint8_t>(~FLAG_SIGN);
       }
       return result;
     }
