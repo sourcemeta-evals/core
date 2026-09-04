@@ -4196,3 +4196,27 @@ TEST(Numeric_decimal,
   const auto expected{sourcemeta::core::Decimal{"19000000000000000000"}};
   EXPECT_EQ(lhs + rhs, expected);
 }
+
+TEST(Numeric_decimal, unary_minus_of_positive_zero_yields_negative_zero) {
+  const auto result = -sourcemeta::core::Decimal{"+0"};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(Numeric_decimal, unary_minus_of_negative_zero_yields_positive_zero) {
+  const auto result = -sourcemeta::core::Decimal{"-0"};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+}
+
+TEST(Numeric_decimal, unary_plus_of_positive_zero_preserves_positive_zero) {
+  const auto result = +sourcemeta::core::Decimal{"+0"};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+}
+
+TEST(Numeric_decimal, unary_plus_of_negative_zero_preserves_negative_zero) {
+  const auto result = +sourcemeta::core::Decimal{"-0"};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}
