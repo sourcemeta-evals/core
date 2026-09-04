@@ -4179,6 +4179,14 @@ TEST(Numeric_decimal,
 }
 
 TEST(Numeric_decimal,
+     divide_integer_by_two_billion_exponent_returns_unchanged) {
+  const auto value{sourcemeta::core::Decimal{"1e2000000000"}};
+  const auto quotient{value.divide_integer(sourcemeta::core::Decimal{1})};
+  EXPECT_EQ(quotient, value);
+  EXPECT_FALSE(quotient.is_nan());
+}
+
+TEST(Numeric_decimal,
      divide_integer_ten_million_exponent_by_three_truncates_exactly) {
   const auto dividend{sourcemeta::core::Decimal{"1e10000001"}};
   const auto divisor{sourcemeta::core::Decimal{3}};
