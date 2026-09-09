@@ -323,6 +323,12 @@ TEST(mailto_iri_rejects_general_address_literal) {
   EXPECT_FALSE(sourcemeta::core::mailto_iri("user@[foo:bar/baz]").has_value());
 }
 
+// RFC 5321 §4.1.3: an IPv6-tagged literal whose payload is not a valid IPv6
+// address is not an address-literal, so the mailbox has no domain to render
+TEST(mailto_iri_rejects_malformed_ipv6_tag_payload) {
+  EXPECT_FALSE(sourcemeta::core::mailto_iri("user@[IPv6:zzz]").has_value());
+}
+
 // RFC 5321 §4.1.2: Mailbox = Local-part "@" ( Domain / address-literal ),
 // the empty string is not a Mailbox
 TEST(mailto_iri_rejects_empty) {

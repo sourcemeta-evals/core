@@ -43,6 +43,23 @@ TEST(invalid_bad_ipv4_address_literal) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email_uts46("user@[999.0.0.1]"));
 }
 
+// A valid IPv6 address literal is accepted regardless of UTS #46 processing
+TEST(valid_ipv6_address_literal) {
+  EXPECT_TRUE(sourcemeta::core::is_idn_email_uts46("user@[IPv6:2001:db8::1]"));
+}
+
+// RFC 5321 §4.1.3: an IPv6-tagged literal whose payload is not a valid IPv6
+// address is not an address-literal, so the mailbox is rejected
+TEST(invalid_malformed_ipv6_tag_payload) {
+  EXPECT_FALSE(sourcemeta::core::is_idn_email_uts46("user@[IPv6:zzz]"));
+}
+
+// RFC 5321 §4.1.3: only the IPv6 tag is registered with IANA, so a literal
+// under any other Standardized-tag is not a valid address-literal
+TEST(invalid_non_ipv6_tag_address_literal) {
+  EXPECT_FALSE(sourcemeta::core::is_idn_email_uts46("user@[unknown-tag:abc]"));
+}
+
 // RFC 5890 §2.3.2.1 states the domain U-label NFC requirement as a SHOULD, so
 // the lookup profile must not reject a non-NFC domain. The mapping normalises
 // it; the strict variant rejects it. Domain is "caf" + "e" + U+0301 ("cafe"

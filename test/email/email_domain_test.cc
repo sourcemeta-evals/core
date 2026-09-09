@@ -26,6 +26,20 @@ TEST(email_domain_ipv4_address_literal) {
             "[192.168.1.1]");
 }
 
+// RFC 5321 §4.1.3: an IPv6-tagged literal whose payload is not a valid IPv6
+// address is not an address-literal, so the mailbox is not well-formed and
+// no domain is reported
+TEST(email_domain_malformed_ipv6_tag_payload) {
+  EXPECT_TRUE(sourcemeta::core::email_domain("user@[IPv6:zzz]").empty());
+}
+
+// RFC 5321 §4.1.3: a valid IPv6 address-literal is preserved verbatim,
+// including the surrounding brackets
+TEST(email_domain_ipv6_address_literal) {
+  EXPECT_EQ(sourcemeta::core::email_domain("user@[IPv6:2001:db8::1]"),
+            "[IPv6:2001:db8::1]");
+}
+
 // RFC 5321 §2.4: mailbox domains are not case sensitive, but the domain is
 // reported as it was written, since the view borrows from the input
 TEST(email_domain_preserves_the_spelling_of_the_domain) {
