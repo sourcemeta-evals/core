@@ -120,7 +120,7 @@ static auto mailbox_separator(const std::string_view value)
 
   const auto domain{value.substr(position + 1)};
 
-  // RFC 5321 §4.1.3: address-literal = "[" ( IPv4 / IPv6 / General ) "]"
+  // RFC 5321 §4.1.3: address-literal = "[" ( IPv4 / IPv6 ) "]"
   if (!domain.empty() && domain.front() == '[') {
     if (is_address_literal(domain)) {
       return position;
