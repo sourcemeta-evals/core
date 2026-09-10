@@ -614,6 +614,20 @@ TEST(invalid_address_literal_ipv6_tag_with_letters) {
   EXPECT_FALSE(sourcemeta::core::is_email("user@[IPv6:zzz]"));
 }
 
+// RFC 6531 §3.3: the internationalized local part is unaffected by the
+// address-literal contract, so a non-ASCII local part with a valid IPv6
+// literal is accepted (2-byte UTF-8: U+03B1 GREEK SMALL ALPHA)
+TEST(valid_utf8_local_with_ipv6_address_literal) {
+  EXPECT_TRUE(sourcemeta::core::is_idn_email("\xce\xb1@[IPv6:2001:db8::1]"));
+}
+
+// RFC 5321 §4.1.3: the IPv6-tag rejection applies uniformly, so a non-ASCII
+// local part paired with a malformed IPv6 payload is rejected regardless of
+// the local part passing the RFC 6531 extension (2-byte UTF-8: U+03B1)
+TEST(invalid_utf8_local_with_malformed_ipv6_tag_payload) {
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("\xce\xb1@[IPv6:zzz]"));
+}
+
 TEST(invalid_address_literal_ipv6_tag_with_non_hexadecimal_groups) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email("user@[IPv6:g:g:g:g:g:g:g:g]"));
   EXPECT_FALSE(sourcemeta::core::is_email("user@[IPv6:g:g:g:g:g:g:g:g]"));
