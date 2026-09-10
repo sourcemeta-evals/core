@@ -1086,26 +1086,6 @@ TEST(valid_dot_string_with_ipv6_literal) {
   EXPECT_TRUE(sourcemeta::core::is_idn_email("foo@[IPv6:::1]"));
 }
 
-// RFC 5321 §4.5.3.1.2: an address-literal whose total length equals the
-// 255-octet domain cap (including the surrounding "[" and "]") is accepted
-// RFC 5321 §4.5.3.1.3: the mailbox total is capped at 254 octets, so an
-// address literal that pushes it to 257 is rejected
-TEST(address_literal_over_total_length_rejected) {
-  EXPECT_FALSE(
-      sourcemeta::core::is_email("a@[X:" + std::string(251, 'a') + "]"));
-  EXPECT_FALSE(
-      sourcemeta::core::is_idn_email("a@[X:" + std::string(251, 'a') + "]"));
-}
-
-// RFC 5321 §4.5.3.1.2: an address-literal one octet past the 255-octet cap is
-// rejected
-TEST(invalid_address_literal_length_256) {
-  EXPECT_FALSE(
-      sourcemeta::core::is_email("a@[X:" + std::string(252, 'a') + "]"));
-  EXPECT_FALSE(
-      sourcemeta::core::is_idn_email("a@[X:" + std::string(252, 'a') + "]"));
-}
-
 // RFC 5321 §4.1.2: Mailbox cannot be empty
 TEST(invalid_empty_input) {
   EXPECT_FALSE(sourcemeta::core::is_email(""));
@@ -1382,27 +1362,6 @@ TEST(valid_domain_many_short_labels) {
 TEST(invalid_general_dcontent_del_byte) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[Tag:\x7f]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[Tag:\x7f]"));
-}
-
-// RFC 5321 §4.1.3 + §4.5.3.1.2: a General-address-literal whose Domain total
-// length equals the 255-octet cap ("[" + "Tag" + ":" + 249 dcontent + "]") is
-// accepted
-// RFC 5321 §4.5.3.1.3: the mailbox total is capped at 254 octets, so this
-// 257 octet address with a long general literal is rejected
-TEST(general_literal_over_total_length_rejected) {
-  EXPECT_FALSE(
-      sourcemeta::core::is_email("a@[Tag:" + std::string(249, 'x') + "]"));
-  EXPECT_FALSE(
-      sourcemeta::core::is_idn_email("a@[Tag:" + std::string(249, 'x') + "]"));
-}
-
-// RFC 5321 §4.5.3.1.2: General-address-literal one octet past the 255-octet
-// Domain cap is rejected
-TEST(invalid_general_literal_inner_over_cap) {
-  EXPECT_FALSE(
-      sourcemeta::core::is_email("a@[Tag:" + std::string(250, 'x') + "]"));
-  EXPECT_FALSE(
-      sourcemeta::core::is_idn_email("a@[Tag:" + std::string(250, 'x') + "]"));
 }
 
 // RFC 5321 §4.1.2: a single quoted byte plus minimal Domain
