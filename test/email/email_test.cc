@@ -925,6 +925,39 @@ TEST(invalid_ipv6_body_empty) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:]"));
 }
 
+// RFC 4291 §2.2.1: each 16-bit group carries at most four hexadecimal digits
+TEST(invalid_ipv6_body_overlong_hextet) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:12345::1]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:12345::1]"));
+}
+
+// RFC 4291 §2.2.1: an uncompressed IPv6 address requires exactly eight groups
+TEST(invalid_ipv6_body_too_few_uncompressed_groups) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:6:7]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:6:7]"));
+}
+
+// RFC 4291 §2.2.3: the embedded IPv4 tail of an IPv4-mapped IPv6 address must
+// itself be a valid dotted-quad, so an out-of-range octet is rejected
+TEST(invalid_ipv6_body_bad_embedded_ipv4) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:::ffff:256.0.0.1]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:::ffff:256.0.0.1]"));
+}
+
+// RFC 4291 does not define a zone-identifier syntax for text-format IPv6
+// addresses (that syntax lives in RFC 6874), so the payload is not an address
+TEST(invalid_ipv6_body_zone_identifier) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:fe80::1%25eth0]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:fe80::1%25eth0]"));
+}
+
+// RFC 4291 §2.2: an address is a bare textual form, not a CIDR prefix, so a
+// trailing prefix length is not part of the address
+TEST(invalid_ipv6_body_prefix_length_suffix) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:2001:db8::/32]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:2001:db8::/32]"));
+}
+
 // RFC 5321 §4.1.3: nine groups are not an address, and reading them as
 // general content instead would leave the IPv6 form unable to ever fail
 TEST(invalid_ipv6_too_many_groups) {
