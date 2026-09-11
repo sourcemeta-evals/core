@@ -886,6 +886,22 @@ TEST(valid_ipv6_literal_v4_compat) {
   EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6:::192.168.1.1]"));
 }
 
+// RFC 5321 §4.1.3: Snum = 1*3DIGIT permits leading-zero spellings such as
+// "001" or "192.000.002.001", so an IPv4-mapped IPv6 form whose embedded
+// IPv4 tail carries padded octets remains a valid address literal
+TEST(valid_ipv6_literal_v4_mapped_padded_snum) {
+  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv6:::ffff:192.000.002.001]"));
+  EXPECT_TRUE(
+      sourcemeta::core::is_idn_email("a@[IPv6:::ffff:192.000.002.001]"));
+}
+
+// RFC 5321 §4.1.3: every-octet-zero-padded embedded IPv4 form is also
+// permitted under the Snum grammar
+TEST(valid_ipv6_literal_v4_compat_all_zero_padded) {
+  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv6:::000.000.000.000]"));
+  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6:::000.000.000.000]"));
+}
+
 // RFC 5234 §2.3: ABNF literal strings are case-insensitive by default, so the
 // "IPv6:" prefix matches "ipv6:"
 TEST(valid_lowercase_ipv6_literal) {
@@ -942,6 +958,14 @@ TEST(invalid_ipv6_body_too_few_uncompressed_groups) {
 TEST(invalid_ipv6_body_bad_embedded_ipv4) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:::ffff:256.0.0.1]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:::ffff:256.0.0.1]"));
+}
+
+// RFC 5321 §4.1.3: Snum caps each embedded IPv4 octet at three digits, so a
+// four-digit octet is not a valid address literal even when the numeric
+// value would fit within a byte
+TEST(invalid_ipv6_body_embedded_ipv4_overlong_octet) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:::ffff:192.0002.0.1]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:::ffff:192.0002.0.1]"));
 }
 
 // RFC 4291 does not define a zone-identifier syntax for text-format IPv6

@@ -102,6 +102,31 @@ constexpr auto matches_ipv6_tag(const std::string_view value) -> bool {
 
 // RFC 5321 §4.1.3: validate the address-literal payload (between "[" and "]")
 // as IPv6 or IPv4. Always ASCII; no IDNA applies
+// RFC 5321 §4.1.3: IPv6v4-comp / IPv6v4-full carry an embedded
+// IPv4-address-literal whose Snum octets may be one to three digits, so
+// leading-zero forms like "192.000.002.001" are permitted. The shared IPv6
+// parser validates a dotted tail with the stricter RFC 3986 dec-octet
+// grammar, which rejects those spellings, so an adapter validates the tail
+// with the RFC 5321 IPv4 grammar and substitutes two hex groups before
+// delegating the remaining hextet and compression structure to the shared
+// parser
+inline auto is_ipv6_address_literal(const std::string_view value) -> bool {
+  const auto last_colon{value.rfind(':')};
+  if (last_colon != std::string_view::npos &&
+      value.substr(last_colon + 1).contains('.')) {
+    const auto ipv4_tail{value.substr(last_colon + 1)};
+    if (!is_ipv4_address_literal(ipv4_tail)) {
+      return false;
+    }
+    std::string substituted;
+    substituted.reserve(value.size());
+    substituted.append(value.substr(0, last_colon + 1));
+    substituted.append("0:0");
+    return sourcemeta::core::is_ipv6(substituted);
+  }
+  return sourcemeta::core::is_ipv6(value);
+}
+
 inline auto is_address_literal(const std::string_view domain) -> bool {
   if (domain.back() != ']') {
     return false;
@@ -116,7 +141,7 @@ inline auto is_address_literal(const std::string_view domain) -> bool {
   // an address is turned down rather than read as general content, which
   // would otherwise leave the IPv6 form unable to ever fail
   if (matches_ipv6_tag(inner)) {
-    return sourcemeta::core::is_ipv6(inner.substr(5));
+    return is_ipv6_address_literal(inner.substr(5));
   }
   // RFC 5321 §4.1.3: a Standardized-tag must be registered with IANA before
   // being used, and the registry carries the IPv6 tag alone, so the general

@@ -48,6 +48,14 @@ TEST(valid_ipv6_address_literal) {
   EXPECT_TRUE(sourcemeta::core::is_idn_email_uts46("user@[IPv6:2001:db8::1]"));
 }
 
+// RFC 5321 §4.1.3: an IPv4-mapped IPv6 form whose embedded IPv4 tail carries
+// padded Snum octets is a valid address literal and is unaffected by UTS #46
+// domain processing
+TEST(valid_ipv6_literal_v4_mapped_padded_snum) {
+  EXPECT_TRUE(sourcemeta::core::is_idn_email_uts46(
+      "user@[IPv6:::ffff:192.000.002.001]"));
+}
+
 // RFC 5321 §4.1.3: an IPv6-tagged literal whose payload is not a valid IPv6
 // address is not an address-literal, so the mailbox is rejected
 TEST(invalid_malformed_ipv6_tag_payload) {
