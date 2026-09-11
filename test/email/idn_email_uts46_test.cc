@@ -60,6 +60,26 @@ TEST(invalid_non_ipv6_tag_address_literal) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email_uts46("user@[unknown-tag:abc]"));
 }
 
+// RFC 6532 §3.1: a UTF-8 local part is accepted regardless of UTS #46 domain
+// processing, including when the domain is a valid IPv6 address literal
+// (Greek alpha U+03B1 as the local part)
+TEST(valid_ipv6_address_literal_with_utf8_local_part) {
+  EXPECT_TRUE(
+      sourcemeta::core::is_idn_email_uts46("\xce\xb1@[IPv6:2001:db8::1]"));
+}
+
+// A UTF-8 local part must not relax IPv6 payload validation of the
+// address literal
+TEST(invalid_malformed_ipv6_tag_payload_with_utf8_local_part) {
+  EXPECT_FALSE(sourcemeta::core::is_idn_email_uts46("\xce\xb1@[IPv6:zzz]"));
+}
+
+// A UTF-8 local part must not relax the IPv6-only Standardized-tag rule
+TEST(invalid_non_ipv6_tag_address_literal_with_utf8_local_part) {
+  EXPECT_FALSE(
+      sourcemeta::core::is_idn_email_uts46("\xce\xb1@[unknown-tag:abc]"));
+}
+
 // RFC 5890 §2.3.2.1 states the domain U-label NFC requirement as a SHOULD, so
 // the lookup profile must not reject a non-NFC domain. The mapping normalises
 // it; the strict variant rejects it. Domain is "caf" + "e" + U+0301 ("cafe"
