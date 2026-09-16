@@ -2051,3 +2051,33 @@ TEST(invalid_dcontent_del) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[x:\x7f]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[x:\x7f]"));
 }
+
+TEST(regression_valid_plain_dot_atom) {
+  EXPECT_TRUE(sourcemeta::core::is_email("user@example.com"));
+  EXPECT_TRUE(sourcemeta::core::is_idn_email("user@example.com"));
+}
+
+TEST(regression_valid_ipv4_address_literal) {
+  EXPECT_TRUE(sourcemeta::core::is_email("user@[192.0.2.1]"));
+  EXPECT_TRUE(sourcemeta::core::is_idn_email("user@[192.0.2.1]"));
+}
+
+TEST(regression_valid_ipv6_loopback_literal) {
+  EXPECT_TRUE(sourcemeta::core::is_email("user@[IPv6:::1]"));
+  EXPECT_TRUE(sourcemeta::core::is_idn_email("user@[IPv6:::1]"));
+}
+
+TEST(regression_invalid_missing_at_sign) {
+  EXPECT_FALSE(sourcemeta::core::is_email("plain"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("plain"));
+}
+
+TEST(regression_invalid_missing_close_bracket) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:::1"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:::1"));
+}
+
+TEST(regression_invalid_trailing_bracket_garbage) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:::1]x"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:::1]x"));
+}

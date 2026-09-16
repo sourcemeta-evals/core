@@ -39,9 +39,10 @@ namespace sourcemeta::core {
 /// prose specifies the IPv6 syntax as that of RFC 4291, while the `IPv6-addr`
 /// ABNF in the same section is stricter and conflicts with it, so the prose is
 /// followed. A bracketed `[IPv6:...]` whose body is not a valid address is
-/// still accepted, because Section 4.1.3 also permits any
-/// General-address-literal (a registered tag, a colon, and content) and ABNF
-/// alternatives are unordered.
+/// turned down rather than read as a General-address-literal, since the tag
+/// names the syntax that has to follow it. Address literals introduced by
+/// any other tag are rejected because RFC 5321 Section 4.1.3 requires a
+/// Standardized-tag to be registered with IANA and only IPv6 is.
 ///
 /// For example:
 ///
