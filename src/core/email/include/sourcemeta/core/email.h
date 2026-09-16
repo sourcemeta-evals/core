@@ -45,6 +45,11 @@ namespace sourcemeta::core {
 /// be registered with IANA before being used and that registry carries the
 /// IPv6 tag alone.
 ///
+/// Both standalone IPv4 literals and the embedded IPv4 tail of an IPv6v4
+/// literal follow the RFC 5321 `Snum` octet grammar, so one to three digits
+/// per octet are permitted (leading zeros allowed) as long as each octet
+/// value stays in the 0 through 255 range.
+///
 /// For example:
 ///
 /// ```cpp
@@ -55,6 +60,7 @@ namespace sourcemeta::core {
 /// assert(sourcemeta::core::is_email("user@example.com"));
 /// assert(sourcemeta::core::is_email("\"a b\"@example.com"));
 /// assert(sourcemeta::core::is_email("user@[192.168.1.1]"));
+/// assert(sourcemeta::core::is_email("user@[IPv6:::ffff:192.000.002.001]"));
 /// assert(!sourcemeta::core::is_email("plain"));
 /// ```
 SOURCEMETA_CORE_EMAIL_EXPORT
