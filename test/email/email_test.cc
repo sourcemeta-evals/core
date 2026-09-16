@@ -2,6 +2,7 @@
 #include <sourcemeta/core/test.h>
 
 #include <string>
+#include <string_view>
 
 // RFC 5321 §4.1.2: minimal Dot-string Atom + minimal Domain sub-domain
 TEST(valid_dot_string_single_letter) {
@@ -922,6 +923,14 @@ TEST(valid_ipv6_literal_v4_mid_compression_padded_snum) {
       sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5::192.000.002.001]"));
 }
 
+// RFC 4291 §2.2.2: the trailing `::` compression may elide a single final
+// zero group, so seven explicit hextets followed by `::` remains a valid
+// IPv6 literal (the Section 4.1.3 prose over the stricter ABNF)
+TEST(valid_ipv6_literal_seven_groups_trailing_compression) {
+  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:6:7::]"));
+  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:6:7::]"));
+}
+
 // RFC 5234 §2.3: ABNF literal strings are case-insensitive by default, so the
 // "IPv6:" prefix matches "ipv6:"
 TEST(valid_lowercase_ipv6_literal) {
@@ -986,6 +995,16 @@ TEST(invalid_ipv6_body_bad_embedded_ipv4) {
 TEST(invalid_ipv6_body_embedded_ipv4_overlong_octet) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:::ffff:192.0002.0.1]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:::ffff:192.0002.0.1]"));
+}
+
+// RFC 5321 §4.1.3: the bracketed payload grammar admits no NUL byte, so an
+// explicit-length input carrying a NUL between the payload and the closing
+// bracket must be rejected; the `sv` literal preserves the embedded NUL
+// through validation, guarding against accidental C-string truncation
+TEST(invalid_ipv6_body_embedded_nul) {
+  using namespace std::string_view_literals;
+  EXPECT_FALSE(sourcemeta::core::is_email("user@[IPv6:::1\0]"sv));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("user@[IPv6:::1\0]"sv));
 }
 
 // RFC 4291 does not define a zone-identifier syntax for text-format IPv6
