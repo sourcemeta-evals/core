@@ -902,6 +902,26 @@ TEST(valid_ipv6_literal_v4_compat_all_zero_padded) {
   EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6:::000.000.000.000]"));
 }
 
+// RFC 4291 §2.2.3: the IPv6v4-full form spells out six leading hextets
+// before the embedded IPv4 tail, and RFC 5321 §4.1.3 Snum still permits
+// leading-zero octets in that tail
+TEST(valid_ipv6_literal_v4_full_padded_snum) {
+  EXPECT_TRUE(
+      sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:6:001.002.003.004]"));
+  EXPECT_TRUE(
+      sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:6:001.002.003.004]"));
+}
+
+// RFC 4291 §2.2.2: the `::` compression may elide zero groups from any
+// interior position rather than only the leading run, and the trailing
+// embedded IPv4 tail still accepts padded Snum octets
+TEST(valid_ipv6_literal_v4_mid_compression_padded_snum) {
+  EXPECT_TRUE(
+      sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5::192.000.002.001]"));
+  EXPECT_TRUE(
+      sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5::192.000.002.001]"));
+}
+
 // RFC 5234 §2.3: ABNF literal strings are case-insensitive by default, so the
 // "IPv6:" prefix matches "ipv6:"
 TEST(valid_lowercase_ipv6_literal) {
