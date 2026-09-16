@@ -122,30 +122,31 @@ constexpr auto matches_ipv6_tag(const std::string_view value) -> bool {
          value[4] == ':';
 }
 
-// RFC 5321 §4.1.3: General-address-literal = Standardized-tag ":" 1*dcontent
-constexpr auto is_general_address_literal(const std::string_view value)
-    -> bool {
-  const auto colon_position{value.find(':')};
-  if (colon_position == std::string_view::npos) {
-    return false;
-  }
-  if (!is_ldh_str(value.substr(0, colon_position))) {
-    return false;
-  }
-  const auto content{value.substr(colon_position + 1)};
-  if (content.empty()) {
-    return false;
-  }
-  for (const auto character : content) {
-    if (!is_dcontent(static_cast<unsigned char>(character))) {
+// Validate an IPv6-tag payload, delegating structure to the shared
+// sourcemeta::core::is_ipv6 predicate. When the payload carries an embedded
+// IPv4 tail, validate that tail with the RFC 5321 IPv4 grammar (which
+// permits leading-zero Snum octets) and substitute two zero hex groups so
+// the shared parser can validate the surrounding hextet and compression
+// structure.
+inline auto is_ipv6_address_literal(const std::string_view value) -> bool {
+  const auto last_colon{value.rfind(':')};
+  if (last_colon != std::string_view::npos &&
+      value.substr(last_colon + 1).contains('.')) {
+    const auto ipv4_tail{value.substr(last_colon + 1)};
+    if (!is_ipv4_address_literal(ipv4_tail)) {
       return false;
     }
+    std::string substituted;
+    substituted.reserve(value.size());
+    substituted.append(value.substr(0, last_colon + 1));
+    substituted.append("0:0");
+    return sourcemeta::core::is_ipv6(substituted);
   }
-  return true;
+  return sourcemeta::core::is_ipv6(value);
 }
 
 // RFC 5321 §4.1.3: validate the address-literal payload (between "[" and "]")
-// as IPv6, IPv4, or General-address-literal. Always ASCII; no IDNA applies
+// as IPv6 or IPv4. Always ASCII; no IDNA applies
 inline auto is_address_literal(const std::string_view domain) -> bool {
   if (domain.back() != ']') {
     return false;
@@ -155,18 +156,10 @@ inline auto is_address_literal(const std::string_view domain) -> bool {
     return false;
   }
   const auto inner{domain.substr(1, domain.size() - 2)};
-  // RFC 5321 §4.1.3: IPv6-address-literal = "IPv6:" IPv6-addr
-  if (matches_ipv6_tag(inner) && sourcemeta::core::is_ipv6(inner.substr(5))) {
-    return true;
+  if (matches_ipv6_tag(inner)) {
+    return is_ipv6_address_literal(inner.substr(5));
   }
-  // RFC 5234 §3.2: ABNF alternatives are unordered. A failed IPv6 match
-  // falls through to IPv4 or General-address-literal.
-  // RFC 5321 §4.1.3: IPv4-address-literal has no ":";
-  // General-address-literal requires ":"
-  if (!inner.contains(':')) {
-    return is_ipv4_address_literal(inner);
-  }
-  return is_general_address_literal(inner);
+  return !inner.contains(':') && is_ipv4_address_literal(inner);
 }
 
 // RFC 3986 §2.1: "For consistency, URI producers and normalizers should use

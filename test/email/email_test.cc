@@ -886,14 +886,6 @@ TEST(valid_ipv6_literal_v4_compat) {
   EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6:::192.168.1.1]"));
 }
 
-// RFC 5321 §4.1.3: without the "IPv6:" tag the literal is parsed as
-// General-address-literal (tag "2001", content "db8::1"), which is valid
-// because ":" is in dcontent (%d58 is within %d33-90)
-TEST(valid_no_ipv6_prefix_as_general) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[2001:db8::1]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[2001:db8::1]"));
-}
-
 // RFC 5234 §2.3: ABNF literal strings are case-insensitive by default, so the
 // "IPv6:" prefix matches "ipv6:"
 TEST(valid_lowercase_ipv6_literal) {
@@ -913,32 +905,10 @@ TEST(valid_mixed_case_ipv6_literal) {
   EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[iPv6:::1]"));
 }
 
-// RFC 5234 §3.2: ABNF alternatives are unordered. The literal five-byte
-// prefix "IPv6:" is stripped, ":1" fails IPv6-addr, and the input falls
-// through to General-address-literal with tag "IPv6" and content ":1"
-TEST(valid_ipv6_prefix_no_colon_as_general) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv6::1]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6::1]"));
-}
-
-// RFC 5234 §3.2: a failed IPv6-addr match falls through to General-address-
-// literal with tag "IPv6" and content "not-an-address" (all dcontent)
-TEST(valid_ipv6_body_garbage_as_general) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv6:not-an-address]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6:not-an-address]"));
-}
-
 // RFC 5321 §4.1.3: IPv6-addr requires at least one group
 TEST(invalid_ipv6_body_empty) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:]"));
-}
-
-// RFC 5234 §3.2: nine groups fail IPv6-addr but the input still matches
-// General-address-literal with tag "IPv6" and content "1:2:3:4:5:6:7:8:9"
-TEST(valid_ipv6_too_many_groups_as_general) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:6:7:8:9]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:6:7:8:9]"));
 }
 
 // RFC 5321 §4.1.3: address-literal needs a closing "]"
@@ -951,75 +921,6 @@ TEST(invalid_ipv6_missing_close_bracket) {
 TEST(invalid_ipv6_trailing_garbage) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:::1]x"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:::1]x"));
-}
-
-// RFC 5321 §4.1.3: General-address-literal = Standardized-tag ":" 1*dcontent
-TEST(valid_general_literal_minimal) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[X:y]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[X:y]"));
-}
-
-// RFC 5321 §4.1.3: typical X400 tag from the IANA Standardized-tag registry
-TEST(valid_general_literal_x400) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[X400:foo]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[X400:foo]"));
-}
-
-// RFC 5321 §4.1.2: Ldh-str body permits DIGIT before the terminal Let-dig
-TEST(valid_general_literal_tag_with_digits) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[tag1:foo]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[tag1:foo]"));
-}
-
-// RFC 5321 §4.1.2: Ldh-str body permits interior "-"
-TEST(valid_general_literal_tag_with_interior_hyphen) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[tag-name:foo]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[tag-name:foo]"));
-}
-
-// RFC 5321 §4.1.2: Ldh-str = *( ALPHA / DIGIT / "-" ) Let-dig permits a
-// leading "-" because Standardized-tag is Ldh-str, not Let-dig [Ldh-str]
-TEST(valid_general_literal_tag_leading_hyphen) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[-tag:foo]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[-tag:foo]"));
-}
-
-// RFC 5321 §4.1.3: dcontent starts at %d33 "!"
-TEST(valid_general_literal_dcontent_lower_bound) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[Tag:!]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[Tag:!]"));
-}
-
-// RFC 5321 §4.1.3: dcontent %d33-90 ends at "Z"
-TEST(valid_general_literal_dcontent_upper_first_range) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[Tag:Z]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[Tag:Z]"));
-}
-
-// RFC 5321 §4.1.3: dcontent %d94-126 starts at "^"
-TEST(valid_general_literal_dcontent_lower_second_range) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[Tag:^]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[Tag:^]"));
-}
-
-// RFC 5321 §4.1.3: dcontent ends at "~" (%d126)
-TEST(valid_general_literal_dcontent_upper_bound) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[Tag:~]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[Tag:~]"));
-}
-
-// RFC 5321 §4.1.3: dcontent %d33-90 includes ":" (%d58)
-TEST(valid_general_literal_dcontent_with_colon) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[Tag:foo:bar]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[Tag:foo:bar]"));
-}
-
-// RFC 5321 §4.1.3: 1*dcontent permits long content
-TEST(valid_general_literal_dcontent_long) {
-  EXPECT_TRUE(
-      sourcemeta::core::is_email("a@[Tag:" + std::string(200, 'a') + "]"));
-  EXPECT_TRUE(
-      sourcemeta::core::is_idn_email("a@[Tag:" + std::string(200, 'a') + "]"));
 }
 
 // RFC 5321 §4.1.2: Ldh-str must end with Let-dig, trailing "-" is invalid
@@ -1142,13 +1043,6 @@ TEST(valid_quoted_local_with_ipv6_literal) {
   EXPECT_TRUE(sourcemeta::core::is_idn_email("\"foo\"@[IPv6:::1]"));
 }
 
-// RFC 5321 §4.1.2 + §4.1.3: Quoted-string Local-part with General-address-
-// literal
-TEST(valid_quoted_local_with_general_literal) {
-  EXPECT_TRUE(sourcemeta::core::is_email("\"foo\"@[X400:bar]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("\"foo\"@[X400:bar]"));
-}
-
 // RFC 5321 §4.1.2 + §4.1.3: Dot-string Local-part with IPv4 address-literal
 TEST(valid_dot_string_with_ipv4_literal) {
   EXPECT_TRUE(sourcemeta::core::is_email("foo@[192.168.1.1]"));
@@ -1159,12 +1053,6 @@ TEST(valid_dot_string_with_ipv4_literal) {
 TEST(valid_dot_string_with_ipv6_literal) {
   EXPECT_TRUE(sourcemeta::core::is_email("foo@[IPv6:::1]"));
   EXPECT_TRUE(sourcemeta::core::is_idn_email("foo@[IPv6:::1]"));
-}
-
-// RFC 5321 §4.1.2 + §4.1.3: Dot-string Local-part with General-address-literal
-TEST(valid_dot_string_with_general_literal) {
-  EXPECT_TRUE(sourcemeta::core::is_email("foo@[X400:bar]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("foo@[X400:bar]"));
 }
 
 // RFC 5321 §4.5.3.1.2: an address-literal whose total length equals the
@@ -1273,12 +1161,6 @@ TEST(invalid_lone_at) {
 TEST(valid_minimum_length_mailbox) {
   EXPECT_TRUE(sourcemeta::core::is_email("a@b"));
   EXPECT_TRUE(sourcemeta::core::is_idn_email("a@b"));
-}
-
-// RFC 5321 §4.1.3: a single dcontent byte is the minimum 1*dcontent
-TEST(valid_general_literal_minimum_dcontent) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[A:B]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[A:B]"));
 }
 
 // RFC 5321 §4.1.2 ALPHA upper bound: "Z" (%d90) is in atext
@@ -1403,39 +1285,11 @@ TEST(invalid_bracket_with_leading_space) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[ 1.2.3.4]"));
 }
 
-// RFC 5321 §4.1.3 + RFC 5234 §3.2: a case-insensitive "IPv6:" match that
-// fails IPv6-addr still falls through to General-address-literal
-TEST(valid_lowercase_ipv6_fallthrough_to_general) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[ipv6:not-an-address]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[ipv6:not-an-address]"));
-}
-
-// RFC 5321 §4.1.2 Ldh-str: leading "-" before another "-" before Let-dig is
-// still a valid Ldh-str
-TEST(valid_general_literal_multiple_leading_hyphens) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[--a:b]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[--a:b]"));
-}
-
-// RFC 5321 §4.1.3: any Ldh-str is a valid Standardized-tag per the grammar,
-// including ones not registered with IANA such as "IPv7"
-TEST(valid_general_literal_ipv7_like_tag) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv7:foo]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv7:foo]"));
-}
-
 // RFC 5321 §4.1.2 Ldh-str alphabet excludes ".", so a tag with "." cannot
 // match Standardized-tag
 TEST(invalid_general_tag_with_dot) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[a.b:c]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[a.b:c]"));
-}
-
-// RFC 5321 §4.1.3: General-address-literal content of just ":" is a single
-// dcontent byte (%d58 is in %d33-90)
-TEST(valid_general_literal_content_just_colon) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[a::]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[a::]"));
 }
 
 // RFC 5321 §4.1.3 + RFC 5234 §3.2: bracketed input where the first colon
@@ -2022,32 +1876,18 @@ TEST(invalid_dcontent_space) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[x: ]"));
 }
 
-// RFC 5321 4.1.3: dcontent = %d33-90 / %d94-126 includes %d33
-TEST(valid_dcontent_bang) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[x:!]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[x:!]"));
-}
-
-// RFC 5321 4.1.3: dcontent = %d33-90 / %d94-126 includes %d90
-TEST(valid_dcontent_upper_z) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[x:Z]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[x:Z]"));
-}
-
-// RFC 5321 4.1.3: dcontent = %d33-90 / %d94-126 includes %d94
-TEST(valid_dcontent_caret) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[x:^]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[x:^]"));
-}
-
-// RFC 5321 4.1.3: dcontent = %d33-90 / %d94-126 includes %d126
-TEST(valid_dcontent_tilde) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[x:~]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[x:~]"));
-}
-
 // RFC 5321 4.1.3: dcontent = %d33-90 / %d94-126 excludes %d127
 TEST(invalid_dcontent_del) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[x:\x7f]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[x:\x7f]"));
+}
+
+TEST(invalid_ipv6_tag_malformed_payload_min) {
+  EXPECT_FALSE(sourcemeta::core::is_email("user@[IPv6:zzz]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("user@[IPv6:zzz]"));
+}
+
+TEST(invalid_unregistered_tag_address_literal_min) {
+  EXPECT_FALSE(sourcemeta::core::is_email("user@[unknown-tag:abc]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("user@[unknown-tag:abc]"));
 }

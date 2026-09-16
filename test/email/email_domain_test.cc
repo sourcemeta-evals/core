@@ -14,13 +14,6 @@ TEST(email_domain_quoted_local_part_carrying_an_at_sign) {
             "example.org");
 }
 
-// RFC 5321 §4.1.3: General-address-literal content is 1*dcontent, and
-// dcontent = %d33-90 / %d94-126 admits the at sign, so the separator is not
-// the last one in the string either
-TEST(email_domain_address_literal_carrying_an_at_sign) {
-  EXPECT_EQ(sourcemeta::core::email_domain("user@[tag:a@b]"), "[tag:a@b]");
-}
-
 TEST(email_domain_ipv4_address_literal) {
   EXPECT_EQ(sourcemeta::core::email_domain("user@[192.168.1.1]"),
             "[192.168.1.1]");

@@ -318,12 +318,6 @@ TEST(mailto_iri_encodes_ipv6_address_literal) {
 
 // RFC 5321 §4.1.3: General-address-literal = Standardized-tag ":"
 // 1*dcontent, characters reserved by RFC 6068 §2 inside it are encoded
-TEST(mailto_iri_encodes_general_address_literal) {
-  const auto result{sourcemeta::core::mailto_iri("user@[foo:bar/baz]")};
-  EXPECT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), "mailto:user@%5Bfoo:bar%2Fbaz%5D");
-}
-
 // RFC 5321 §4.1.2: Mailbox = Local-part "@" ( Domain / address-literal ),
 // the empty string is not a Mailbox
 TEST(mailto_iri_rejects_empty) {
