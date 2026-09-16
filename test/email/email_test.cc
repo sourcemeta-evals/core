@@ -1891,3 +1891,18 @@ TEST(invalid_unregistered_tag_address_literal_min) {
   EXPECT_FALSE(sourcemeta::core::is_email("user@[unknown-tag:abc]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("user@[unknown-tag:abc]"));
 }
+
+TEST(ascii_only_is_email_check_min) {
+  EXPECT_FALSE(sourcemeta::core::is_email("user@[IPv6:bogus]"));
+  EXPECT_FALSE(sourcemeta::core::is_email("user@[X400:foo]"));
+  EXPECT_FALSE(sourcemeta::core::is_email("user@[2001:db8::1]"));
+}
+
+TEST(address_literal_and_length_limits_min) {
+  const std::string long_local(65, 'a');
+  const std::string long_local_address{long_local + "@example.com"};
+  EXPECT_FALSE(sourcemeta::core::is_email(long_local_address));
+  EXPECT_FALSE(sourcemeta::core::is_email("user@[IPv6:zz::1]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email(long_local_address));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("user@[IPv6:zz::1]"));
+}

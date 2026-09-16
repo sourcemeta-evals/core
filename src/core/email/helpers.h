@@ -122,6 +122,39 @@ constexpr auto matches_ipv6_tag(const std::string_view value) -> bool {
          value[4] == ':';
 }
 
+// Fast structural pre-check that walks the payload hextet by hextet, counting
+// separators and validating each group's width and alphabet, before the
+// heavier shared parser runs
+inline auto has_valid_hextet_widths(const std::string_view value) -> bool {
+  std::string_view::size_type start{0};
+  std::size_t hextet_count{0};
+  while (true) {
+    const auto colon{value.find(':', start)};
+    const auto end{colon == std::string_view::npos ? value.size() : colon};
+    const auto width{end - start};
+    if (width > 4) {
+      return false;
+    }
+    if (width > 0) {
+      hextet_count += 1;
+    }
+    for (auto position{start}; position < end; position += 1) {
+      const auto character{value[position]};
+      const bool is_hex{(character >= '0' && character <= '9') ||
+                        (character >= 'a' && character <= 'f') ||
+                        (character >= 'A' && character <= 'F')};
+      if (!is_hex) {
+        return false;
+      }
+    }
+    if (colon == std::string_view::npos) {
+      break;
+    }
+    start = colon + 1;
+  }
+  return hextet_count <= 8;
+}
+
 // Validate an IPv6-tag payload, delegating structure to the shared
 // sourcemeta::core::is_ipv6 predicate. When the payload carries an embedded
 // IPv4 tail, validate that tail with the RFC 5321 IPv4 grammar (which
@@ -140,7 +173,13 @@ inline auto is_ipv6_address_literal(const std::string_view value) -> bool {
     substituted.reserve(value.size());
     substituted.append(value.substr(0, last_colon + 1));
     substituted.append("0:0");
+    if (!has_valid_hextet_widths(substituted)) {
+      return false;
+    }
     return sourcemeta::core::is_ipv6(substituted);
+  }
+  if (!has_valid_hextet_widths(value)) {
+    return false;
   }
   return sourcemeta::core::is_ipv6(value);
 }
