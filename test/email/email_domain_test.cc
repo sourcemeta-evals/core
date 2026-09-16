@@ -40,6 +40,15 @@ TEST(email_domain_ipv6_address_literal) {
             "[IPv6:2001:db8::1]");
 }
 
+// RFC 5321 §4.1.3: an IPv6v4 address-literal with leading-zero Snum octets
+// in its embedded IPv4 tail is preserved verbatim, without any Snum
+// normalisation
+TEST(email_domain_ipv6_address_literal_padded_snum) {
+  EXPECT_EQ(
+      sourcemeta::core::email_domain("user@[IPv6:::ffff:192.000.002.001]"),
+      "[IPv6:::ffff:192.000.002.001]");
+}
+
 // RFC 5321 §2.4: mailbox domains are not case sensitive, but the domain is
 // reported as it was written, since the view borrows from the input
 TEST(email_domain_preserves_the_spelling_of_the_domain) {

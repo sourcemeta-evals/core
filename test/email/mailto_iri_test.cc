@@ -316,6 +316,16 @@ TEST(mailto_iri_encodes_ipv6_address_literal) {
   EXPECT_EQ(result.value(), "mailto:user@%5BIPv6:2001:db8::1%5D");
 }
 
+// RFC 5321 §4.1.3: the leading-zero Snum spelling of an IPv6v4 tail is
+// preserved through mailto rendering; only the surrounding brackets are
+// percent-encoded per RFC 6068
+TEST(mailto_iri_encodes_ipv6_address_literal_padded_snum) {
+  const auto result{
+      sourcemeta::core::mailto_iri("user@[IPv6:::ffff:192.000.002.001]")};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), "mailto:user@%5BIPv6:::ffff:192.000.002.001%5D");
+}
+
 // RFC 5321 §4.1.3: a Standardized-tag has to be registered with IANA before
 // being used, and only the IPv6 tag is, so a literal under any other tag is
 // not a Mailbox to render
