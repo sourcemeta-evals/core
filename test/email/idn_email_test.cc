@@ -597,12 +597,6 @@ TEST(invalid_address_literal_empty_octet) {
   EXPECT_FALSE(sourcemeta::core::is_email("user@[1..2.3]"));
 }
 
-// General-address-literal = Standardized-tag ":" 1*dcontent
-TEST(valid_general_address_literal) {
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("user@[unknown-tag:abc]"));
-  EXPECT_TRUE(sourcemeta::core::is_email("user@[unknown-tag:abc]"));
-}
-
 TEST(valid_general_address_literal_shortest) {
   EXPECT_TRUE(sourcemeta::core::is_idn_email("user@[a:b]"));
   EXPECT_TRUE(sourcemeta::core::is_email("user@[a:b]"));

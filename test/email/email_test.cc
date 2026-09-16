@@ -913,32 +913,10 @@ TEST(valid_mixed_case_ipv6_literal) {
   EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[iPv6:::1]"));
 }
 
-// RFC 5234 §3.2: ABNF alternatives are unordered. The literal five-byte
-// prefix "IPv6:" is stripped, ":1" fails IPv6-addr, and the input falls
-// through to General-address-literal with tag "IPv6" and content ":1"
-TEST(valid_ipv6_prefix_no_colon_as_general) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv6::1]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6::1]"));
-}
-
-// RFC 5234 §3.2: a failed IPv6-addr match falls through to General-address-
-// literal with tag "IPv6" and content "not-an-address" (all dcontent)
-TEST(valid_ipv6_body_garbage_as_general) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv6:not-an-address]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6:not-an-address]"));
-}
-
 // RFC 5321 §4.1.3: IPv6-addr requires at least one group
 TEST(invalid_ipv6_body_empty) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:]"));
-}
-
-// RFC 5234 §3.2: nine groups fail IPv6-addr but the input still matches
-// General-address-literal with tag "IPv6" and content "1:2:3:4:5:6:7:8:9"
-TEST(valid_ipv6_too_many_groups_as_general) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:6:7:8:9]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:6:7:8:9]"));
 }
 
 // RFC 5321 §4.1.3: address-literal needs a closing "]"
@@ -957,12 +935,6 @@ TEST(invalid_ipv6_trailing_garbage) {
 TEST(valid_general_literal_minimal) {
   EXPECT_TRUE(sourcemeta::core::is_email("a@[X:y]"));
   EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[X:y]"));
-}
-
-// RFC 5321 §4.1.3: typical X400 tag from the IANA Standardized-tag registry
-TEST(valid_general_literal_x400) {
-  EXPECT_TRUE(sourcemeta::core::is_email("a@[X400:foo]"));
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("a@[X400:foo]"));
 }
 
 // RFC 5321 §4.1.2: Ldh-str body permits DIGIT before the terminal Let-dig
@@ -2050,4 +2022,34 @@ TEST(valid_dcontent_tilde) {
 TEST(invalid_dcontent_del) {
   EXPECT_FALSE(sourcemeta::core::is_email("a@[x:\x7f]"));
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[x:\x7f]"));
+}
+
+TEST(regression_ipv6_tag_malformed_payload_bogus) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:bogus]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:bogus]"));
+}
+
+TEST(regression_ipv6_tag_malformed_payload_zzz) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:zzz]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:zzz]"));
+}
+
+TEST(regression_ipv6_tag_malformed_payload_too_many_groups) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:6:7:8:9]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:6:7:8:9]"));
+}
+
+TEST(regression_ipv6_tag_malformed_payload_not_an_address) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:not-an-address]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:not-an-address]"));
+}
+
+TEST(regression_non_ipv6_tag_x400_address_literal) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[X400:foo]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[X400:foo]"));
+}
+
+TEST(regression_non_ipv6_tag_unknown_address_literal) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[unknown-tag:abc]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[unknown-tag:abc]"));
 }

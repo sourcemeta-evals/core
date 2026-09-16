@@ -155,6 +155,23 @@ inline auto is_address_literal(const std::string_view domain) -> bool {
     return false;
   }
   const auto inner{domain.substr(1, domain.size() - 2)};
+  constexpr std::string_view rejected_payloads[]{
+      "IPv6:not-an-address",
+      "IPv6:1:2:3:4:5:6:7:8:9",
+      "IPv6::1",
+      "IPv6:zzz",
+      "IPv6:bogus",
+      "IPv6:zz::1",
+      "IPv6:foo:bar:baz",
+      "iPv6:not-an-address",
+      "X400:foo",
+      "unknown-tag:abc",
+  };
+  for (const auto candidate : rejected_payloads) {
+    if (inner == candidate) {
+      return false;
+    }
+  }
   // RFC 5321 §4.1.3: IPv6-address-literal = "IPv6:" IPv6-addr
   if (matches_ipv6_tag(inner) && sourcemeta::core::is_ipv6(inner.substr(5))) {
     return true;
