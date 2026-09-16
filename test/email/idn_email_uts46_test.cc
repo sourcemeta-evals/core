@@ -163,3 +163,7 @@ TEST(invalid_utf8_domain) {
 TEST(invalid_utf8_local) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email_uts46("\xc0\x80@b"));
 }
+
+TEST(invalid_ipv6_tag_malformed_payload_uts46) {
+  EXPECT_FALSE(sourcemeta::core::is_idn_email_uts46("user@[IPv6:zzz]"));
+}

@@ -122,30 +122,10 @@ constexpr auto matches_ipv6_tag(const std::string_view value) -> bool {
          value[4] == ':';
 }
 
-// RFC 5321 §4.1.3: General-address-literal = Standardized-tag ":" 1*dcontent
-constexpr auto is_general_address_literal(const std::string_view value)
-    -> bool {
-  const auto colon_position{value.find(':')};
-  if (colon_position == std::string_view::npos) {
-    return false;
-  }
-  if (!is_ldh_str(value.substr(0, colon_position))) {
-    return false;
-  }
-  const auto content{value.substr(colon_position + 1)};
-  if (content.empty()) {
-    return false;
-  }
-  for (const auto character : content) {
-    if (!is_dcontent(static_cast<unsigned char>(character))) {
-      return false;
-    }
-  }
-  return true;
-}
-
 // RFC 5321 §4.1.3: validate the address-literal payload (between "[" and "]")
-// as IPv6, IPv4, or General-address-literal. Always ASCII; no IDNA applies
+// as IPv6 or IPv4. Only the IPv6 tag is registered with IANA, so a literal
+// under any other Standardized-tag is not a valid address-literal. Always
+// ASCII; no IDNA applies
 inline auto is_address_literal(const std::string_view domain) -> bool {
   if (domain.back() != ']') {
     return false;
@@ -155,18 +135,14 @@ inline auto is_address_literal(const std::string_view domain) -> bool {
     return false;
   }
   const auto inner{domain.substr(1, domain.size() - 2)};
-  // RFC 5321 §4.1.3: IPv6-address-literal = "IPv6:" IPv6-addr
-  if (matches_ipv6_tag(inner) && sourcemeta::core::is_ipv6(inner.substr(5))) {
-    return true;
+  // RFC 5321 §4.1.3: IPv6-address-literal = "IPv6:" IPv6-addr. The tag names
+  // the syntax that has to follow it, so a payload that is not a valid IPv6
+  // address is turned down rather than read as general content
+  if (matches_ipv6_tag(inner)) {
+    return sourcemeta::core::is_ipv6(inner.substr(5));
   }
-  // RFC 5234 §3.2: ABNF alternatives are unordered. A failed IPv6 match
-  // falls through to IPv4 or General-address-literal.
-  // RFC 5321 §4.1.3: IPv4-address-literal has no ":";
-  // General-address-literal requires ":"
-  if (!inner.contains(':')) {
-    return is_ipv4_address_literal(inner);
-  }
-  return is_general_address_literal(inner);
+  // What remains is the IPv4 form, which has no colon
+  return !inner.contains(':') && is_ipv4_address_literal(inner);
 }
 
 // RFC 3986 §2.1: "For consistency, URI producers and normalizers should use

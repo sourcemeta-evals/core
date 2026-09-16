@@ -597,25 +597,6 @@ TEST(invalid_address_literal_empty_octet) {
   EXPECT_FALSE(sourcemeta::core::is_email("user@[1..2.3]"));
 }
 
-// General-address-literal = Standardized-tag ":" 1*dcontent
-TEST(valid_general_address_literal) {
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("user@[unknown-tag:abc]"));
-  EXPECT_TRUE(sourcemeta::core::is_email("user@[unknown-tag:abc]"));
-}
-
-TEST(valid_general_address_literal_shortest) {
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("user@[a:b]"));
-  EXPECT_TRUE(sourcemeta::core::is_email("user@[a:b]"));
-}
-
-// RFC 5321 §4.1.2: Ldh-str = *( ALPHA / DIGIT / "-" ) Let-dig constrains only
-// the final character, so unlike sub-domain (Let-dig [Ldh-str]) a
-// Standardized-tag may begin with a hyphen
-TEST(valid_general_address_literal_leading_hyphen_tag) {
-  EXPECT_TRUE(sourcemeta::core::is_idn_email("user@[-tag:abc]"));
-  EXPECT_TRUE(sourcemeta::core::is_email("user@[-tag:abc]"));
-}
-
 TEST(invalid_general_address_literal_trailing_hyphen_tag) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email("user@[tag-:abc]"));
   EXPECT_FALSE(sourcemeta::core::is_email("user@[tag-:abc]"));
