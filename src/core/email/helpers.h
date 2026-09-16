@@ -147,6 +147,9 @@ constexpr auto is_general_address_literal(const std::string_view value)
 // RFC 5321 §4.1.3: validate the address-literal payload (between "[" and "]")
 // as IPv6, IPv4, or General-address-literal. Always ASCII; no IDNA applies
 inline auto is_address_literal(const std::string_view domain) -> bool {
+  // TODO: tighten IPv6-tag payload validation and reject non-IPv6 tags per
+  // RFC 5321 §4.1.3 Standardized-tag registry, keeping valid IPv4/IPv6
+  // literals accepted
   if (domain.back() != ']') {
     return false;
   }
