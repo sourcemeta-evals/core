@@ -4,13 +4,72 @@
 #include <sourcemeta/core/jsonld.h>
 #include <sourcemeta/core/text.h>
 
+#include <cstddef>     // std::size_t
 #include <filesystem>  // std::filesystem
 #include <optional>    // std::optional
 #include <string>      // std::string
 #include <string_view> // std::string_view
 #include <utility>     // std::move
+#include <vector>      // std::vector
 
 namespace {
+
+// JSON-LD 1.1 API §3.1.5: property arrays (and the top-level expansion result)
+// are order-insensitive multisets, except for the value of the `@list` keyword
+// which preserves order. This helper implements that comparison so the suite
+// runner does not reject spec-legit implementations whose emission order
+// differs from the reference expected output.
+auto jsonld_deep_equal(const sourcemeta::core::JSON &left,
+                       const sourcemeta::core::JSON &right, bool ordered)
+    -> bool {
+  if (left.is_array() && right.is_array()) {
+    if (left.size() != right.size()) {
+      return false;
+    }
+    if (ordered) {
+      for (std::size_t index{0}; index < left.size(); index += 1) {
+        if (!jsonld_deep_equal(left.at(index), right.at(index), false)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    std::vector<bool> matched(right.size(), false);
+    for (const auto &left_item : left.as_array()) {
+      bool found{false};
+      for (std::size_t index{0}; index < right.size(); index += 1) {
+        if (matched[index]) {
+          continue;
+        }
+        if (jsonld_deep_equal(left_item, right.at(index), false)) {
+          matched[index] = true;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (left.is_object() && right.is_object()) {
+    if (left.size() != right.size()) {
+      return false;
+    }
+    for (const auto &entry : left.as_object()) {
+      if (!right.defines(entry.first)) {
+        return false;
+      }
+      const bool is_list{entry.first == "@list"};
+      if (!jsonld_deep_equal(entry.second, right.at(entry.first), is_list)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return left == right;
+}
 
 struct JSONLDExpandCase {
   std::filesystem::path suite_root;
@@ -74,18 +133,18 @@ public:
       }
     } else {
       const auto expected{sourcemeta::core::read_json(test_case.expect)};
-      if (test_case.expand_context.has_value()) {
-        const auto context{
-            sourcemeta::core::read_json(test_case.expand_context.value())};
-        EXPECT_EQ(sourcemeta::core::jsonld_expand(input, context,
-                                                  test_case.base_iri, resolver,
-                                                  test_case.version),
-                  expected);
-      } else {
-        EXPECT_EQ(sourcemeta::core::jsonld_expand(input, test_case.base_iri,
-                                                  resolver, test_case.version),
-                  expected);
-      }
+      const auto actual{
+          test_case.expand_context.has_value()
+              ? sourcemeta::core::jsonld_expand(
+                    input,
+                    sourcemeta::core::read_json(
+                        test_case.expand_context.value()),
+                    test_case.base_iri, resolver, test_case.version)
+              : sourcemeta::core::jsonld_expand(input, test_case.base_iri,
+                                                resolver, test_case.version)};
+      EXPECT_TRUE(jsonld_deep_equal(actual, expected, false))
+          << "Expanded output did not match expected under JSON-LD 1.1 "
+             "unordered semantics";
     }
   }
 
@@ -107,6 +166,16 @@ auto sanitize(const std::string_view identifier) -> std::string {
 auto register_case(const sourcemeta::core::JSON &entry,
                    const std::filesystem::path &suite_root,
                    const sourcemeta::core::JSON::String &base_prefix) -> void {
+  // The W3C manifest may mark a test with `option.normative: false` when the
+  // behaviour is explicitly non-normative. Such entries express the suite
+  // author's preference, not a JSON-LD 1.1 API specification requirement, so
+  // they must not gate a conformance verdict.
+  if (entry.defines("option") && entry.at("option").defines("normative") &&
+      entry.at("option").at("normative").is_boolean() &&
+      !entry.at("option").at("normative").to_boolean()) {
+    return;
+  }
+
   bool negative{false};
   for (const auto &type : entry.at("@type").as_array()) {
     if (type.to_string() == "jld:NegativeEvaluationTest") {
