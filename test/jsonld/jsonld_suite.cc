@@ -80,7 +80,6 @@ struct JSONLDExpandCase {
   sourcemeta::core::JSON::String base_iri;
   sourcemeta::core::JSONLDVersion version;
   bool negative;
-  bool non_normative;
   std::optional<std::filesystem::path> expand_context;
 };
 
@@ -91,16 +90,6 @@ public:
 
   auto TestBody() -> void override {
     const auto &test_case{this->test_case_};
-    // Non-normative manifest entries are runtime-skipped rather than
-    // pre-filtered out at registration time. Pre-registration manifest-metadata
-    // filtering is disallowed for suite runners in this task (it lets a runner
-    // appear to pass the suite while silently reducing coverage), and skipping
-    // at runtime via GTEST_SKIP preserves the "every entry is registered"
-    // invariant while still avoiding a conformance verdict on behaviours the
-    // specification marks as non-normative.
-    if (test_case.non_normative) {
-      GTEST_SKIP() << "Skipping manifest entry marked option.normative: false";
-    }
     const sourcemeta::core::JSONLDResolver resolver =
         [&test_case](const sourcemeta::core::JSON::StringView identifier)
         -> std::optional<sourcemeta::core::JSON> {
@@ -193,7 +182,6 @@ auto register_case(const sourcemeta::core::JSON &entry,
   test_case.base_iri = base_prefix + input_relative;
   test_case.version = sourcemeta::core::JSONLDVersion::V1_1;
   test_case.negative = negative;
-  test_case.non_normative = false;
 
   if (entry.defines("option")) {
     const auto &option{entry.at("option")};
@@ -209,10 +197,6 @@ auto register_case(const sourcemeta::core::JSON &entry,
     if (option.defines("expandContext")) {
       test_case.expand_context =
           suite_root / option.at("expandContext").to_string();
-    }
-    if (option.defines("normative") && option.at("normative").is_boolean() &&
-        !option.at("normative").to_boolean()) {
-      test_case.non_normative = true;
     }
   }
 
