@@ -1058,6 +1058,17 @@ TEST(invalid_ipv6_snum_tail_with_excessive_groups_before_compression) {
       "a@[IPv6:1:2:3:4:5:6:7::192.000.002.001]"));
 }
 
+// RFC 4291 §2.2.2: `::` stands for ONE or more zero groups, so a compression
+// run that would elide no groups is not a valid address form. Six explicit
+// hextets plus the two-group IPv4-encoded tail already fill the eight-group
+// total, so the `::` between them cannot expand into anything
+TEST(invalid_ipv6_snum_tail_compression_elides_zero_groups) {
+  EXPECT_FALSE(
+      sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:6::192.000.002.001]"));
+  EXPECT_FALSE(
+      sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:6::192.000.002.001]"));
+}
+
 // RFC 4291 §2.2: `::` may appear only once, so a payload with a second
 // compression run is not an address literal even when the trailing IPv4-encoded
 // pair is a valid Snum spelling
