@@ -62,6 +62,27 @@ TEST(invalid_malformed_ipv6_tag_payload) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email_uts46("user@[IPv6:zzz]"));
 }
 
+// RFC 4291 §2.2: `::` may appear only once in an address, so a payload with a
+// second compression run is not a valid IPv6 address
+TEST(invalid_ipv6_double_compression_payload) {
+  EXPECT_FALSE(
+      sourcemeta::core::is_idn_email_uts46("user@[IPv6:2001:db8::1::2]"));
+}
+
+// RFC 4291 §2.2.1: an uncompressed IPv6 address is exactly eight hextets, so
+// a nine-hextet payload is not a valid address
+TEST(invalid_ipv6_too_many_uncompressed_groups_payload) {
+  EXPECT_FALSE(
+      sourcemeta::core::is_idn_email_uts46("user@[IPv6:1:2:3:4:5:6:7:8:9]"));
+}
+
+// RFC 4291 §2.2: a single trailing `:` closes no group and is not part of the
+// address grammar, so the payload is not a valid IPv6 address
+TEST(invalid_ipv6_single_trailing_colon_payload) {
+  EXPECT_FALSE(
+      sourcemeta::core::is_idn_email_uts46("user@[IPv6:2001:db8::1:]"));
+}
+
 // RFC 4291 §2.2.3: the eight-group total counts the two IPv4-encoded groups,
 // so a valid Snum-padded tail does not repair a prefix that is short by itself
 TEST(invalid_ipv6_snum_tail_with_too_few_uncompressed_groups) {
