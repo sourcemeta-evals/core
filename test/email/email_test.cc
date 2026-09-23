@@ -1028,6 +1028,55 @@ TEST(invalid_ipv6_too_many_groups) {
   EXPECT_FALSE(sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:6:7:8:9]"));
 }
 
+// RFC 4291 §2.2.3: the IPv6v4 form still spells eight groups when the two
+// trailing IPv4-encoded groups are counted, so a valid Snum-padded tail does
+// not repair a prefix that is short by itself
+TEST(invalid_ipv6_snum_tail_with_too_few_uncompressed_groups) {
+  EXPECT_FALSE(
+      sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:192.000.002.001]"));
+  EXPECT_FALSE(
+      sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:192.000.002.001]"));
+}
+
+// RFC 4291 §2.2.3: seven explicit hextets ahead of an embedded IPv4 tail
+// already overflow the eight-group total, so a valid Snum spelling does not
+// repair the count
+TEST(invalid_ipv6_snum_tail_with_too_many_uncompressed_groups) {
+  EXPECT_FALSE(
+      sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:6:7:192.000.002.001]"));
+  EXPECT_FALSE(
+      sourcemeta::core::is_idn_email("a@[IPv6:1:2:3:4:5:6:7:192.000.002.001]"));
+}
+
+// RFC 4291 §2.2.2: `::` stands for one or more zero groups, so the explicit
+// groups plus the compression run plus the IPv4-encoded pair must not exceed
+// the eight-group total
+TEST(invalid_ipv6_snum_tail_with_excessive_groups_before_compression) {
+  EXPECT_FALSE(
+      sourcemeta::core::is_email("a@[IPv6:1:2:3:4:5:6:7::192.000.002.001]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email(
+      "a@[IPv6:1:2:3:4:5:6:7::192.000.002.001]"));
+}
+
+// RFC 4291 §2.2: `::` may appear only once, so a payload with a second
+// compression run is not an address literal even when the trailing IPv4-encoded
+// pair is a valid Snum spelling
+TEST(invalid_ipv6_snum_tail_with_double_compression) {
+  EXPECT_FALSE(sourcemeta::core::is_email("a@[IPv6:1::2::192.000.002.001]"));
+  EXPECT_FALSE(
+      sourcemeta::core::is_idn_email("a@[IPv6:1::2::192.000.002.001]"));
+}
+
+// RFC 4291 §2.2: each hextet is a hexadecimal group, so a valid Snum-padded
+// IPv4 tail does not repair a payload whose leading hextets carry non-hex
+// characters
+TEST(invalid_ipv6_snum_tail_with_non_hex_prefix) {
+  EXPECT_FALSE(sourcemeta::core::is_email(
+      "a@[IPv6:zzz:zzz:zzz:zzz:zzz:zzz:192.000.002.001]"));
+  EXPECT_FALSE(sourcemeta::core::is_idn_email(
+      "a@[IPv6:zzz:zzz:zzz:zzz:zzz:zzz:192.000.002.001]"));
+}
+
 // RFC 5321 §4.1.3: a Standardized-tag MUST be registered with IANA before
 // being used, and that registry carries the IPv6 tag alone, so no other tag
 // names an address-literal however well formed the rest of it is
