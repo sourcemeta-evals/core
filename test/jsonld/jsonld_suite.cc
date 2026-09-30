@@ -16,9 +16,12 @@ namespace {
 
 // JSON-LD 1.1 API §3.1.5: property arrays (and the top-level expansion result)
 // are order-insensitive multisets, except for the value of the `@list` keyword
-// which preserves order. This helper implements that comparison so the suite
-// runner does not reject spec-legit implementations whose emission order
-// differs from the reference expected output.
+// which preserves order, and except for JSON literals (`@type: @json`) whose
+// values pass through expansion verbatim with plain JSON semantics where
+// array order is significant. This helper implements that comparison so the
+// suite runner does not reject spec-legit implementations whose emission
+// order differs from the reference expected output, while still rejecting
+// implementations that reorder the contents of a JSON literal.
 auto jsonld_deep_equal(const sourcemeta::core::JSON &left,
                        const sourcemeta::core::JSON &right, bool ordered)
     -> bool {
@@ -57,9 +60,18 @@ auto jsonld_deep_equal(const sourcemeta::core::JSON &left,
     if (left.size() != right.size()) {
       return false;
     }
+    const bool is_json_literal{left.defines("@type") &&
+                               left.at("@type").is_string() &&
+                               left.at("@type").to_string() == "@json"};
     for (const auto &entry : left.as_object()) {
       if (!right.defines(entry.first)) {
         return false;
+      }
+      if (is_json_literal && entry.first == "@value") {
+        if (entry.second != right.at(entry.first)) {
+          return false;
+        }
+        continue;
       }
       const bool is_list{entry.first == "@list"};
       if (!jsonld_deep_equal(entry.second, right.at(entry.first), is_list)) {
