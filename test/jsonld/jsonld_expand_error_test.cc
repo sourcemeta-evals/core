@@ -343,7 +343,7 @@ TEST(JSONLD_expand_error, invalid_language_tagged_value) {
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid language-tagged value",
-                             "/http:~1~1example.com~1p");
+                             "/http:~1~1example.com~1p/@value");
 }
 
 TEST(JSONLD_expand_error, invalid_typed_value) {
@@ -352,7 +352,8 @@ TEST(JSONLD_expand_error, invalid_typed_value) {
   })");
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Invalid typed value", "/http:~1~1example.com~1p");
+                             "Invalid typed value",
+                             "/http:~1~1example.com~1p/@type");
 }
 
 TEST(JSONLD_expand_error, invalid_value_object_value) {
@@ -362,7 +363,7 @@ TEST(JSONLD_expand_error, invalid_value_object_value) {
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid value object value",
-                             "/http:~1~1example.com~1p");
+                             "/http:~1~1example.com~1p/@value");
 }
 
 TEST(JSONLD_expand_error, invalid_set_or_list_object) {

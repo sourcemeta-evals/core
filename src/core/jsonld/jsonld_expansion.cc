@@ -71,10 +71,19 @@ auto expand_type(ExpansionState &state, const ActiveContext &type_context,
   return type.has_value() ? JSON{type.value()} : JSON{nullptr};
 }
 
+// The input-spelled locations of the members that expanded to @value and
+// @type, so the value-object post-processing checks can point at the
+// offending key rather than at the enclosing element.
+struct ValueMemberPointers {
+  std::optional<WeakPointer> value;
+  std::optional<WeakPointer> type;
+};
+
 // Expand the direct (and deferred @nest) entries of a map into the result,
 // mutating it in place. Mutually recursive with expand_object.
 auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                     const ActiveContext &type_context, JSON &result,
+                    ValueMemberPointers &value_members,
                     const std::optional<JSON::String> &active_property,
                     const JSON &source, const WeakPointer &source_pointer)
     -> void;
@@ -124,8 +133,9 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
     }
   }
 
-  expand_entries(state, active_context, type_context, result, active_property,
-                 element, pointer);
+  ValueMemberPointers value_members;
+  expand_entries(state, active_context, type_context, result, value_members,
+                 active_property, element, pointer);
 
   // An empty reverse map carries no information.
   if (const auto *reverse{result.try_at(KEYWORD_REVERSE, KEYWORD_REVERSE_HASH)};
@@ -158,15 +168,23 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
     }
     if (result.defines(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH) &&
         !content.is_string()) {
-      throw JSONLDError("Invalid language-tagged value", pointer);
+      throw JSONLDError("Invalid language-tagged value",
+                        value_members.value.has_value()
+                            ? value_members.value.value()
+                            : pointer);
     }
     if (has_type && (type_string == nullptr || type_string->starts_with("_:") ||
                      type_string->find(' ') != JSON::String::npos)) {
-      throw JSONLDError("Invalid typed value", pointer);
+      throw JSONLDError("Invalid typed value", value_members.type.has_value()
+                                                   ? value_members.type.value()
+                                                   : pointer);
     }
     if (!is_json && !content.is_string() && !content.is_number() &&
         !content.is_boolean()) {
-      throw JSONLDError("Invalid value object value", pointer);
+      throw JSONLDError("Invalid value object value",
+                        value_members.value.has_value()
+                            ? value_members.value.value()
+                            : pointer);
     }
   } else if (const auto *type_entry{
                  result.try_at(KEYWORD_TYPE, KEYWORD_TYPE_HASH)};
@@ -227,6 +245,7 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
 
 auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                     const ActiveContext &type_context, JSON &result,
+                    ValueMemberPointers &value_members,
                     const std::optional<JSON::String> &active_property,
                     const JSON &source, const WeakPointer &source_pointer)
     -> void {
@@ -304,6 +323,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
     }
 
     if (name == KEYWORD_TYPE) {
+      value_members.type = entry_pointer;
       if (entry.second.is_array()) {
         for (const auto &item : entry.second.as_array()) {
           if (!item.is_string()) {
@@ -350,6 +370,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
     }
 
     if (name == KEYWORD_VALUE) {
+      value_members.value = entry_pointer;
       result.assign_assume_new(JSON::String{KEYWORD_VALUE}, JSON{entry.second},
                                KEYWORD_VALUE_HASH);
       continue;
@@ -853,10 +874,10 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       state.protected_override = saved_override;
       state.context_base_override = saved_base;
       nested.previous = nullptr;
-      expand_entries(state, nested, type_context, result, active_property,
-                     *nest, nest_pointer);
+      expand_entries(state, nested, type_context, result, value_members,
+                     active_property, *nest, nest_pointer);
     } else {
-      expand_entries(state, active_context, type_context, result,
+      expand_entries(state, active_context, type_context, result, value_members,
                      active_property, *nest, nest_pointer);
     }
   }
