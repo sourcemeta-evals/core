@@ -553,6 +553,20 @@ TEST(Numeric_decimal, to_integral_already_integer) {
   EXPECT_EQ(value.to_integral(), expected);
 }
 
+TEST(Numeric_decimal, to_integral_rounds_up_sub_unit) {
+  EXPECT_EQ(sourcemeta::core::Decimal{"0.7"}.to_integral(),
+            sourcemeta::core::Decimal{1});
+  EXPECT_EQ(sourcemeta::core::Decimal{"-0.7"}.to_integral(),
+            sourcemeta::core::Decimal{-1});
+}
+
+TEST(Numeric_decimal, to_integral_half_even_big) {
+  EXPECT_EQ(sourcemeta::core::Decimal{"10000000000000000000.5"}.to_integral(),
+            sourcemeta::core::Decimal{"10000000000000000000"});
+  EXPECT_EQ(sourcemeta::core::Decimal{"10000000000000000001.5"}.to_integral(),
+            sourcemeta::core::Decimal{"10000000000000000002"});
+}
+
 TEST(Numeric_decimal, factory_nan) {
   const auto nan_value{sourcemeta::core::Decimal::nan()};
   EXPECT_TRUE(nan_value.is_nan());

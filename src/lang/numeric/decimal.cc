@@ -823,15 +823,49 @@ auto Decimal::to_integral() const -> Decimal {
     auto number_of_digits = static_cast<std::int32_t>(digit_string.size());
     auto digits_to_remove = -this->exponent_;
 
-    if (digits_to_remove >= number_of_digits) {
-      Decimal result;
-      return result;
+    if (digits_to_remove > number_of_digits) {
+      return Decimal{};
     }
 
-    auto integer_string = digit_string.substr(
-        0, static_cast<std::size_t>(number_of_digits - digits_to_remove));
+    const auto keep_count =
+        static_cast<std::size_t>(number_of_digits - digits_to_remove);
+    std::string integer_string =
+        keep_count == 0 ? std::string{"0"} : digit_string.substr(0, keep_count);
+
+    bool round_up{false};
+    const char first_removed{digit_string[keep_count]};
+    if (first_removed > '5') {
+      round_up = true;
+    } else if (first_removed == '5') {
+      bool rest_zero{true};
+      for (auto index = keep_count + 1; index < digit_string.size(); ++index) {
+        if (digit_string[index] != '0') {
+          rest_zero = false;
+          break;
+        }
+      }
+      const bool quotient_odd{(integer_string.back() - '0') % 2 != 0};
+      round_up = !rest_zero || quotient_odd;
+    }
+
+    if (round_up) {
+      auto index = integer_string.size();
+      while (index > 0) {
+        --index;
+        if (integer_string[index] != '9') {
+          ++integer_string[index];
+          break;
+        }
+        integer_string[index] = '0';
+        if (index == 0) {
+          integer_string.insert(integer_string.begin(), '1');
+          break;
+        }
+      }
+    }
+
     Decimal result{integer_string};
-    if (this->flags_ & FLAG_SIGN) {
+    if ((this->flags_ & FLAG_SIGN) && !result.is_zero()) {
       result.flags_ |= FLAG_SIGN;
     }
 
@@ -841,7 +875,7 @@ auto Decimal::to_integral() const -> Decimal {
   auto coefficient = this->coefficient_;
   auto digits_to_remove = -this->exponent_;
 
-  if (static_cast<std::uint32_t>(digits_to_remove) >=
+  if (static_cast<std::uint32_t>(digits_to_remove) >
       digit_count(static_cast<std::uint64_t>(coefficient))) {
     return Decimal{};
   }
