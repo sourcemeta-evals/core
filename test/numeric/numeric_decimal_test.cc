@@ -1039,6 +1039,15 @@ TEST(Numeric_decimal, divisible_by_very_large_negative_number_divisible_true) {
   EXPECT_TRUE(dividend.divisible_by(divisor));
 }
 
+TEST(Numeric_decimal, divisible_by_hundred_digit_coefficient_true) {
+  const sourcemeta::core::Decimal dividend{
+      "1234567890123456789012345678901234567890"
+      "1234567890123456789012345678901234567890"
+      "12345678901234567890"};
+  const sourcemeta::core::Decimal divisor{"1234567890"};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
 TEST(Numeric_decimal, divisible_by_very_small_fractional_not_divisible_false) {
   const sourcemeta::core::Decimal dividend{"1e-100"};
   const sourcemeta::core::Decimal divisor{"3e-101"};
