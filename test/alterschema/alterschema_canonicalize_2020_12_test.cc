@@ -1616,9 +1616,8 @@ TEST(AlterSchema_canonicalize_2020_12,
   EXPECT_TRUE(result.first);
 
   EXPECT_TRUE(document.defines("maximum"));
-  ASSERT_TRUE(document.at("maximum").is_decimal());
-  EXPECT_EQ(document.at("maximum").to_decimal(),
-            sourcemeta::core::Decimal{"100"});
+  EXPECT_EQ(document.at("maximum"),
+            sourcemeta::core::JSON{sourcemeta::core::Decimal{"100"}});
 }
 
 TEST(AlterSchema_canonicalize_2020_12,
@@ -1635,7 +1634,6 @@ TEST(AlterSchema_canonicalize_2020_12,
   EXPECT_TRUE(result.first);
 
   EXPECT_TRUE(document.defines("minimum"));
-  ASSERT_TRUE(document.at("minimum").is_decimal());
-  EXPECT_EQ(document.at("minimum").to_decimal(),
-            sourcemeta::core::Decimal{"100"});
+  EXPECT_EQ(document.at("minimum"),
+            sourcemeta::core::JSON{sourcemeta::core::Decimal{"100"}});
 }
