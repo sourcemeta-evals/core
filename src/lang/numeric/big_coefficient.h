@@ -400,20 +400,36 @@ public:
       auto remainder_top = static_cast<sourcemeta::core::uint128_t>(
           remainder.words[remainder.length - 1]);
       if (remainder.length > divisor.length) {
-        auto shift = remainder.length - divisor.length;
+        auto numerator =
+            remainder_top * BASE + static_cast<sourcemeta::core::uint128_t>(
+                                       remainder.words[remainder.length - 2]);
         auto divisor_top = divisor.words[divisor.length - 1];
-        auto estimate =
-            static_cast<std::uint64_t>(remainder_top / (divisor_top + 1));
+        auto estimate = static_cast<std::uint64_t>(
+            numerator /
+            (static_cast<sourcemeta::core::uint128_t>(divisor_top) + 1U));
         if (estimate == 0) {
           estimate = 1;
         }
+
+        auto shift = remainder.length - divisor.length - 1U;
 
         BigCoefficient estimate_big{1};
         estimate_big.words[0] = estimate;
         estimate_big.length = 1;
 
-        auto scaled = estimate_big.multiply_pow10(shift * BASE_DIGITS);
+        BigCoefficient scaled =
+            shift == 0U ? estimate_big.clone()
+                        : estimate_big.multiply_pow10(shift * BASE_DIGITS);
         auto product = scaled.multiply(divisor);
+
+        while (product.compare(remainder) > 0 && estimate > 1U) {
+          estimate--;
+          estimate_big.words[0] = estimate;
+          scaled = shift == 0U
+                       ? estimate_big.clone()
+                       : estimate_big.multiply_pow10(shift * BASE_DIGITS);
+          product = scaled.multiply(divisor);
+        }
 
         if (product.compare(remainder) > 0) {
           remainder = remainder.subtract(divisor);

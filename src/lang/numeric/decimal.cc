@@ -1857,14 +1857,37 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
   auto divisor_big = coefficient_as_big(other.coefficient_,
                                         other.coefficient_high_, other.flags_);
 
-  auto scaled = dividend_big.multiply_pow10(WORKING_PRECISION);
+  const auto dividend_digits = dividend_big.digit_count();
+  const auto divisor_digits = divisor_big.digit_count();
+  auto guard_digits = static_cast<std::uint32_t>(WORKING_PRECISION + 1);
+  if (divisor_digits > dividend_digits) {
+    guard_digits +=
+        static_cast<std::uint32_t>(divisor_digits - dividend_digits);
+  }
+
+  auto scaled = dividend_big.multiply_pow10(guard_digits);
   auto [quotient, remainder] = scaled.divide_modulo(divisor_big);
+
+  if (!remainder.is_zero()) {
+    auto doubled = remainder.add(remainder);
+    const auto comparison = doubled.compare(divisor_big);
+    bool round_up{false};
+    if (comparison > 0) {
+      round_up = true;
+    } else if (comparison == 0) {
+      round_up = (quotient.words[0] % 2U) != 0U;
+    }
+    if (round_up) {
+      quotient = quotient.add(BigCoefficient::from_uint64(1));
+    }
+  }
 
   free_big_coefficient(this->coefficient_, this->flags_);
   store_big_result(this->coefficient_, this->coefficient_high_, this->flags_,
                    std::move(quotient), result_negative);
 
-  this->exponent_ = this->exponent_ - other.exponent_ - WORKING_PRECISION;
+  this->exponent_ = this->exponent_ - other.exponent_ -
+                    static_cast<std::int32_t>(guard_digits);
 
   round_to_precision(this->coefficient_, this->coefficient_high_,
                      this->exponent_, this->flags_);

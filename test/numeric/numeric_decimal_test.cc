@@ -163,6 +163,34 @@ TEST(Numeric_decimal, divide_one) {
   EXPECT_EQ(left / right, result);
 }
 
+TEST(Numeric_decimal, divide_small_by_long_divisor_preserves_quotient) {
+  const sourcemeta::core::Decimal left{1};
+  const sourcemeta::core::Decimal right{"100000000000000000000"};
+  const sourcemeta::core::Decimal result{"1e-20"};
+  EXPECT_EQ(left / right, result);
+}
+
+TEST(Numeric_decimal, divide_full_digit_divisor_matches_exponent_form) {
+  const sourcemeta::core::Decimal dividend{1};
+  const sourcemeta::core::Decimal full_digit_divisor{"100000000000000000000"};
+  const sourcemeta::core::Decimal exponent_divisor{"1e20"};
+  EXPECT_EQ(dividend / full_digit_divisor, dividend / exponent_divisor);
+}
+
+TEST(Numeric_decimal, divide_rounds_half_even_two_thirds) {
+  const sourcemeta::core::Decimal numerator{2};
+  const sourcemeta::core::Decimal denominator{3};
+  const sourcemeta::core::Decimal expected{"0.6666666666666667"};
+  EXPECT_EQ(numerator / denominator, expected);
+}
+
+TEST(Numeric_decimal, divide_rounds_half_even_negative_two_thirds) {
+  const sourcemeta::core::Decimal numerator{-2};
+  const sourcemeta::core::Decimal denominator{3};
+  const sourcemeta::core::Decimal expected{"-0.6666666666666667"};
+  EXPECT_EQ(numerator / denominator, expected);
+}
+
 TEST(Numeric_decimal, modulo_basic) {
   const sourcemeta::core::Decimal left{17};
   const sourcemeta::core::Decimal right{5};
