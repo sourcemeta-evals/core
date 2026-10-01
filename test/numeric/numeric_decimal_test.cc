@@ -1301,6 +1301,30 @@ TEST(Numeric_decimal, copy_assignment) {
   EXPECT_EQ(copy, sourcemeta::core::Decimal{100});
 }
 
+TEST(Numeric_decimal, copy_constructor_heap_backed) {
+  const sourcemeta::core::Decimal original{
+      "123456789012345678901234567890123456789"};
+  const sourcemeta::core::Decimal copy{original};
+  EXPECT_EQ(copy, original);
+  EXPECT_EQ(copy.to_string(), "123456789012345678901234567890123456789");
+}
+
+TEST(Numeric_decimal, copy_assignment_heap_backed_from_small) {
+  const sourcemeta::core::Decimal original{
+      "123456789012345678901234567890123456789"};
+  sourcemeta::core::Decimal destination{42};
+  destination = original;
+  EXPECT_EQ(destination, original);
+}
+
+TEST(Numeric_decimal, copy_assignment_small_from_heap_backed) {
+  const sourcemeta::core::Decimal original{42};
+  sourcemeta::core::Decimal destination{
+      "123456789012345678901234567890123456789"};
+  destination = original;
+  EXPECT_EQ(destination, original);
+}
+
 TEST(Numeric_decimal, move_constructor) {
   sourcemeta::core::Decimal original{999};
   const sourcemeta::core::Decimal moved{std::move(original)};

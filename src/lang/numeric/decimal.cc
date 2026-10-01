@@ -405,8 +405,11 @@ Decimal::Decimal(const Decimal &other)
       coefficient_high_{other.coefficient_high_}, exponent_{other.exponent_},
       flags_{other.flags_} {
   if (other.flags_ & FLAG_HEAP) {
-    store_big_pointer(this->coefficient_,
-                      load_big_pointer(other.coefficient_)->clone());
+    this->coefficient_ = 0;
+    this->flags_ = static_cast<std::uint8_t>(other.flags_ & ~FLAG_HEAP);
+    auto cloned = load_big_pointer(other.coefficient_)->clone();
+    store_big_pointer(this->coefficient_, std::move(cloned));
+    this->flags_ = other.flags_;
   }
 }
 
@@ -422,14 +425,21 @@ Decimal::Decimal(Decimal &&other) noexcept
 
 auto Decimal::operator=(const Decimal &other) -> Decimal & {
   if (this != &other) {
-    free_big_coefficient(this->coefficient_, this->flags_);
-    this->coefficient_ = other.coefficient_;
-    this->coefficient_high_ = other.coefficient_high_;
-    this->exponent_ = other.exponent_;
-    this->flags_ = other.flags_;
     if (other.flags_ & FLAG_HEAP) {
-      store_big_pointer(this->coefficient_,
-                        load_big_pointer(other.coefficient_)->clone());
+      auto cloned = load_big_pointer(other.coefficient_)->clone();
+      free_big_coefficient(this->coefficient_, this->flags_);
+      this->coefficient_ = 0;
+      this->flags_ = 0;
+      store_big_pointer(this->coefficient_, std::move(cloned));
+      this->coefficient_high_ = other.coefficient_high_;
+      this->exponent_ = other.exponent_;
+      this->flags_ = other.flags_;
+    } else {
+      free_big_coefficient(this->coefficient_, this->flags_);
+      this->coefficient_ = other.coefficient_;
+      this->coefficient_high_ = other.coefficient_high_;
+      this->exponent_ = other.exponent_;
+      this->flags_ = other.flags_;
     }
   }
 
