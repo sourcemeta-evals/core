@@ -3718,6 +3718,13 @@ TEST(Numeric_decimal, strict_from_0_1) {
   EXPECT_EQ(result, sourcemeta::core::Decimal{"0.1"});
 }
 
+TEST(Numeric_decimal, divide_integer_large_exponent_exact_quotient) {
+  const sourcemeta::core::Decimal dividend{"9e100000001"};
+  const sourcemeta::core::Decimal divisor{3};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"3e100000001"});
+}
+
 TEST(Numeric_decimal, strict_from_double_max) {
   const auto value{sourcemeta::core::Decimal::strict_from(
       std::numeric_limits<double>::max())};
