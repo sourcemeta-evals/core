@@ -2508,6 +2508,11 @@ TEST(Numeric_decimal, parse_very_large_negative_exponent) {
   EXPECT_TRUE(value.is_finite());
 }
 
+TEST(Numeric_decimal, parse_oversized_positive_exponent_safe) {
+  const sourcemeta::core::Decimal value{"1e10000000000000000000"};
+  EXPECT_TRUE(value.is_finite());
+}
+
 TEST(Numeric_decimal, parse_fractional_at_int32_min_exponent) {
   const sourcemeta::core::Decimal value{"0.1e-2147483648"};
   EXPECT_TRUE(value.is_finite());
