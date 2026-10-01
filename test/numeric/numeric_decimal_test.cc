@@ -3440,6 +3440,13 @@ TEST(Numeric_decimal, reduce_zero) {
   EXPECT_EQ(value.reduce(), expected);
 }
 
+TEST(Numeric_decimal, reduce_negative_zero_preserves_sign) {
+  const sourcemeta::core::Decimal value{"-0.00"};
+  const auto reduced{value.reduce()};
+  EXPECT_TRUE(reduced.is_zero());
+  EXPECT_TRUE(reduced.is_signed());
+}
+
 TEST(Numeric_decimal, reduce_integer) {
   const sourcemeta::core::Decimal value{"1200"};
   const sourcemeta::core::Decimal expected{"12E+2"};
