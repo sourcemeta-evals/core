@@ -513,6 +513,18 @@ public:
 
   [[nodiscard]] auto to_uint128(std::int32_t exponent) const
       -> sourcemeta::core::uint128_t {
+    if (exponent < 0 && !this->is_zero()) {
+      auto divisor = BigCoefficient::from_uint64(1).multiply_pow10(
+          static_cast<std::uint32_t>(-exponent));
+      auto [quotient, remainder] = this->divide_modulo(divisor);
+      static_cast<void>(remainder);
+      sourcemeta::core::uint128_t value = 0;
+      for (auto index = quotient.length; index > 0; index--) {
+        value = value * BASE + quotient.words[index - 1];
+      }
+      return value;
+    }
+
     sourcemeta::core::uint128_t value = 0;
     for (auto index = this->length; index > 0; index--) {
       value = value * BASE + this->words[index - 1];
@@ -521,11 +533,6 @@ public:
     while (exponent > 0) {
       value *= 10;
       exponent--;
-    }
-
-    while (exponent < 0) {
-      value = value / sourcemeta::core::uint128_t{10};
-      exponent++;
     }
 
     return value;

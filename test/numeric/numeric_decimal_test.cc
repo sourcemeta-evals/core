@@ -353,6 +353,16 @@ TEST(Numeric_decimal, convert_negative_to_int64) {
   EXPECT_EQ(value.to_int64(), -999999);
 }
 
+TEST(Numeric_decimal, convert_long_fractional_zeros_to_int64) {
+  const sourcemeta::core::Decimal value{"3." + std::string(50, '0')};
+  EXPECT_EQ(value.to_int64(), 3);
+}
+
+TEST(Numeric_decimal, convert_long_fractional_zeros_to_uint64) {
+  const sourcemeta::core::Decimal value{"3." + std::string(50, '0')};
+  EXPECT_EQ(value.to_uint64(), 3ULL);
+}
+
 TEST(Numeric_decimal, very_large_integer) {
   const sourcemeta::core::Decimal value{
       "99999999999999999999999999999999999999"};
