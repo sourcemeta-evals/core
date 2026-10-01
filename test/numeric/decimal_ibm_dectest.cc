@@ -171,7 +171,52 @@ static auto decimal_trim(const sourcemeta::core::Decimal &value)
   if (value.is_nan() || value.is_infinite()) {
     return value;
   }
-  return value.reduce();
+  if (value.is_zero()) {
+    return value.is_signed() ? sourcemeta::core::Decimal{"-0"}
+                             : sourcemeta::core::Decimal{"0"};
+  }
+
+  // IBM General Decimal Arithmetic trim: strip trailing zeros from the
+  // coefficient, but stop at exponent 0 when the operand had a fractional
+  // part. Operands with a non-negative stored exponent strip freely like
+  // Decimal::reduce; operands with a negative stored exponent stop once the
+  // fractional zeros are gone so trim(10.0) is 10 (quantum E+0), not 1E+1.
+  // Recover the stored exponent via to_scientific_string's canonical form.
+  const auto scientific = value.to_scientific_string();
+  const auto e_pos = scientific.find('e');
+  std::size_t digit_count = 0;
+  for (std::size_t index = 0; index < e_pos; index++) {
+    const auto character = scientific[index];
+    if (character >= '0' && character <= '9') {
+      digit_count++;
+    }
+  }
+  const auto adjusted_exp = std::stoi(scientific.substr(e_pos + 1));
+  const auto original_exp =
+      adjusted_exp - static_cast<std::int32_t>(digit_count) + 1;
+
+  if (original_exp == 0) {
+    return value;
+  }
+
+  if (original_exp > 0) {
+    return value.reduce();
+  }
+
+  auto text = value.to_string();
+  const auto dot = text.find('.');
+  if (dot == std::string::npos) {
+    return value;
+  }
+  auto end = text.size();
+  while (end > dot && text[end - 1] == '0') {
+    end--;
+  }
+  if (end > 0 && text[end - 1] == '.') {
+    end--;
+  }
+  text.resize(end);
+  return sourcemeta::core::Decimal{text};
 }
 
 static auto expect_comparison_result(const sourcemeta::core::Decimal &left,
@@ -291,7 +336,7 @@ public:
     } else if (operation == "reduce") {
       this->run_unary([](const auto &value) { return value.reduce(); });
     } else if (operation == "trim") {
-      this->run_unary([](const auto &value) { return decimal_trim(value); });
+      this->run_trim();
     } else {
       FAIL();
     }
@@ -376,6 +421,17 @@ private:
 
     expect_decimal_eq(op(make_decimal(this->test_case_.operand1)),
                       make_decimal(this->test_case_.expected));
+  }
+
+  auto run_trim() -> void {
+    const auto input = make_decimal(this->test_case_.operand1);
+    const auto expected = make_decimal(this->test_case_.expected);
+    const auto result = decimal_trim(input);
+    expect_decimal_eq(result, expected);
+    if (result.is_finite() && expected.is_finite()) {
+      EXPECT_TRUE(result.same_quantum(expected))
+          << "trim result quantum differs from expected";
+    }
   }
 
   // TODO: Our to_scientific_string() always uses exponential form
