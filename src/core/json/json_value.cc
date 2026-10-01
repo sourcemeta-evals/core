@@ -746,7 +746,13 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
 
   if (this->is_integer() && divisor.is_integer()) {
     const auto divisor_value{divisor.to_integer()};
-    return divisor_value != 0 && this->to_integer() % divisor_value == 0;
+    if (divisor_value == 0) {
+      return false;
+    }
+    if (divisor_value == 1 || divisor_value == -1) {
+      return true;
+    }
+    return this->to_integer() % divisor_value == 0;
   }
 
   if (this->is_integer() && divisor.is_real()) {
@@ -772,13 +778,6 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
     Real dividend_integral = 0;
     if (std::modf(dividend_value, &dividend_integral) == 0.0 &&
         divisor_value == 0.5) {
-      return true;
-    }
-
-    const auto division{dividend_value / divisor_value};
-    Real integral = 0;
-    if (!std::isinf(division) && !std::isnan(division) &&
-        std::modf(division, &integral) == 0.0) {
       return true;
     }
 

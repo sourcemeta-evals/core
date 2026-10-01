@@ -2,6 +2,9 @@
 
 #include <sourcemeta/core/json.h>
 
+#include <cstdint> // std::int64_t
+#include <limits>  // std::numeric_limits
+
 TEST(JSON_number, is_number_zero) {
   const sourcemeta::core::JSON document{0};
   EXPECT_TRUE(document.is_number());
@@ -573,6 +576,25 @@ TEST(JSON_number, divisible_by_negative_integer_real_0_1_true) {
 TEST(JSON_number, divisible_by_negative_integer_real_0_01_true) {
   const sourcemeta::core::JSON dividend{-5};
   const sourcemeta::core::JSON divisor{0.01};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_number, divisible_by_real_1e20_by_3_false) {
+  const sourcemeta::core::JSON dividend{1e20};
+  const sourcemeta::core::JSON divisor{3.0};
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_number, divisible_by_real_underflow_false) {
+  const sourcemeta::core::JSON dividend{1e-300};
+  const sourcemeta::core::JSON divisor{1e300};
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_number, divisible_by_int64_min_by_neg_one_true) {
+  const sourcemeta::core::JSON dividend{
+      std::numeric_limits<std::int64_t>::min()};
+  const sourcemeta::core::JSON divisor{std::int64_t{-1}};
   EXPECT_TRUE(dividend.divisible_by(divisor));
 }
 
