@@ -159,6 +159,10 @@ static auto decimal_copynegate(const sourcemeta::core::Decimal &value)
     return sourcemeta::core::Decimal{prefix + kind +
                                      std::to_string(value.nan_payload())};
   }
+  if (value.is_zero()) {
+    return value.is_signed() ? sourcemeta::core::Decimal{"0"}
+                             : sourcemeta::core::Decimal{"-0"};
+  }
   return -value;
 }
 
@@ -404,6 +408,8 @@ private:
         const std::string kind{result.is_snan() ? "sNaN" : "NaN"};
         result = sourcemeta::core::Decimal{
             "-" + kind + std::to_string(result.nan_payload())};
+      } else if (result.is_zero()) {
+        result = sourcemeta::core::Decimal{"-0"};
       } else {
         result = -result;
       }
