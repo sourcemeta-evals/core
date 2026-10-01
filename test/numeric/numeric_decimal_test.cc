@@ -2499,6 +2499,16 @@ TEST(Numeric_decimal, parse_very_large_negative_exponent) {
   EXPECT_TRUE(value.is_finite());
 }
 
+TEST(Numeric_decimal, parse_fractional_at_int32_min_exponent) {
+  const sourcemeta::core::Decimal value{"0.1e-2147483648"};
+  EXPECT_TRUE(value.is_finite());
+}
+
+TEST(Numeric_decimal, parse_fractional_one_at_int32_min_exponent) {
+  const sourcemeta::core::Decimal value{"1.0e-2147483648"};
+  EXPECT_TRUE(value.is_finite());
+}
+
 TEST(Numeric_decimal, parse_reject_whitespace_leading) {
   EXPECT_THROW(
       { const sourcemeta::core::Decimal value{" 123"}; },

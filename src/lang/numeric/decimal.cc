@@ -242,19 +242,16 @@ auto parse_decimal_string(const char *input, std::size_t length)
     throw sourcemeta::core::DecimalParseError{};
   }
 
-  auto exponent_suffix = static_cast<std::int32_t>(std::min(
-      std::max(
-          exponent_suffix_64,
-          static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::min())),
-      static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())));
-
+  auto exponent_total = exponent_suffix_64;
   if (decimal_offset >= 0) {
-    result.exponent =
-        exponent_suffix -
-        (static_cast<std::int32_t>(digit_count_total) - decimal_offset);
-  } else {
-    result.exponent = exponent_suffix;
+    exponent_total -=
+        static_cast<std::int64_t>(digit_count_total) - decimal_offset;
   }
+
+  result.exponent = static_cast<std::int32_t>(std::min(
+      std::max(exponent_total, static_cast<std::int64_t>(
+                                   std::numeric_limits<std::int32_t>::min())),
+      static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())));
 
   std::uint32_t leading_zeros = 0;
   while (leading_zeros < digit_count_total - 1 &&
