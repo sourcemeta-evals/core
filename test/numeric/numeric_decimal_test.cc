@@ -3898,6 +3898,7 @@ TEST(Numeric_decimal, reduce_multi_limb_preserves_value) {
   const sourcemeta::core::Decimal original{"2000000000000000010"};
   const auto reduced{original.reduce()};
   EXPECT_EQ(reduced, original);
+  EXPECT_FALSE(reduced.same_quantum(original));
 }
 
 TEST(Numeric_decimal,
