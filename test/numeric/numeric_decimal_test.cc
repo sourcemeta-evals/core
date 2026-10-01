@@ -3718,6 +3718,30 @@ TEST(Numeric_decimal, strict_from_0_1) {
   EXPECT_EQ(result, sourcemeta::core::Decimal{"0.1"});
 }
 
+TEST(Numeric_decimal, strict_from_double_max) {
+  const auto value{sourcemeta::core::Decimal::strict_from(
+      std::numeric_limits<double>::max())};
+  EXPECT_TRUE(value.is_finite());
+  EXPECT_FALSE(value.is_zero());
+  EXPECT_FALSE(value.is_signed());
+}
+
+TEST(Numeric_decimal, strict_from_double_lowest) {
+  const auto value{sourcemeta::core::Decimal::strict_from(
+      std::numeric_limits<double>::lowest())};
+  EXPECT_TRUE(value.is_finite());
+  EXPECT_FALSE(value.is_zero());
+  EXPECT_TRUE(value.is_signed());
+}
+
+TEST(Numeric_decimal, strict_from_double_denorm_min) {
+  const auto value{sourcemeta::core::Decimal::strict_from(
+      std::numeric_limits<double>::denorm_min())};
+  EXPECT_TRUE(value.is_finite());
+  EXPECT_FALSE(value.is_zero());
+  EXPECT_FALSE(value.is_signed());
+}
+
 TEST(Numeric_decimal, strict_from_0_01) {
   const auto result{sourcemeta::core::Decimal::strict_from(0.01)};
   EXPECT_EQ(result, sourcemeta::core::Decimal{"0.01"});
