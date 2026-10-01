@@ -1604,6 +1604,18 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
 
   check_exponent_overflow(this->exponent_, other.exponent_);
 
+  if (this->is_zero() && other.is_zero()) {
+    this->exponent_ = std::min(this->exponent_, other.exponent_);
+    const bool both_negative =
+        (this->flags_ & FLAG_SIGN) && (other.flags_ & FLAG_SIGN);
+    this->flags_ = static_cast<std::uint8_t>(
+        this->flags_ & ~(FLAG_INTEGER_LITERAL | FLAG_SIGN));
+    if (both_negative) {
+      this->flags_ |= FLAG_SIGN;
+    }
+    return *this;
+  }
+
   if (other.is_zero()) {
     this->flags_ =
         static_cast<std::uint8_t>(this->flags_ & ~FLAG_INTEGER_LITERAL);
@@ -1878,6 +1890,8 @@ auto Decimal::operator%=(const Decimal &other) -> Decimal & {
     return *this;
   }
 
+  const bool dividend_negative = (this->flags_ & FLAG_SIGN) != 0;
+
   Decimal quotient{*this};
   quotient /= other;
 
@@ -1922,6 +1936,14 @@ auto Decimal::operator%=(const Decimal &other) -> Decimal & {
   Decimal product{quotient};
   product *= other;
   *this -= product;
+
+  if (this->is_zero()) {
+    if (dividend_negative) {
+      this->flags_ |= FLAG_SIGN;
+    } else {
+      this->flags_ = static_cast<std::uint8_t>(this->flags_ & ~FLAG_SIGN);
+    }
+  }
 
   return *this;
 }

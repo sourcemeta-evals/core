@@ -129,7 +129,15 @@ static auto decimal_minus(const sourcemeta::core::Decimal &value)
   if (value.is_nan() || value.is_snan()) {
     return value;
   }
-  return -value;
+  return sourcemeta::core::Decimal{0} - value;
+}
+
+static auto decimal_plus(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (value.is_nan() || value.is_snan()) {
+    return value;
+  }
+  return sourcemeta::core::Decimal{0} + value;
 }
 
 static auto decimal_copyabs(const sourcemeta::core::Decimal &value)
@@ -197,6 +205,9 @@ static auto expect_decimal_eq(const sourcemeta::core::Decimal &result,
     EXPECT_EQ(result.is_signed(), expected.is_signed());
   } else {
     EXPECT_EQ(result, expected);
+    if (expected.is_zero()) {
+      EXPECT_EQ(result.is_signed(), expected.is_signed());
+    }
   }
 }
 
@@ -230,7 +241,7 @@ public:
       this->run_unary(
           [](const auto &value) { return decimal_copynegate(value); });
     } else if (operation == "plus") {
-      this->run_unary([](const auto &value) { return +value; });
+      this->run_unary([](const auto &value) { return decimal_plus(value); });
     } else if (operation == "abs") {
       this->run_unary([](const auto &value) { return decimal_abs(value); });
     } else if (operation == "copyabs") {
@@ -555,13 +566,15 @@ static auto parse_directive(const std::string &line, DecTestContext &context)
   auto key{full_line.substr(0, colon_position)};
   auto value{full_line.substr(colon_position + 1)};
 
-  while (!key.empty() && key.back() == ' ') {
+  while (!key.empty() &&
+         (key.back() == ' ' || key.back() == '\t' || key.back() == '\r')) {
     key.remove_suffix(1);
   }
-  while (!value.empty() && value.front() == ' ') {
+  while (!value.empty() && (value.front() == ' ' || value.front() == '\t')) {
     value.remove_prefix(1);
   }
-  while (!value.empty() && value.back() == ' ') {
+  while (!value.empty() && (value.back() == ' ' || value.back() == '\t' ||
+                            value.back() == '\r')) {
     value.remove_suffix(1);
   }
 
@@ -652,6 +665,16 @@ static auto should_skip_test(const DecTestCase &test_case,
     if (context.rounding != "half_even") {
       return true;
     }
+  }
+
+  // IEEE 754 §6.3: under round-toward-negative (floor), the sign of a zero
+  // sum or difference is '-' where every other rounding attribute gives '+'.
+  // Our Decimal has no rounding mode knob, so zero-result add/subtract rows
+  // under floor rounding are skipped.
+  if ((operation == "add" || operation == "subtract") &&
+      context.rounding == "floor" &&
+      count_significant_digits(test_case.expected) == 0) {
+    return true;
   }
 
   return has_skip_condition(test_case.conditions);
