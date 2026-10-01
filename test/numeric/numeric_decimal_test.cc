@@ -3415,7 +3415,9 @@ TEST(Numeric_decimal, multithreaded_high_thread_count) {
 TEST(Numeric_decimal, reduce_strips_trailing_zeros) {
   const sourcemeta::core::Decimal value{"1.200"};
   const sourcemeta::core::Decimal expected{"1.2"};
-  EXPECT_EQ(value.reduce(), expected);
+  const auto reduced{value.reduce()};
+  EXPECT_EQ(reduced, expected);
+  EXPECT_TRUE(reduced.same_quantum(expected));
 }
 
 TEST(Numeric_decimal, reduce_zero) {
