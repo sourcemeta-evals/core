@@ -3524,6 +3524,20 @@ TEST(Numeric_decimal, scale_by_huge_scale_throws) {
                sourcemeta::core::NumericOverflowError);
 }
 
+TEST(Numeric_decimal, scale_by_int64_max_overflow_throws) {
+  const sourcemeta::core::Decimal value{"10"};
+  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
+                   std::numeric_limits<std::int64_t>::max()})),
+               sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, scale_by_int64_min_overflow_throws) {
+  const sourcemeta::core::Decimal value{"10"};
+  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
+                   std::numeric_limits<std::int64_t>::min()})),
+               sourcemeta::core::NumericOverflowError);
+}
+
 TEST(Numeric_decimal, scale_by_double_constructor_canonical_scale_accepts) {
   const sourcemeta::core::Decimal value{"1.5"};
   const sourcemeta::core::Decimal scale{2.0};
