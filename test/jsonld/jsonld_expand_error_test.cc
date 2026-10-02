@@ -4,6 +4,7 @@
 #include <sourcemeta/core/jsonld.h>
 #include <sourcemeta/core/jsonpointer.h>
 
+#include <algorithm> // std::ranges::fill
 #include <optional>  // std::optional, std::nullopt
 #include <stdexcept> // std::runtime_error
 #include <string>    // std::string
@@ -785,7 +786,9 @@ TEST(JSONLD_expand_error, error_code_value_is_owned) {
   std::string code{"A custom error code longer than small string optimization"};
   const sourcemeta::core::JSONLDError error{code.c_str(),
                                             sourcemeta::core::Pointer{}};
-  code = std::string{};
+  // Mutating the live buffer without freeing it distinguishes an owned copy
+  // from a borrowed pointer deterministically
+  std::ranges::fill(code, 'x');
   EXPECT_STREQ(error.what(),
                "A custom error code longer than small string optimization");
 }
