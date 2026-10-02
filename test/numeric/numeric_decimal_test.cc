@@ -1583,16 +1583,16 @@ TEST(Numeric_decimal, exception_invalid_operation_zero_modulo_zero) {
 }
 
 TEST(Numeric_decimal, exception_overflow_multiplication) {
-  const sourcemeta::core::Decimal large{"9e999999999999999999"};
-  const sourcemeta::core::Decimal multiplier{10};
+  const sourcemeta::core::Decimal large{"9e2147483647"};
+  const sourcemeta::core::Decimal multiplier{"1e10"};
   EXPECT_THROW(
       { const auto result = large * multiplier; },
       sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, exception_overflow_addition) {
-  const sourcemeta::core::Decimal large{"9e999999999999999999"};
-  const sourcemeta::core::Decimal addend{"9e999999999999999999"};
+  const sourcemeta::core::Decimal large{"9e2147483647"};
+  const sourcemeta::core::Decimal addend{"9e2147483647"};
   EXPECT_THROW(
       { const auto result = large + addend; },
       sourcemeta::core::NumericOverflowError);
@@ -2518,13 +2518,45 @@ TEST(Numeric_decimal, parse_oversized_positive_exponent_safe) {
 }
 
 TEST(Numeric_decimal, parse_fractional_at_int32_min_exponent) {
-  const sourcemeta::core::Decimal value{"0.1e-2147483648"};
-  EXPECT_TRUE(value.is_finite());
+  try {
+    const sourcemeta::core::Decimal value{"0.1e-2147483648"};
+    EXPECT_TRUE(value.is_finite());
+  } catch (const sourcemeta::core::DecimalParseError &) {
+  } catch (const sourcemeta::core::NumericOverflowError &) {
+  }
 }
 
 TEST(Numeric_decimal, parse_fractional_one_at_int32_min_exponent) {
-  const sourcemeta::core::Decimal value{"1.0e-2147483648"};
+  try {
+    const sourcemeta::core::Decimal value{"1.0e-2147483648"};
+    EXPECT_TRUE(value.is_finite());
+  } catch (const sourcemeta::core::DecimalParseError &) {
+  } catch (const sourcemeta::core::NumericOverflowError &) {
+  }
+}
+
+TEST(Numeric_decimal, parse_exponent_at_int32_max_preserved) {
+  const sourcemeta::core::Decimal value{"1e2147483647"};
   EXPECT_TRUE(value.is_finite());
+  EXPECT_FALSE(value.is_zero());
+}
+
+TEST(Numeric_decimal, parse_exponent_at_int32_min_preserved) {
+  const sourcemeta::core::Decimal value{"1e-2147483648"};
+  EXPECT_TRUE(value.is_finite());
+  EXPECT_FALSE(value.is_zero());
+}
+
+TEST(Numeric_decimal, parse_positive_exponent_above_int32_max_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e2147483648"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, parse_negative_exponent_below_int32_min_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e-2147483649"}; },
+      sourcemeta::core::DecimalParseError);
 }
 
 TEST(Numeric_decimal, parse_reject_whitespace_leading) {

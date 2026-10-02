@@ -248,10 +248,14 @@ auto parse_decimal_string(const char *input, std::size_t length)
         static_cast<std::int64_t>(digit_count_total) - decimal_offset;
   }
 
-  result.exponent = static_cast<std::int32_t>(std::min(
-      std::max(exponent_total, static_cast<std::int64_t>(
-                                   std::numeric_limits<std::int32_t>::min())),
-      static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())));
+  if (exponent_total >
+          static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()) ||
+      exponent_total <
+          static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::min())) {
+    throw sourcemeta::core::DecimalParseError{};
+  }
+
+  result.exponent = static_cast<std::int32_t>(exponent_total);
 
   std::uint32_t leading_zeros = 0;
   while (leading_zeros < digit_count_total - 1 &&
