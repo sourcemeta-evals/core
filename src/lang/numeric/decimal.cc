@@ -1980,7 +1980,6 @@ auto Decimal::operator%=(const Decimal &other) -> Decimal & {
   auto [quotient, remainder] = dividend_big.divide_modulo(divisor_big);
   static_cast<void>(quotient);
 
-  free_big_coefficient(this->coefficient_, this->flags_);
   Decimal result;
   store_big_result(result.coefficient_, result.coefficient_high_, result.flags_,
                    std::move(remainder), dividend_negative);
