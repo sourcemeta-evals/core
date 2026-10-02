@@ -4509,3 +4509,26 @@ TEST(Numeric_decimal, divide_inexact_does_not_strip_zeros) {
   EXPECT_EQ(result, expected);
   EXPECT_TRUE(result.same_quantum(expected));
 }
+
+TEST(Numeric_decimal, divisible_by_rejects_quiet_nan_divisor_on_zero_dividend) {
+  const sourcemeta::core::Decimal zero;
+  EXPECT_FALSE(zero.divisible_by(sourcemeta::core::Decimal::nan()));
+}
+
+TEST(Numeric_decimal,
+     divisible_by_rejects_signaling_nan_divisor_on_zero_dividend) {
+  const sourcemeta::core::Decimal zero;
+  EXPECT_FALSE(zero.divisible_by(sourcemeta::core::Decimal::snan()));
+}
+
+TEST(Numeric_decimal,
+     divisible_by_rejects_payload_nan_divisor_on_negative_zero_dividend) {
+  const sourcemeta::core::Decimal negative_zero{"-0"};
+  EXPECT_FALSE(negative_zero.divisible_by(sourcemeta::core::Decimal::nan(42)));
+}
+
+TEST(Numeric_decimal, divisible_by_zero_dividend_by_finite_divisor_true) {
+  const sourcemeta::core::Decimal zero;
+  const sourcemeta::core::Decimal divisor{7};
+  EXPECT_TRUE(zero.divisible_by(divisor));
+}

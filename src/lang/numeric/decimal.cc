@@ -931,16 +931,16 @@ auto Decimal::to_integral() const -> Decimal {
 }
 
 auto Decimal::divisible_by(const Decimal &divisor) const -> bool {
+  if (!this->is_finite() || !divisor.is_finite()) {
+    return false;
+  }
+
   if (divisor.is_zero()) {
     return false;
   }
 
   if (this->is_zero()) {
     return true;
-  }
-
-  if (!this->is_finite() || !divisor.is_finite()) {
-    return false;
   }
 
   if (!(divisor.flags_ & FLAG_BIG) && !(this->flags_ & FLAG_HEAP)) {
