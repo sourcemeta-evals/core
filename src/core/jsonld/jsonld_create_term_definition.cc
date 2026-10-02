@@ -227,6 +227,17 @@ auto create_term_definition(ExpansionState &state,
           }
         }
       }
+      // A string definition stands for a map whose @id entry has that value,
+      // so it is subject to the same mapping validation as the explicit form
+      if (!definition.iri.has_value() ||
+          (!is_keyword(definition.iri.value()) &&
+           definition.iri.value().find(':') == JSON::String::npos &&
+           !active_context.vocabulary.has_value())) {
+        throw JSONLDError("Invalid IRI mapping", term_pointer);
+      }
+      if (definition.iri.value() == KEYWORD_CONTEXT) {
+        throw JSONLDError("Invalid keyword alias", term_pointer);
+      }
     }
   } else if (value.is_object()) {
     const bool has_id{id_entry != nullptr};

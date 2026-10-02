@@ -122,6 +122,24 @@ TEST(JSONLD_expand_error, invalid_keyword_alias) {
                              "Invalid keyword alias", "/@context/a/@id");
 }
 
+TEST(JSONLD_expand_error, invalid_iri_mapping_shorthand) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "a": "bad" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/a");
+}
+
+TEST(JSONLD_expand_error, invalid_keyword_alias_shorthand) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "a": "@context" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid keyword alias", "/@context/a");
+}
+
 TEST(JSONLD_expand_error, invalid_reverse_property) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {
