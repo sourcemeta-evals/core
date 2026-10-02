@@ -710,6 +710,48 @@ TEST(JSONLD_expand_error, invalid_container_set_with_multiple_keywords) {
                              "/@context/a/@container");
 }
 
+TEST(JSONLD_expand_error, list_object_with_type) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": { "@list": [ "a" ], "@type": "http://example.com/T" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid set or list object",
+                             "/http:~1~1example.com~1p");
+}
+
+TEST(JSONLD_expand_error, set_object_with_type) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": { "@set": [ "a" ], "@type": "http://example.com/T" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid set or list object",
+                             "/http:~1~1example.com~1p");
+}
+
+TEST(JSONLD_expand_error, aliased_list_object_with_type) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "list": "@list", "type": "@type" },
+    "http://example.com/p": { "list": [ "a" ], "type": "http://example.com/T" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid set or list object",
+                             "/http:~1~1example.com~1p");
+}
+
+TEST(JSONLD_expand_error, list_object_with_type_in_1_0) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": { "@list": [ "a" ], "@type": "http://example.com/T" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Invalid set or list object", "/http:~1~1example.com~1p");
+}
+
 TEST(JSONLD_expand_error, unknown_entry_in_term_definition) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": { "a": { "@id": "http://example.com/a", "@bogus": true } }

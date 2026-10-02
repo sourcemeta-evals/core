@@ -463,6 +463,22 @@ TEST(JSONLD_expand, relative_context_resolved_against_base) {
   EXPECT_EQ(resolved_identifier, "https://example.com/dir/context.jsonld");
 }
 
+TEST(JSONLD_expand, list_object_with_index) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": { "@list": [ "a" ], "@index": "i" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [
+        { "@list": [ { "@value": "a" } ], "@index": "i" }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(JSONLD_expand, unicode_iri_term_mapping) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": { "café": "https://example.com/café" },
