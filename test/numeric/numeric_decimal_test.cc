@@ -4417,3 +4417,23 @@ TEST(Numeric_decimal,
   const sourcemeta::core::Decimal expected{"20000000000000000"};
   EXPECT_EQ(left + right, expected);
 }
+
+TEST(Numeric_decimal, negate_positive_scaled_zero_preserves_quantum) {
+  const sourcemeta::core::Decimal value{"0.0000"};
+  const sourcemeta::core::Decimal expected{"-0.0000"};
+  const auto result{-value};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, negate_negative_scaled_zero_preserves_quantum) {
+  const sourcemeta::core::Decimal value{"-0.0000"};
+  const sourcemeta::core::Decimal expected{"0.0000"};
+  const auto result{-value};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(expected));
+}
