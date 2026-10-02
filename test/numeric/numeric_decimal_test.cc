@@ -4482,3 +4482,30 @@ TEST(Numeric_decimal, add_both_quiet_nan_propagates_left_payload) {
   EXPECT_TRUE(result.is_nan());
   EXPECT_EQ(result.nan_payload(), 16U);
 }
+
+TEST(Numeric_decimal, divide_exact_preserves_preferred_quantum) {
+  const sourcemeta::core::Decimal dividend{"1.20"};
+  const sourcemeta::core::Decimal divisor{2};
+  const sourcemeta::core::Decimal expected{"0.60"};
+  const auto result{dividend / divisor};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, divide_exact_integer_quotient_has_integer_quantum) {
+  const sourcemeta::core::Decimal dividend{"6"};
+  const sourcemeta::core::Decimal divisor{2};
+  const sourcemeta::core::Decimal expected{3};
+  const auto result{dividend / divisor};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, divide_inexact_does_not_strip_zeros) {
+  const sourcemeta::core::Decimal numerator{2};
+  const sourcemeta::core::Decimal denominator{3};
+  const sourcemeta::core::Decimal expected{"0.6666666666666667"};
+  const auto result{numerator / denominator};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}

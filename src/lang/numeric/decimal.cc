@@ -1897,6 +1897,10 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
   auto scaled = dividend_big.multiply_pow10(guard_digits);
   auto [quotient, remainder] = scaled.divide_modulo(divisor_big);
 
+  const auto preferred_exponent = this->exponent_ - other.exponent_;
+  auto final_exponent =
+      preferred_exponent - static_cast<std::int32_t>(guard_digits);
+
   if (!remainder.is_zero()) {
     auto doubled = remainder.add(remainder);
     const auto comparison = doubled.compare(divisor_big);
@@ -1909,14 +1913,24 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
     if (round_up) {
       quotient = quotient.add(BigCoefficient::from_uint64(1));
     }
+  } else {
+    const auto ten = BigCoefficient::from_uint64(10);
+    while (final_exponent < preferred_exponent && !quotient.is_zero()) {
+      auto [stripped, strip_remainder] = quotient.divide_modulo(ten);
+      if (!strip_remainder.is_zero()) {
+        break;
+      }
+
+      quotient = std::move(stripped);
+      final_exponent++;
+    }
   }
 
   free_big_coefficient(this->coefficient_, this->flags_);
   store_big_result(this->coefficient_, this->coefficient_high_, this->flags_,
                    std::move(quotient), result_negative);
 
-  this->exponent_ = this->exponent_ - other.exponent_ -
-                    static_cast<std::int32_t>(guard_digits);
+  this->exponent_ = final_exponent;
 
   round_to_precision(this->coefficient_, this->coefficient_high_,
                      this->exponent_, this->flags_);
