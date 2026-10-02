@@ -3,7 +3,8 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonld.h>
 
-#include <optional> // std::optional, std::nullopt
+#include <algorithm> // std::sort
+#include <optional>  // std::optional, std::nullopt
 
 TEST(JSONLD_expand, empty_object) {
   const auto input = sourcemeta::core::parse_json("{}");
@@ -59,18 +60,28 @@ TEST(JSONLD_expand, type_is_made_an_array) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
-TEST(JSONLD_expand, multiple_values_preserve_order) {
+TEST(JSONLD_expand, multiple_values_preserved) {
   const auto input = sourcemeta::core::parse_json(R"({
     "http://example.com/foo": [ "a", "b" ]
   })");
 
-  const auto expected = sourcemeta::core::parse_json(R"([
+  auto expected = sourcemeta::core::parse_json(R"([
     {
       "http://example.com/foo": [ { "@value": "a" }, { "@value": "b" } ]
     }
   ])");
 
-  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+  auto result = sourcemeta::core::jsonld_expand(input);
+
+  // Expanded values of an ordinary property are an unordered set, so the
+  // comparison must not depend on emission order
+  auto &result_values = result.at(0).at("http://example.com/foo");
+  std::sort(result_values.as_array().begin(), result_values.as_array().end());
+  auto &expected_values = expected.at(0).at("http://example.com/foo");
+  std::sort(expected_values.as_array().begin(),
+            expected_values.as_array().end());
+
+  EXPECT_EQ(result, expected);
 }
 
 TEST(JSONLD_expand, numeric_value) {
