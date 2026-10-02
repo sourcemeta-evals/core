@@ -69,7 +69,13 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       }
       for (const auto &loaded : state.remote_context_chain) {
         if (loaded == reference) {
-          throw JSONLDError("Recursive context inclusion", location);
+          // JSON-LD 1.1 replaced the recursive context inclusion error with
+          // context overflow, with re-inclusion in the active chain acting as
+          // the processor-defined limit
+          if (state.processing_1_0) {
+            throw JSONLDError("Recursive context inclusion", location);
+          }
+          throw JSONLDError("Context overflow", location);
         }
       }
       if (state.resolver == nullptr || !*state.resolver) {

@@ -313,13 +313,23 @@ TEST(JSONLD_expand_error, invalid_remote_context) {
       "Invalid remote context", "/@context");
 }
 
-TEST(JSONLD_expand_error, recursive_context_inclusion) {
+TEST(JSONLD_expand_error, recursive_context_inclusion_in_1_0) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": "https://example.com/recursive" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver(),
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Recursive context inclusion", "/@context");
+}
+
+TEST(JSONLD_expand_error, context_overflow) {
   const auto input = sourcemeta::core::parse_json(
       R"({ "@context": "https://example.com/recursive" })");
 
   EXPECT_JSONLD_EXPAND_ERROR(
       sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
-      "Recursive context inclusion", "/@context");
+      "Context overflow", "/@context");
 }
 
 TEST(JSONLD_expand_error, error_inside_expansion_context) {

@@ -502,7 +502,7 @@ auto create_term_definition(ExpansionState &state,
         const JSON::StringView code{error.what()};
         if (code != "Loading remote context failed" &&
             code != "Recursive context inclusion" &&
-            code != "Invalid remote context") {
+            code != "Context overflow" && code != "Invalid remote context") {
           throw JSONLDError("Invalid scoped context", term_pointer,
                             {KEYWORD_CONTEXT});
         }
