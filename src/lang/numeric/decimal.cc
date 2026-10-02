@@ -385,7 +385,9 @@ auto format_special_value(std::string &result, std::uint8_t flags,
 auto propagate_nan(const sourcemeta::core::Decimal &left,
                    const sourcemeta::core::Decimal &right)
     -> sourcemeta::core::Decimal {
-  const auto &source = left.is_nan() ? left : right;
+  const bool prefer_right =
+      !left.is_snan() && (right.is_snan() || !left.is_nan());
+  const auto &source = prefer_right ? right : left;
   auto result = sourcemeta::core::Decimal::nan(source.nan_payload());
   if (source.is_signed()) {
     result = -result;

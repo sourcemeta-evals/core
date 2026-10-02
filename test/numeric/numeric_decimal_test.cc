@@ -4458,3 +4458,27 @@ TEST(Numeric_decimal, compound_modulo_17_digit_dividend_by_two_exact) {
   dividend %= divisor;
   EXPECT_EQ(dividend, sourcemeta::core::Decimal{1});
 }
+
+TEST(Numeric_decimal, add_right_signaling_nan_payload_wins_over_left_quiet) {
+  const auto left{sourcemeta::core::Decimal::nan(16)};
+  const auto right{sourcemeta::core::Decimal::snan(19)};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_nan());
+  EXPECT_EQ(result.nan_payload(), 19U);
+}
+
+TEST(Numeric_decimal, add_left_signaling_nan_payload_wins_over_right_quiet) {
+  const auto left{sourcemeta::core::Decimal::snan(19)};
+  const auto right{sourcemeta::core::Decimal::nan(16)};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_nan());
+  EXPECT_EQ(result.nan_payload(), 19U);
+}
+
+TEST(Numeric_decimal, add_both_quiet_nan_propagates_left_payload) {
+  const auto left{sourcemeta::core::Decimal::nan(16)};
+  const auto right{sourcemeta::core::Decimal::nan(19)};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_nan());
+  EXPECT_EQ(result.nan_payload(), 16U);
+}
