@@ -460,7 +460,10 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       if (state.processing_1_0) {
         continue;
       }
-      auto included{into_array(expand(state, active_context, std::nullopt,
+      // Included content is expanded under the @included active property so
+      // identifier-only node references survive free-floating cleanup
+      auto included{into_array(expand(state, active_context,
+                                      JSON::String{KEYWORD_INCLUDED},
                                       entry.second, entry_pointer))};
       for (const auto &item : included.as_array()) {
         if (!item.is_object() ||

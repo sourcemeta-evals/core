@@ -281,6 +281,38 @@ TEST(JSONLD_expand, included_dropped_in_json_ld_1_0) {
             expected);
 }
 
+TEST(JSONLD_expand, included_identifier_only_node) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": "v",
+    "@included": { "@id": "http://example.com/n" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [ { "@value": "v" } ],
+      "@included": [ { "@id": "http://example.com/n" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, included_identifier_only_node_array) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": "v",
+    "@included": [ { "@id": "http://example.com/n" } ]
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [ { "@value": "v" } ],
+      "@included": [ { "@id": "http://example.com/n" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(JSONLD_expand, nest_term_whose_scoped_context_redefines_itself) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {
