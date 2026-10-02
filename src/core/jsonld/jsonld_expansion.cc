@@ -127,8 +127,11 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
         definition->second.context.has_value()) {
       const auto &scoped{definition->second.context.value()};
       const auto saved_base{state.context_base_override};
+      const auto saved_remote{state.remote_base_override};
       state.context_base_override = definition->second.context_base;
+      state.remote_base_override = definition->second.context_remote;
       process_context(state, active_context, scoped, pointer, false);
+      state.remote_base_override = saved_remote;
       state.context_base_override = saved_base;
     }
   }
@@ -551,9 +554,12 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       const auto saved_override{state.protected_override};
       state.protected_override = true;
       const auto saved_base{state.context_base_override};
+      const auto saved_remote{state.remote_base_override};
       state.context_base_override = definition->context_base;
+      state.remote_base_override = definition->context_remote;
       process_context(state, scoped_context, definition->context.value(),
                       entry_pointer);
+      state.remote_base_override = saved_remote;
       state.context_base_override = saved_base;
       state.protected_override = saved_override;
     }
@@ -752,10 +758,13 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
           if (type_definition != base_context.terms.cend() &&
               type_definition->second.context.has_value()) {
             const auto saved_base{state.context_base_override};
+            const auto saved_remote{state.remote_base_override};
             state.context_base_override = type_definition->second.context_base;
+            state.remote_base_override = type_definition->second.context_remote;
             process_context(state, entry_context,
                             type_definition->second.context.value(),
                             entry_pointer.concat(index));
+            state.remote_base_override = saved_remote;
             state.context_base_override = saved_base;
             entry_context.previous = nullptr;
           }
@@ -895,12 +904,15 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       // freed while it is being read.
       ActiveContext nested{active_context};
       const auto saved_base{state.context_base_override};
+      const auto saved_remote{state.remote_base_override};
       state.context_base_override = definition->second.context_base;
+      state.remote_base_override = definition->second.context_remote;
       const auto saved_override{state.protected_override};
       state.protected_override = true;
       process_context(state, nested, definition->second.context.value(),
                       nest_property_pointer);
       state.protected_override = saved_override;
+      state.remote_base_override = saved_remote;
       state.context_base_override = saved_base;
       nested.previous = nullptr;
       expand_entries(state, nested, type_context, result, value_members,

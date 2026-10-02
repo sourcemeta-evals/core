@@ -23,6 +23,9 @@ struct TermDefinition {
   bool has_direction{false};
   std::optional<JSON> context;
   std::optional<JSON::String> context_base;
+  // Whether the scoped context was defined inside a remotely-loaded context,
+  // in which case its @base is ignored when it is processed after the fact
+  bool context_remote{false};
   std::optional<JSON::String> index;
   bool reverse{false};
   bool prefix{false};
@@ -48,6 +51,9 @@ struct ExpansionState {
   // When a scoped context is processed after the fact, remote references in it
   // resolve against the URL of the document that defined the term.
   std::optional<JSON::String> context_base_override;
+  // Whether the scoped context being processed after the fact came from a
+  // remotely-loaded context, so its @base stays ignored at use time
+  bool remote_base_override{false};
   // Protected-term state for the context currently being processed.
   bool context_protected{false};
   bool protected_override{false};

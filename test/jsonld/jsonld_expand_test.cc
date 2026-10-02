@@ -563,6 +563,65 @@ TEST(JSONLD_expand, unicode_remote_context_reference) {
   EXPECT_EQ(resolved_identifier, "https://example.com/ctx-café.jsonld");
 }
 
+TEST(JSONLD_expand, remote_scoped_context_base_is_ignored) {
+  const sourcemeta::core::JSONLDResolver resolver =
+      [](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    if (identifier == "https://example.com/remote-scoped") {
+      return sourcemeta::core::parse_json(R"({
+        "@context": {
+          "p": {
+            "@id": "http://example.com/p",
+            "@context": { "@base": "https://remote.example/" }
+          }
+        }
+      })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": "https://example.com/remote-scoped",
+    "p": { "@id": "child" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [
+        { "@id": "https://local.example/dir/child" }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input, "https://local.example/dir/",
+                                            resolver),
+            expected);
+}
+
+TEST(JSONLD_expand, local_scoped_context_base_applies) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": {
+        "@id": "http://example.com/p",
+        "@context": { "@base": "https://scoped.example/" }
+      }
+    },
+    "p": { "@id": "child" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [
+        { "@id": "https://scoped.example/child" }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(
+      sourcemeta::core::jsonld_expand(input, "https://local.example/dir/"),
+      expected);
+}
+
 TEST(JSONLD_expand, imported_base_is_ignored) {
   const sourcemeta::core::JSONLDResolver resolver =
       [](const sourcemeta::core::JSON::StringView identifier)

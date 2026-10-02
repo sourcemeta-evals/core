@@ -524,6 +524,8 @@ auto create_term_definition(ExpansionState &state,
       }
       definition.context = *context_entry;
       definition.context_base = state.context_resolution_base();
+      definition.context_remote =
+          !state.remote_context_chain.empty() || state.remote_base_override;
     }
 
     if (const auto *prefix_entry{

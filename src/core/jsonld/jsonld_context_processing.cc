@@ -242,7 +242,7 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
     }
 
     if (const auto *base_entry{
-            state.remote_context_chain.empty()
+            state.remote_context_chain.empty() && !state.remote_base_override
                 ? context.try_at(KEYWORD_BASE, KEYWORD_BASE_HASH)
                 : nullptr}) {
       const auto &base{*base_entry};
