@@ -1973,10 +1973,9 @@ auto Decimal::operator%=(const Decimal &other) -> Decimal & {
   auto divisor_big = coefficient_as_big(other.coefficient_,
                                         other.coefficient_high_, other.flags_);
 
-  auto dividend_exponent = this->exponent_;
-  auto divisor_exponent = other.exponent_;
-  BigCoefficient::align_exponents(dividend_big, divisor_big, dividend_exponent,
-                                  divisor_exponent);
+  const auto aligned_exponent = std::min(this->exponent_, other.exponent_);
+  BigCoefficient::align_exponents(dividend_big, divisor_big, this->exponent_,
+                                  other.exponent_);
 
   auto [quotient, remainder] = dividend_big.divide_modulo(divisor_big);
   static_cast<void>(quotient);
@@ -1985,7 +1984,7 @@ auto Decimal::operator%=(const Decimal &other) -> Decimal & {
   Decimal result;
   store_big_result(result.coefficient_, result.coefficient_high_, result.flags_,
                    std::move(remainder), dividend_negative);
-  result.exponent_ = dividend_exponent;
+  result.exponent_ = aligned_exponent;
   if (result.is_zero()) {
     result.flags_ = dividend_negative ? FLAG_SIGN : 0;
   }

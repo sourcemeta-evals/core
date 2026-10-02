@@ -4490,6 +4490,22 @@ TEST(Numeric_decimal, compound_modulo_17_digit_dividend_by_two_exact) {
   EXPECT_EQ(dividend, sourcemeta::core::Decimal{1});
 }
 
+TEST(Numeric_decimal,
+     modulo_small_dividend_higher_exponent_than_large_divisor) {
+  const sourcemeta::core::Decimal dividend{"1e1"};
+  const sourcemeta::core::Decimal divisor{"10000000000000000"};
+  const sourcemeta::core::Decimal expected{10};
+  EXPECT_EQ(dividend % divisor, expected);
+}
+
+TEST(Numeric_decimal,
+     modulo_decimal_dividend_integer_divisor_aligned_exponent) {
+  const sourcemeta::core::Decimal dividend{"3.0"};
+  const sourcemeta::core::Decimal divisor{2};
+  const sourcemeta::core::Decimal expected{"1.0"};
+  EXPECT_EQ(dividend % divisor, expected);
+}
+
 TEST(Numeric_decimal, add_right_signaling_nan_payload_wins_over_left_quiet) {
   const auto left{sourcemeta::core::Decimal::nan(16)};
   const auto right{sourcemeta::core::Decimal::snan(19)};
