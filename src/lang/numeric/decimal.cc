@@ -1906,20 +1906,14 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
   auto final_exponent =
       preferred_exponent - static_cast<std::int32_t>(guard_digits);
 
+  const auto ten = BigCoefficient::from_uint64(10);
   if (!remainder.is_zero()) {
-    auto doubled = remainder.add(remainder);
-    const auto comparison = doubled.compare(divisor_big);
-    bool round_up{false};
-    if (comparison > 0) {
-      round_up = true;
-    } else if (comparison == 0) {
-      round_up = (quotient.words[0] % 2U) != 0U;
-    }
-    if (round_up) {
+    auto [stripped, last_digit] = quotient.divide_modulo(ten);
+    static_cast<void>(stripped);
+    if (last_digit.is_zero()) {
       quotient = quotient.add(BigCoefficient::from_uint64(1));
     }
   } else {
-    const auto ten = BigCoefficient::from_uint64(10);
     while (final_exponent < preferred_exponent && !quotient.is_zero()) {
       auto [stripped, strip_remainder] = quotient.divide_modulo(ten);
       if (!strip_remainder.is_zero()) {

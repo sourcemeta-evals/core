@@ -4616,3 +4616,31 @@ TEST(Numeric_decimal, scale_by_negative_exponent_plus_int64_min_throws) {
                    std::numeric_limits<std::int64_t>::min()})),
                sourcemeta::core::NumericOverflowError);
 }
+
+TEST(Numeric_decimal, divide_above_midpoint_501_rounds_up) {
+  const sourcemeta::core::Decimal dividend{"1000000000000000501"};
+  const sourcemeta::core::Decimal divisor{"1000000000000000000"};
+  const sourcemeta::core::Decimal expected{"1.000000000000001"};
+  EXPECT_EQ(dividend / divisor, expected);
+}
+
+TEST(Numeric_decimal, divide_below_midpoint_499_rounds_down) {
+  const sourcemeta::core::Decimal dividend{"1234567890123455499"};
+  const sourcemeta::core::Decimal divisor{"1000000000000000000"};
+  const sourcemeta::core::Decimal expected{"1.234567890123455"};
+  EXPECT_EQ(dividend / divisor, expected);
+}
+
+TEST(Numeric_decimal, divide_compound_above_midpoint_rounds_up) {
+  sourcemeta::core::Decimal dividend{"1000000000000000501"};
+  const sourcemeta::core::Decimal divisor{"1000000000000000000"};
+  dividend /= divisor;
+  EXPECT_EQ(dividend, sourcemeta::core::Decimal{"1.000000000000001"});
+}
+
+TEST(Numeric_decimal, divide_negative_above_midpoint_rounds_away_from_zero) {
+  const sourcemeta::core::Decimal dividend{"-1000000000000000501"};
+  const sourcemeta::core::Decimal divisor{"1000000000000000000"};
+  const sourcemeta::core::Decimal expected{"-1.000000000000001"};
+  EXPECT_EQ(dividend / divisor, expected);
+}
