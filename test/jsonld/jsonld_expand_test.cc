@@ -463,6 +463,65 @@ TEST(JSONLD_expand, relative_context_resolved_against_base) {
   EXPECT_EQ(resolved_identifier, "https://example.com/dir/context.jsonld");
 }
 
+TEST(JSONLD_expand, unicode_iri_term_mapping) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "café": "https://example.com/café" },
+    "café": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "https://example.com/café": [ { "@value": "v" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, unicode_relative_id_resolved_against_base) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@id": "café",
+    "http://example.com/p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "https://example.com/dir/café",
+      "http://example.com/p": [ { "@value": "v" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input, "https://example.com/dir/"),
+            expected);
+}
+
+TEST(JSONLD_expand, unicode_remote_context_reference) {
+  sourcemeta::core::JSON::String resolved_identifier;
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&resolved_identifier](
+          const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    resolved_identifier = identifier;
+    if (identifier == "https://example.com/ctx-café.jsonld") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "p": "http://example.com/p" } })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": "ctx-café.jsonld",
+    "p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/p": [ { "@value": "v" } ] }
+  ])");
+
+  EXPECT_EQ(
+      sourcemeta::core::jsonld_expand(input, "https://example.com/", resolver),
+      expected);
+  EXPECT_EQ(resolved_identifier, "https://example.com/ctx-café.jsonld");
+}
+
 TEST(JSONLD_expand, base_in_remote_context_is_ignored) {
   const sourcemeta::core::JSONLDResolver resolver =
       [](const sourcemeta::core::JSON::StringView identifier)
