@@ -3,10 +3,33 @@
 
 #include <sourcemeta/core/uri.h>
 
-#include <memory>   // std::make_shared
-#include <optional> // std::optional
-#include <utility>  // std::move, std::pair
-#include <vector>   // std::vector
+#include <initializer_list> // std::initializer_list
+#include <memory>           // std::make_shared
+#include <optional>         // std::optional
+#include <utility>          // std::move, std::pair
+#include <vector>           // std::vector
+
+namespace {
+
+// Invoke the resolver callback, translating any failure it raises into the
+// public loading error at the given input location
+auto resolve_remote_document(
+    const sourcemeta::core::ExpansionState &state,
+    const sourcemeta::core::JSON::String &reference,
+    const sourcemeta::core::WeakPointer &location,
+    const std::initializer_list<sourcemeta::core::JSON::StringView> children)
+    -> std::optional<sourcemeta::core::JSON> {
+  try {
+    return (*state.resolver)(reference);
+  } catch (const sourcemeta::core::JSONLDError &) {
+    throw;
+  } catch (...) {
+    throw sourcemeta::core::JSONLDError("Loading remote context failed",
+                                        location, children);
+  }
+}
+
+} // namespace
 
 namespace sourcemeta::core {
 
@@ -81,7 +104,8 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       if (state.resolver == nullptr || !*state.resolver) {
         throw JSONLDError("Loading remote context failed", location);
       }
-      const auto document{(*state.resolver)(reference)};
+      const auto document{
+          resolve_remote_document(state, reference, location, {})};
       if (!document.has_value()) {
         throw JSONLDError("Loading remote context failed", location);
       }
@@ -173,7 +197,8 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         throw JSONLDError("Loading remote context failed", location,
                           {KEYWORD_IMPORT});
       }
-      const auto document{(*state.resolver)(reference)};
+      const auto document{resolve_remote_document(state, reference, location,
+                                                  {KEYWORD_IMPORT})};
       if (!document.has_value()) {
         throw JSONLDError("Loading remote context failed", location,
                           {KEYWORD_IMPORT});

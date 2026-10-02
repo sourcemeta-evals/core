@@ -4,8 +4,9 @@
 #include <sourcemeta/core/jsonld.h>
 #include <sourcemeta/core/jsonpointer.h>
 
-#include <optional> // std::optional, std::nullopt
-#include <string>   // std::string
+#include <optional>  // std::optional, std::nullopt
+#include <stdexcept> // std::runtime_error
+#include <string>    // std::string
 
 #define EXPECT_JSONLD_EXPAND_ERROR(expression, expected_code,                  \
                                    expected_pointer)                           \
@@ -35,6 +36,9 @@ auto remote_resolver() -> sourcemeta::core::JSONLDResolver {
     if (identifier == "https://example.com/invalid-term") {
       return sourcemeta::core::parse_json(
           R"({ "@context": { "a": { "@id": "http://example.com/a", "@bogus": true } } })");
+    }
+    if (identifier == "https://example.com/throws") {
+      throw std::runtime_error("network failure");
     }
     return std::nullopt;
   };
@@ -354,6 +358,24 @@ TEST(JSONLD_expand_error, error_inside_wrapped_expansion_context) {
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input, context),
                              "Invalid term definition", "");
+}
+
+TEST(JSONLD_expand_error, throwing_resolver) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": "https://example.com/throws" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Loading remote context failed", "/@context");
+}
+
+TEST(JSONLD_expand_error, throwing_resolver_on_import) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@import": "https://example.com/throws" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Loading remote context failed", "/@context/@import");
 }
 
 TEST(JSONLD_expand_error, error_inside_remote_context) {
