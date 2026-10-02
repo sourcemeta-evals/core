@@ -53,7 +53,7 @@ TEST(JSONLD_expand_error, invalid_term_definition_empty) {
   })");
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Invalid term definition", "/@context");
+                             "Invalid term definition", "/@context/");
 }
 
 TEST(JSONLD_expand_error, keyword_redefinition) {
@@ -537,7 +537,7 @@ TEST(JSONLD_expand_error, unknown_entry_in_term_definition) {
   })");
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Invalid term definition", "/@context/a");
+                             "Invalid term definition", "/@context/a/@bogus");
 }
 
 TEST(JSONLD_expand_error, type_keyword_container_id) {

@@ -71,7 +71,7 @@ auto create_term_definition(ExpansionState &state,
   }
 
   if (term.empty()) {
-    throw JSONLDError("Invalid term definition", context_pointer);
+    throw JSONLDError("Invalid term definition", context_pointer.concat(term));
   }
 
   defined[term] = false;
@@ -586,7 +586,7 @@ auto create_term_definition(ExpansionState &state,
           key != KEYWORD_LANGUAGE && key != KEYWORD_NEST &&
           key != KEYWORD_PREFIX && key != KEYWORD_PROTECTED &&
           key != KEYWORD_TYPE) {
-        throw JSONLDError("Invalid term definition", term_pointer);
+        throw JSONLDError("Invalid term definition", term_pointer, {key});
       }
     }
   } else {
