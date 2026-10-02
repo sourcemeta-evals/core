@@ -313,6 +313,35 @@ TEST(JSONLD_expand, included_identifier_only_node_array) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+TEST(JSONLD_expand, protected_redefinition_with_reordered_container) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "@protected": true,
+        "p": {
+          "@id": "http://example.com/p",
+          "@container": [ "@set", "@index" ]
+        }
+      },
+      {
+        "p": {
+          "@id": "http://example.com/p",
+          "@container": [ "@index", "@set" ]
+        }
+      }
+    ],
+    "p": { "a": "v" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [ { "@value": "v", "@index": "a" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(JSONLD_expand, null_index_map_value) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {

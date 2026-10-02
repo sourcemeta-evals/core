@@ -3,8 +3,9 @@
 
 #include <sourcemeta/core/uri.h>
 
-#include <optional> // std::optional
-#include <utility>  // std::move
+#include <algorithm> // std::ranges::sort
+#include <optional>  // std::optional
+#include <utility>   // std::move
 
 namespace sourcemeta::core {
 
@@ -401,6 +402,9 @@ auto create_term_definition(ExpansionState &state,
         throw JSONLDError("Invalid container mapping", term_pointer,
                           {KEYWORD_CONTAINER});
       }
+      // Valid multi-keyword combinations are order-insensitive, so the stored
+      // mapping is normalised for protected-term definition comparisons
+      std::ranges::sort(definition.container);
       if (definition.reverse) {
         for (const auto &item : definition.container) {
           if (item != KEYWORD_SET && item != KEYWORD_INDEX) {
