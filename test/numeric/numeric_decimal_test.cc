@@ -3586,6 +3586,36 @@ TEST(Numeric_decimal, scale_by_int64_min_overflow_throws) {
                sourcemeta::core::NumericOverflowError);
 }
 
+TEST(Numeric_decimal, scale_by_two_e_eighteen_negative_scale_throws) {
+  const sourcemeta::core::Decimal value{1};
+  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
+                   std::int64_t{-2000000000000000000}})),
+               sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, scale_by_two_e_eighteen_positive_scale_throws) {
+  const sourcemeta::core::Decimal value{1};
+  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
+                   std::int64_t{2000000000000000000}})),
+               sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     scale_by_one_point_five_e_eighteen_negative_scale_throws) {
+  const sourcemeta::core::Decimal value{1};
+  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
+                   std::int64_t{-1500000000000000000}})),
+               sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     scale_by_one_point_five_e_eighteen_positive_scale_throws) {
+  const sourcemeta::core::Decimal value{1};
+  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
+                   std::int64_t{1500000000000000000}})),
+               sourcemeta::core::NumericOverflowError);
+}
+
 TEST(Numeric_decimal, scale_by_double_constructor_canonical_scale_accepts) {
   const sourcemeta::core::Decimal value{"1.5"};
   const sourcemeta::core::Decimal scale{2.0};
