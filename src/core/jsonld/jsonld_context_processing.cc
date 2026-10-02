@@ -90,6 +90,11 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
                         .resolve_from(URI::from_iri(resolution_base.value()))
                         .recompose();
       }
+      // The resolver contract only admits absolute IRIs, so a relative
+      // reference that no base can resolve is a loading failure
+      if (!URI::from_iri(reference).is_absolute()) {
+        throw JSONLDError("Loading remote context failed", location);
+      }
       for (const auto &loaded : state.remote_context_chain) {
         if (loaded == reference) {
           // JSON-LD 1.1 replaced the recursive context inclusion error with
@@ -192,6 +197,12 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         reference = URI::from_iri(reference)
                         .resolve_from(URI::from_iri(resolution_base.value()))
                         .recompose();
+      }
+      // The resolver contract only admits absolute IRIs, so a relative
+      // reference that no base can resolve is a loading failure
+      if (!URI::from_iri(reference).is_absolute()) {
+        throw JSONLDError("Loading remote context failed", location,
+                          {KEYWORD_IMPORT});
       }
       if (state.resolver == nullptr || !*state.resolver) {
         throw JSONLDError("Loading remote context failed", location,

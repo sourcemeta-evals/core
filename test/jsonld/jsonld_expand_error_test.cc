@@ -360,6 +360,24 @@ TEST(JSONLD_expand_error, error_inside_wrapped_expansion_context) {
                              "Invalid term definition", "");
 }
 
+TEST(JSONLD_expand_error, relative_context_without_base) {
+  const auto input =
+      sourcemeta::core::parse_json(R"({ "@context": "context.jsonld" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Loading remote context failed", "/@context");
+}
+
+TEST(JSONLD_expand_error, relative_import_without_base) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@import": "context.jsonld" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Loading remote context failed", "/@context/@import");
+}
+
 TEST(JSONLD_expand_error, throwing_resolver) {
   const auto input = sourcemeta::core::parse_json(
       R"({ "@context": "https://example.com/throws" })");

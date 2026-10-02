@@ -405,6 +405,35 @@ TEST(JSONLD_expand, graph_value_expanding_to_null_yields_no_element) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+TEST(JSONLD_expand, relative_context_resolved_against_base) {
+  sourcemeta::core::JSON::String resolved_identifier;
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&resolved_identifier](
+          const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    resolved_identifier = identifier;
+    if (identifier == "https://example.com/dir/context.jsonld") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "p": "http://example.com/p" } })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": "context.jsonld",
+    "p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/p": [ { "@value": "v" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(
+                input, "https://example.com/dir/document.jsonld", resolver),
+            expected);
+  EXPECT_EQ(resolved_identifier, "https://example.com/dir/context.jsonld");
+}
+
 TEST(JSONLD_expand, base_in_remote_context_is_ignored) {
   const sourcemeta::core::JSONLDResolver resolver =
       [](const sourcemeta::core::JSON::StringView identifier)
