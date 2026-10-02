@@ -61,13 +61,14 @@ auto create_term_definition(ExpansionState &state,
                             ActiveContext &active_context,
                             const JSON &local_context, const JSON::String &term,
                             DefinedTerms &defined,
-                            const WeakPointer &context_pointer) -> void {
+                            const WeakPointer &context_pointer,
+                            const WeakPointer &reference_pointer) -> void {
   const auto status{defined.find(term)};
   if (status != defined.cend()) {
     if (status->second) {
       return;
     }
-    throw JSONLDError("Cyclic IRI mapping", context_pointer.concat(term));
+    throw JSONLDError("Cyclic IRI mapping", reference_pointer);
   }
 
   if (term.empty()) {
@@ -77,6 +78,11 @@ auto create_term_definition(ExpansionState &state,
   defined[term] = false;
   const auto &value{local_context.at(term)};
   const WeakPointer term_pointer{context_pointer.concat(term)};
+  // Owned keyword spellings so weak pointers can reference keyword entries
+  static const JSON::String TOKEN_ID{KEYWORD_ID};
+  static const JSON::String TOKEN_REVERSE{KEYWORD_REVERSE};
+  static const JSON::String TOKEN_TYPE{KEYWORD_TYPE};
+  static const JSON::String TOKEN_INDEX{KEYWORD_INDEX};
 
   if (is_keyword(term)) {
     if (term == KEYWORD_TYPE && value.is_object() && !state.processing_1_0) {
@@ -185,7 +191,7 @@ auto create_term_definition(ExpansionState &state,
           const auto iterator{defined.find(prefix)};
           if (iterator == defined.cend() || !iterator->second) {
             create_term_definition(state, active_context, local_context, prefix,
-                                   defined, context_pointer);
+                                   defined, context_pointer, term_pointer);
           }
         }
         const auto prefix_definition{active_context.terms.find(prefix)};
@@ -204,7 +210,7 @@ auto create_term_definition(ExpansionState &state,
     } else {
       definition.iri =
           expand_iri(state, active_context, string_value, false, true,
-                     &local_context, &defined, context_pointer);
+                     &local_context, &defined, context_pointer, term_pointer);
       // In 1.1, an IRI-like term must expand to its IRI mapping.
       if (!state.processing_1_0 && definition.iri.has_value()) {
         const auto colon_position{term.find(':')};
@@ -239,7 +245,8 @@ auto create_term_definition(ExpansionState &state,
       definition.reverse = true;
       definition.iri =
           expand_iri(state, active_context, reverse.to_string(), false, true,
-                     &local_context, &defined, context_pointer);
+                     &local_context, &defined, context_pointer,
+                     term_pointer.concat(TOKEN_REVERSE));
       if (!definition.iri.has_value()) {
         // A reverse value with the form of a keyword is ignored.
         defined[term] = true;
@@ -260,7 +267,8 @@ auto create_term_definition(ExpansionState &state,
         return;
       }
       definition.iri = expand_iri(state, active_context, id_value, false, true,
-                                  &local_context, &defined, context_pointer);
+                                  &local_context, &defined, context_pointer,
+                                  term_pointer.concat(TOKEN_ID));
       const auto &mapping{definition.iri};
       if (!mapping.has_value() ||
           (!is_keyword(mapping.value()) &&
@@ -299,7 +307,7 @@ auto create_term_definition(ExpansionState &state,
         const auto iterator{defined.find(prefix)};
         if (iterator == defined.cend() || !iterator->second) {
           create_term_definition(state, active_context, local_context, prefix,
-                                 defined, context_pointer);
+                                 defined, context_pointer, term_pointer);
         }
       }
       const auto prefix_definition{active_context.terms.find(prefix)};
@@ -323,7 +331,8 @@ auto create_term_definition(ExpansionState &state,
       }
       const auto type{expand_iri(state, active_context, type_value.to_string(),
                                  false, true, &local_context, &defined,
-                                 context_pointer)};
+                                 context_pointer,
+                                 term_pointer.concat(TOKEN_TYPE))};
       if (!type.has_value() || type.value().starts_with("_:") ||
           (type.value() != KEYWORD_ID && type.value() != KEYWORD_VOCAB &&
            type.value() != KEYWORD_JSON && type.value() != KEYWORD_NONE &&
@@ -554,9 +563,9 @@ auto create_term_definition(ExpansionState &state,
                           {KEYWORD_INDEX});
       }
       const auto &index_string{index.to_string()};
-      const auto index_iri{expand_iri(state, active_context, index_string,
-                                      false, true, &local_context, &defined,
-                                      context_pointer)};
+      const auto index_iri{expand_iri(
+          state, active_context, index_string, false, true, &local_context,
+          &defined, context_pointer, term_pointer.concat(TOKEN_INDEX))};
       if (!index_iri.has_value() || is_keyword(index_iri.value())) {
         throw JSONLDError("Invalid term definition", term_pointer,
                           {KEYWORD_INDEX});

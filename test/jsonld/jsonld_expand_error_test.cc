@@ -48,7 +48,16 @@ TEST(JSONLD_expand_error, cyclic_iri_mapping) {
   })");
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Cyclic IRI mapping", "/@context/term");
+                             "Cyclic IRI mapping", "/@context/term/@id");
+}
+
+TEST(JSONLD_expand_error, cyclic_iri_mapping_shorthand) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "a": "b:x", "b": "a:x" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Cyclic IRI mapping", "/@context/b");
 }
 
 TEST(JSONLD_expand_error, invalid_term_definition_empty) {
@@ -263,7 +272,27 @@ TEST(JSONLD_expand_error, invalid_context_entry) {
   EXPECT_JSONLD_EXPAND_ERROR(
       sourcemeta::core::jsonld_expand(input, "", {},
                                       sourcemeta::core::JSONLDVersion::V1_0),
-      "Invalid context entry", "/@context");
+      "Invalid context entry", "/@context/@protected");
+}
+
+TEST(JSONLD_expand_error, invalid_context_entry_import) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@import": "https://example.com/ctx" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Invalid context entry", "/@context/@import");
+}
+
+TEST(JSONLD_expand_error, invalid_context_entry_propagate) {
+  const auto input =
+      sourcemeta::core::parse_json(R"({ "@context": { "@propagate": true } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Invalid context entry", "/@context/@propagate");
 }
 
 TEST(JSONLD_expand_error, loading_remote_context_failed) {
@@ -412,7 +441,17 @@ TEST(JSONLD_expand_error, invalid_reverse_property_value) {
   })");
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Invalid reverse property value", "/@reverse");
+                             "Invalid reverse property value",
+                             "/@reverse/http:~1~1example.com~1p");
+}
+
+TEST(JSONLD_expand_error, keyword_inside_reverse_map) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@reverse": { "@id": "http://example.com/x" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property map", "/@reverse/@id");
 }
 
 TEST(JSONLD_expand_error, invalid_included_value) {

@@ -73,19 +73,33 @@ struct ExpansionState {
 // defined (true) versus are still being defined (false, used to detect cycles).
 using DefinedTerms = std::map<JSON::String, bool>;
 
-// IRI Expansion (JSON-LD 1.1 API Section 5.2)
+// IRI Expansion (JSON-LD 1.1 API Section 5.2). The value pointer locates the
+// input entry whose value is being expanded, so that term definitions it
+// triggers can report cycles at the referencing location.
+auto expand_iri(ExpansionState &state, ActiveContext &active_context,
+                const JSON::String &value, const bool document_relative,
+                const bool vocabulary, const JSON *const local_context,
+                DefinedTerms *const defined, const WeakPointer &context_pointer,
+                const WeakPointer &value_pointer)
+    -> std::optional<JSON::String>;
+
+// Convenience overload for call sites that cannot trigger term definitions
+// and therefore track no referencing location
 auto expand_iri(ExpansionState &state, ActiveContext &active_context,
                 const JSON::String &value, const bool document_relative,
                 const bool vocabulary, const JSON *const local_context,
                 DefinedTerms *const defined, const WeakPointer &context_pointer)
     -> std::optional<JSON::String>;
 
-// Create Term Definition (JSON-LD 1.1 API Section 5.1.1)
+// Create Term Definition (JSON-LD 1.1 API Section 5.1.1). The reference
+// pointer locates the input entry whose value triggered this definition,
+// which is where a cyclic mapping is reported
 auto create_term_definition(ExpansionState &state,
                             ActiveContext &active_context,
                             const JSON &local_context, const JSON::String &term,
                             DefinedTerms &defined,
-                            const WeakPointer &context_pointer) -> void;
+                            const WeakPointer &context_pointer,
+                            const WeakPointer &reference_pointer) -> void;
 
 // Context Processing (JSON-LD 1.1 API Section 5.1)
 auto process_context(ExpansionState &state, ActiveContext &active_context,

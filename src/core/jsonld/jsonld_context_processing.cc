@@ -118,11 +118,18 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       throw JSONLDError("Processing mode conflict", location,
                         {KEYWORD_VERSION});
     }
-    if (state.processing_1_0 &&
-        (context.defines(KEYWORD_PROPAGATE, KEYWORD_PROPAGATE_HASH) ||
-         context.defines(KEYWORD_IMPORT, KEYWORD_IMPORT_HASH) ||
-         context.defines(KEYWORD_PROTECTED, KEYWORD_PROTECTED_HASH))) {
-      throw JSONLDError("Invalid context entry", location);
+    if (state.processing_1_0) {
+      if (context.defines(KEYWORD_PROPAGATE, KEYWORD_PROPAGATE_HASH)) {
+        throw JSONLDError("Invalid context entry", location,
+                          {KEYWORD_PROPAGATE});
+      }
+      if (context.defines(KEYWORD_IMPORT, KEYWORD_IMPORT_HASH)) {
+        throw JSONLDError("Invalid context entry", location, {KEYWORD_IMPORT});
+      }
+      if (context.defines(KEYWORD_PROTECTED, KEYWORD_PROTECTED_HASH)) {
+        throw JSONLDError("Invalid context entry", location,
+                          {KEYWORD_PROTECTED});
+      }
     }
 
     if (const auto *propagate_entry{
@@ -273,7 +280,7 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         continue;
       }
       create_term_definition(state, active_context, context, name, defined,
-                             location);
+                             location, location.concat(name));
     }
 
     state.context_protected = saved_protected;

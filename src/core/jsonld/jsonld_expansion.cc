@@ -493,7 +493,8 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                     into_array(JSON{forward.second}));
             }
           } else if (is_keyword(reverse_property, reverse_entry.hash)) {
-            throw JSONLDError("Invalid reverse property map", entry_pointer);
+            throw JSONLDError("Invalid reverse property map", entry_pointer,
+                              {reverse_property});
           } else {
             const auto reverse_values{into_array(JSON{reverse_entry.second})};
             for (const auto &item : reverse_values.as_array()) {
@@ -501,7 +502,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                   (item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH) ||
                    item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH))) {
                 throw JSONLDError("Invalid reverse property value",
-                                  entry_pointer);
+                                  entry_pointer, {reverse_property});
               }
             }
             merge(reverse_map, reverse_property,

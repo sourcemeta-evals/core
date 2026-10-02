@@ -11,7 +11,8 @@ namespace sourcemeta::core {
 auto expand_iri(ExpansionState &state, ActiveContext &active_context,
                 const JSON::String &value, const bool document_relative,
                 const bool vocabulary, const JSON *const local_context,
-                DefinedTerms *const defined, const WeakPointer &context_pointer)
+                DefinedTerms *const defined, const WeakPointer &context_pointer,
+                const WeakPointer &value_pointer)
     -> std::optional<JSON::String> {
   if (is_keyword(value)) {
     return value;
@@ -26,7 +27,7 @@ auto expand_iri(ExpansionState &state, ActiveContext &active_context,
     const auto iterator{defined->find(value)};
     if (iterator == defined->cend() || !iterator->second) {
       create_term_definition(state, active_context, *local_context, value,
-                             *defined, context_pointer);
+                             *defined, context_pointer, value_pointer);
     }
   }
 
@@ -54,7 +55,7 @@ auto expand_iri(ExpansionState &state, ActiveContext &active_context,
       const auto iterator{defined->find(prefix)};
       if (iterator == defined->cend() || !iterator->second) {
         create_term_definition(state, active_context, *local_context, prefix,
-                               *defined, context_pointer);
+                               *defined, context_pointer, value_pointer);
       }
     }
 
@@ -82,6 +83,15 @@ auto expand_iri(ExpansionState &state, ActiveContext &active_context,
   }
 
   return value;
+}
+
+auto expand_iri(ExpansionState &state, ActiveContext &active_context,
+                const JSON::String &value, const bool document_relative,
+                const bool vocabulary, const JSON *const local_context,
+                DefinedTerms *const defined, const WeakPointer &context_pointer)
+    -> std::optional<JSON::String> {
+  return expand_iri(state, active_context, value, document_relative, vocabulary,
+                    local_context, defined, context_pointer, context_pointer);
 }
 
 } // namespace sourcemeta::core
