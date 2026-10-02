@@ -4644,3 +4644,29 @@ TEST(Numeric_decimal, divide_negative_above_midpoint_rounds_away_from_zero) {
   const sourcemeta::core::Decimal expected{"-1.000000000000001"};
   EXPECT_EQ(dividend / divisor, expected);
 }
+
+TEST(Numeric_decimal,
+     subtract_right_signaling_nan_payload_wins_over_left_quiet) {
+  const auto left{sourcemeta::core::Decimal::nan(1)};
+  const auto right{sourcemeta::core::Decimal::snan(2)};
+  const auto result{left - right};
+  EXPECT_TRUE(result.is_nan());
+  EXPECT_EQ(result.nan_payload(), 2U);
+}
+
+TEST(Numeric_decimal,
+     subtract_left_signaling_nan_payload_wins_over_right_quiet) {
+  const auto left{sourcemeta::core::Decimal::snan(2)};
+  const auto right{sourcemeta::core::Decimal::nan(1)};
+  const auto result{left - right};
+  EXPECT_TRUE(result.is_nan());
+  EXPECT_EQ(result.nan_payload(), 2U);
+}
+
+TEST(Numeric_decimal, compound_subtract_right_signaling_nan_payload_wins) {
+  auto left{sourcemeta::core::Decimal::nan(1)};
+  const auto right{sourcemeta::core::Decimal::snan(2)};
+  left -= right;
+  EXPECT_TRUE(left.is_nan());
+  EXPECT_EQ(left.nan_payload(), 2U);
+}
