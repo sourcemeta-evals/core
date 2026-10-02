@@ -130,7 +130,14 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
       const auto saved_remote{state.remote_base_override};
       state.context_base_override = definition->second.context_base;
       state.remote_base_override = definition->second.context_remote;
-      process_context(state, active_context, scoped, pointer, false);
+      try {
+        process_context(state, active_context, scoped, pointer, false);
+      } catch (const JSONLDError &error) {
+        state.remote_base_override = saved_remote;
+        state.context_base_override = saved_base;
+        // Deferred scoped-context errors report at the defining input location
+        throw JSONLDError(error.what(), definition->second.context_location);
+      }
       state.remote_base_override = saved_remote;
       state.context_base_override = saved_base;
     }
@@ -557,8 +564,16 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       const auto saved_remote{state.remote_base_override};
       state.context_base_override = definition->context_base;
       state.remote_base_override = definition->context_remote;
-      process_context(state, scoped_context, definition->context.value(),
-                      entry_pointer);
+      try {
+        process_context(state, scoped_context, definition->context.value(),
+                        entry_pointer);
+      } catch (const JSONLDError &error) {
+        state.remote_base_override = saved_remote;
+        state.context_base_override = saved_base;
+        state.protected_override = saved_override;
+        // Deferred scoped-context errors report at the defining input location
+        throw JSONLDError(error.what(), definition->context_location);
+      }
       state.remote_base_override = saved_remote;
       state.context_base_override = saved_base;
       state.protected_override = saved_override;
@@ -761,9 +776,18 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
             const auto saved_remote{state.remote_base_override};
             state.context_base_override = type_definition->second.context_base;
             state.remote_base_override = type_definition->second.context_remote;
-            process_context(state, entry_context,
-                            type_definition->second.context.value(),
-                            entry_pointer.concat(index));
+            try {
+              process_context(state, entry_context,
+                              type_definition->second.context.value(),
+                              entry_pointer.concat(index));
+            } catch (const JSONLDError &error) {
+              state.remote_base_override = saved_remote;
+              state.context_base_override = saved_base;
+              // Deferred scoped-context errors report at the defining input
+              // location
+              throw JSONLDError(error.what(),
+                                type_definition->second.context_location);
+            }
             state.remote_base_override = saved_remote;
             state.context_base_override = saved_base;
             entry_context.previous = nullptr;
@@ -909,8 +933,16 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       state.remote_base_override = definition->second.context_remote;
       const auto saved_override{state.protected_override};
       state.protected_override = true;
-      process_context(state, nested, definition->second.context.value(),
-                      nest_property_pointer);
+      try {
+        process_context(state, nested, definition->second.context.value(),
+                        nest_property_pointer);
+      } catch (const JSONLDError &error) {
+        state.protected_override = saved_override;
+        state.remote_base_override = saved_remote;
+        state.context_base_override = saved_base;
+        // Deferred scoped-context errors report at the defining input location
+        throw JSONLDError(error.what(), definition->second.context_location);
+      }
       state.protected_override = saved_override;
       state.remote_base_override = saved_remote;
       state.context_base_override = saved_base;

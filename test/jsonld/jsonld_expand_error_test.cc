@@ -41,6 +41,16 @@ auto remote_resolver() -> sourcemeta::core::JSONLDResolver {
     if (identifier == "https://example.com/throws") {
       throw std::runtime_error("network failure");
     }
+    if (identifier == "https://example.com/scoped-missing") {
+      return sourcemeta::core::parse_json(R"({
+        "@context": {
+          "p": {
+            "@id": "http://example.com/p",
+            "@context": "https://example.com/missing"
+          }
+        }
+      })");
+    }
     return std::nullopt;
   };
 }
@@ -395,6 +405,33 @@ TEST(JSONLD_expand_error, relative_import_without_base) {
   EXPECT_JSONLD_EXPAND_ERROR(
       sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
       "Loading remote context failed", "/@context/@import");
+}
+
+TEST(JSONLD_expand_error, deferred_scoped_context_error_from_remote_term) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": "https://example.com/scoped-missing",
+    "p": { "http://example.com/q": "v" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Loading remote context failed", "/@context");
+}
+
+TEST(JSONLD_expand_error, deferred_scoped_context_error_from_local_term) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": {
+        "@id": "http://example.com/p",
+        "@context": "https://example.com/missing"
+      }
+    },
+    "p": { "http://example.com/q": "v" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Loading remote context failed", "/@context/p/@context");
 }
 
 TEST(JSONLD_expand_error, throwing_resolver) {

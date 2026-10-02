@@ -84,6 +84,7 @@ auto create_term_definition(ExpansionState &state,
   static const JSON::String TOKEN_REVERSE{KEYWORD_REVERSE};
   static const JSON::String TOKEN_TYPE{KEYWORD_TYPE};
   static const JSON::String TOKEN_INDEX{KEYWORD_INDEX};
+  static const JSON::String TOKEN_CONTEXT{KEYWORD_CONTEXT};
 
   if (is_keyword(term)) {
     if (term == KEYWORD_TYPE && value.is_object() && !state.processing_1_0) {
@@ -526,6 +527,12 @@ auto create_term_definition(ExpansionState &state,
       definition.context_base = state.context_resolution_base();
       definition.context_remote =
           !state.remote_context_chain.empty() || state.remote_base_override;
+      // Remote definitions report at the input reference that loaded the
+      // defining context, as the scoped entry itself is not in the input
+      definition.context_location =
+          definition.context_remote
+              ? to_pointer(context_pointer)
+              : to_pointer(term_pointer.concat(TOKEN_CONTEXT));
     }
 
     if (const auto *prefix_entry{

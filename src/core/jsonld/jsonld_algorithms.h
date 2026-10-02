@@ -26,6 +26,10 @@ struct TermDefinition {
   // Whether the scoped context was defined inside a remotely-loaded context,
   // in which case its @base is ignored when it is processed after the fact
   bool context_remote{false};
+  // The input location of the scoped context, or of the reference that loaded
+  // the context defining it, where errors raised when the scoped context is
+  // processed after the fact are reported
+  Pointer context_location;
   std::optional<JSON::String> index;
   bool reverse{false};
   bool prefix{false};
