@@ -322,6 +322,30 @@ TEST(JSONLD_expand_error, recursive_context_inclusion) {
       "Recursive context inclusion", "/@context");
 }
 
+TEST(JSONLD_expand_error, error_inside_expansion_context) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": "v"
+  })");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "a": { "@id": "http://example.com/a", "@bogus": true }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input, context),
+                             "Invalid term definition", "");
+}
+
+TEST(JSONLD_expand_error, error_inside_wrapped_expansion_context) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": "v"
+  })");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "@context": { "a": { "@id": "http://example.com/a", "@bogus": true } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input, context),
+                             "Invalid term definition", "");
+}
+
 TEST(JSONLD_expand_error, error_inside_remote_context) {
   const auto input = sourcemeta::core::parse_json(
       R"({ "@context": "https://example.com/invalid-term" })");

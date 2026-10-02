@@ -79,9 +79,13 @@ auto jsonld_expand(const JSON &input, const JSON &expand_context,
               expand_context.defines(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)
           ? expand_context.at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)
           : expand_context};
-  // The external expansion context is not part of the input document, so its
-  // errors carry an empty pointer.
-  process_context(state, active_context, context, empty_weak_pointer);
+  try {
+    process_context(state, active_context, context, empty_weak_pointer);
+  } catch (const JSONLDError &error) {
+    // The external expansion context is not part of the input document, so
+    // its errors are reported at the document root
+    throw JSONLDError(error.what(), empty_weak_pointer);
+  }
   return run_expansion(state, active_context, input);
 }
 
