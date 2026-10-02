@@ -227,6 +227,10 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       // Merge the imported entries with the current ones, the current ones
       // overriding, and process the result as a single context.
       auto merged{JSON{*imported_context}};
+      // A @base defined inside a remotely-loaded document is ignored, and the
+      // merged context is processed outside the remote chain, so the imported
+      // entry is dropped before merging
+      merged.erase(KEYWORD_BASE);
       for (const auto &entry : context.as_object()) {
         if (JSON::StringView{entry.first} != KEYWORD_IMPORT) {
           merged.assign(entry.first, entry.second);

@@ -563,6 +563,44 @@ TEST(JSONLD_expand, unicode_remote_context_reference) {
   EXPECT_EQ(resolved_identifier, "https://example.com/ctx-café.jsonld");
 }
 
+TEST(JSONLD_expand, imported_base_is_ignored) {
+  const sourcemeta::core::JSONLDResolver resolver =
+      [](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    if (identifier == "https://example.com/import-base") {
+      return sourcemeta::core::parse_json(R"({
+        "@context": {
+          "@base": "https://remote.example/",
+          "q": "http://example.com/q"
+        }
+      })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@import": "https://example.com/import-base",
+      "p": "http://example.com/p"
+    },
+    "@id": "relative-node",
+    "p": "v",
+    "q": "w"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "https://local.example/dir/relative-node",
+      "http://example.com/p": [ { "@value": "v" } ],
+      "http://example.com/q": [ { "@value": "w" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input, "https://local.example/dir/",
+                                            resolver),
+            expected);
+}
+
 TEST(JSONLD_expand, repeated_sibling_remote_references) {
   const sourcemeta::core::JSONLDResolver resolver =
       [](const sourcemeta::core::JSON::StringView identifier)
