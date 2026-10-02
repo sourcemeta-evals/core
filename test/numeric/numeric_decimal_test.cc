@@ -4602,3 +4602,17 @@ TEST(Numeric_decimal, modulo_heap_backed_dividend_by_seven_nonzero) {
   const sourcemeta::core::Decimal expected{1};
   EXPECT_EQ(dividend % divisor, expected);
 }
+
+TEST(Numeric_decimal, scale_by_nonzero_exponent_plus_int64_max_throws) {
+  const sourcemeta::core::Decimal value{"1e1"};
+  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
+                   std::numeric_limits<std::int64_t>::max()})),
+               sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, scale_by_negative_exponent_plus_int64_min_throws) {
+  const sourcemeta::core::Decimal value{"1e-1"};
+  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
+                   std::numeric_limits<std::int64_t>::min()})),
+               sourcemeta::core::NumericOverflowError);
+}

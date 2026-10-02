@@ -1136,6 +1136,11 @@ auto Decimal::scale_by(const Decimal &scale) const -> Decimal {
   }
 
   auto scale_value = scale.to_int64();
+  if (scale_value > std::numeric_limits<std::int32_t>::max() ||
+      scale_value < std::numeric_limits<std::int32_t>::min()) {
+    throw NumericOverflowError{};
+  }
+
   auto new_exponent = static_cast<std::int64_t>(this->exponent_) + scale_value;
   if (new_exponent > std::numeric_limits<std::int32_t>::max() ||
       new_exponent < std::numeric_limits<std::int32_t>::min()) {
