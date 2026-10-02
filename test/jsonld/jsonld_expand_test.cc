@@ -313,6 +313,21 @@ TEST(JSONLD_expand, included_identifier_only_node_array) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+TEST(JSONLD_expand, null_index_map_value) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": { "@id": "http://example.com/p", "@container": "@index" }
+    },
+    "p": { "a": null }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/p": [] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(JSONLD_expand, nest_term_whose_scoped_context_redefines_itself) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {

@@ -690,6 +690,10 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
             into_array(expand(state, value_context, property, *index_value,
                               entry_pointer.concat(index)))};
         for (auto &item : index_items.as_array()) {
+          // A null map value expands to nothing
+          if (item.is_null()) {
+            continue;
+          }
           if (index != KEYWORD_NONE) {
             if (property_valued) {
               if (item.is_object() &&
