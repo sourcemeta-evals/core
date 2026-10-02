@@ -472,6 +472,25 @@ TEST(JSONLD_expand_error, invalid_nest_value_expansion) {
                              "Invalid @nest value", "/nest");
 }
 
+TEST(JSONLD_expand_error, invalid_id_inside_nest_array) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@nest": [ {}, { "@id": false } ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @id value", "/@nest/1/@id");
+}
+
+TEST(JSONLD_expand_error, invalid_id_inside_aliased_nest_array) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "data": "@nest" },
+    "data": [ {}, { "@id": false } ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @id value", "/data/1/@id");
+}
+
 TEST(JSONLD_expand_error, list_of_lists) {
   const auto input = sourcemeta::core::parse_json(R"({
     "http://example.com/p": { "@list": [ { "@list": [ "a" ] } ] }

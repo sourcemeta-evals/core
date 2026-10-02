@@ -250,8 +250,15 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                     const JSON &source, const WeakPointer &source_pointer)
     -> void {
   // @nest entries are deferred and processed after the direct ones. The
-  // property is referenced from the source object, never copied.
-  std::vector<std::pair<const JSON::String *, const JSON *>> nests;
+  // property is referenced from the source object, never copied. The index
+  // locates the nested object within an array-valued @nest entry so errors
+  // inside it identify the exact input element.
+  struct NestEntry {
+    const JSON::String *property;
+    const JSON *value;
+    std::optional<std::size_t> index;
+  };
+  std::vector<NestEntry> nests;
   for (const auto &[key_pointer, value_pointer] : sorted_entries(source)) {
     const std::pair<const JSON::String &, const JSON &> entry{*key_pointer,
                                                               *value_pointer};
@@ -268,16 +275,18 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
     if (expanded_property.has_value() &&
         expanded_property.value() == KEYWORD_NEST) {
       if (entry.second.is_array()) {
+        std::size_t nest_index{0};
         for (const auto &nest_value : entry.second.as_array()) {
           if (!nest_value.is_object() ||
               nest_value.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
             throw JSONLDError("Invalid @nest value", entry_pointer);
           }
-          nests.emplace_back(&property, &nest_value);
+          nests.emplace_back(&property, &nest_value, nest_index);
+          nest_index += 1;
         }
       } else if (entry.second.is_object() &&
                  !entry.second.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
-        nests.emplace_back(&property, &entry.second);
+        nests.emplace_back(&property, &entry.second, std::nullopt);
       } else {
         throw JSONLDError("Invalid @nest value", entry_pointer);
       }
@@ -863,10 +872,15 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
 
     merge(result, name, into_array(std::move(expanded_value)));
   }
-  for (const auto &[nest_property, nest] : nests) {
+  for (const auto &[nest_property, nest, nest_index] : nests) {
     // A @nest alias term may carry a property-scoped context for the nested
     // entries.
-    const WeakPointer nest_pointer{source_pointer.concat(*nest_property)};
+    const WeakPointer nest_property_pointer{
+        source_pointer.concat(*nest_property)};
+    const WeakPointer nest_pointer{
+        nest_index.has_value()
+            ? nest_property_pointer.concat(nest_index.value())
+            : nest_property_pointer};
     const auto definition{active_context.terms.find(*nest_property)};
     if (definition != active_context.terms.cend() &&
         definition->second.context.has_value()) {
@@ -878,7 +892,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       const auto saved_override{state.protected_override};
       state.protected_override = true;
       process_context(state, nested, definition->second.context.value(),
-                      nest_pointer);
+                      nest_property_pointer);
       state.protected_override = saved_override;
       state.context_base_override = saved_base;
       nested.previous = nullptr;
