@@ -563,6 +563,62 @@ TEST(JSONLD_expand, unicode_remote_context_reference) {
   EXPECT_EQ(resolved_identifier, "https://example.com/ctx-café.jsonld");
 }
 
+TEST(JSONLD_expand, repeated_sibling_remote_references) {
+  const sourcemeta::core::JSONLDResolver resolver =
+      [](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    if (identifier == "https://example.com/sibling") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "p": "http://example.com/p" } })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      "https://example.com/sibling",
+      "https://example.com/sibling"
+    ],
+    "p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/p": [ { "@value": "v" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input, "", resolver), expected);
+}
+
+TEST(JSONLD_expand, local_base_after_remote_context) {
+  const sourcemeta::core::JSONLDResolver resolver =
+      [](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    if (identifier == "https://example.com/sibling") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "p": "http://example.com/p" } })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      "https://example.com/sibling",
+      { "@base": "https://local.example/" }
+    ],
+    "@id": "relative-node",
+    "p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "https://local.example/relative-node",
+      "http://example.com/p": [ { "@value": "v" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input, "", resolver), expected);
+}
+
 TEST(JSONLD_expand, base_in_remote_context_is_ignored) {
   const sourcemeta::core::JSONLDResolver resolver =
       [](const sourcemeta::core::JSON::StringView identifier)
