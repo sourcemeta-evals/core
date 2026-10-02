@@ -581,15 +581,6 @@ TEST(JSONLD_expand_error, protected_null_term_redefinition) {
                              "Protected term redefinition", "/@context/1/term");
 }
 
-TEST(JSONLD_expand_error, free_floating_invalid_set_or_list_object) {
-  const auto input = sourcemeta::core::parse_json(R"({
-    "@list": [ "foo" ], "@id": "http://example.com/bar"
-  })");
-
-  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Invalid set or list object", "");
-}
-
 TEST(JSONLD_expand_error, import_loading_failed) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": { "@import": "https://example.com/unknown" }

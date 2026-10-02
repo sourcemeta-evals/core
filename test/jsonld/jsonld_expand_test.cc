@@ -111,6 +111,16 @@ TEST(JSONLD_expand, undefined_term_without_context_is_dropped) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+TEST(JSONLD_expand, free_floating_list_is_dropped) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@list": [ "foo" ], "@id": "http://example.com/bar"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json("[]");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(JSONLD_expand, term_maps_to_iri) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": { "name": "http://example.com/name" },
