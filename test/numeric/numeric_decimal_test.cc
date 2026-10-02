@@ -4359,3 +4359,25 @@ TEST(Numeric_decimal,
   const auto expected{sourcemeta::core::Decimal{"19000000000000000000"}};
   EXPECT_EQ(lhs + rhs, expected);
 }
+
+TEST(Numeric_decimal, add_signed_constructor_at_half_int64_max) {
+  const sourcemeta::core::Decimal left{std::int64_t{5000000000000000000}};
+  const sourcemeta::core::Decimal right{std::int64_t{5000000000000000000}};
+  const sourcemeta::core::Decimal expected{"1e19"};
+  EXPECT_EQ(left + right, expected);
+}
+
+TEST(Numeric_decimal, add_signed_constructor_near_int64_min_negative) {
+  const sourcemeta::core::Decimal left{std::int64_t{-5000000000000000000}};
+  const sourcemeta::core::Decimal right{std::int64_t{-5000000000000000000}};
+  const sourcemeta::core::Decimal expected{"-1e19"};
+  EXPECT_EQ(left + right, expected);
+}
+
+TEST(Numeric_decimal,
+     add_compact_result_rounds_half_even_to_working_precision) {
+  const sourcemeta::core::Decimal left{"9999999999999998"};
+  const sourcemeta::core::Decimal right{"9999999999999998"};
+  const sourcemeta::core::Decimal expected{"20000000000000000"};
+  EXPECT_EQ(left + right, expected);
+}

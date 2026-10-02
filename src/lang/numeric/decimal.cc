@@ -466,11 +466,25 @@ Decimal::Decimal(const std::int64_t value) {
     this->coefficient_high_ = absolute_value / BASE;
     this->flags_ = FLAG_BIG | FLAG_SIGN | FLAG_INTEGER_LITERAL;
   } else if (value < 0) {
-    this->coefficient_ = -value;
-    this->flags_ = FLAG_SIGN | FLAG_INTEGER_LITERAL;
+    auto absolute_value = static_cast<std::uint64_t>(-value);
+    if (absolute_value > static_cast<std::uint64_t>(COMPACT_MAX)) {
+      this->coefficient_ = static_cast<std::int64_t>(absolute_value % BASE);
+      this->coefficient_high_ = absolute_value / BASE;
+      this->flags_ = FLAG_BIG | FLAG_SIGN | FLAG_INTEGER_LITERAL;
+    } else {
+      this->coefficient_ = static_cast<std::int64_t>(absolute_value);
+      this->flags_ = FLAG_SIGN | FLAG_INTEGER_LITERAL;
+    }
   } else {
-    this->coefficient_ = value;
-    this->flags_ = FLAG_INTEGER_LITERAL;
+    auto absolute_value = static_cast<std::uint64_t>(value);
+    if (absolute_value > static_cast<std::uint64_t>(COMPACT_MAX)) {
+      this->coefficient_ = static_cast<std::int64_t>(absolute_value % BASE);
+      this->coefficient_high_ = absolute_value / BASE;
+      this->flags_ = FLAG_BIG | FLAG_INTEGER_LITERAL;
+    } else {
+      this->coefficient_ = value;
+      this->flags_ = FLAG_INTEGER_LITERAL;
+    }
   }
 }
 
@@ -1725,6 +1739,8 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
   this->exponent_ = result_exponent;
   this->flags_ = result_negative ? FLAG_SIGN : 0;
 
+  round_to_precision(this->coefficient_, this->coefficient_high_,
+                     this->exponent_, this->flags_);
   return *this;
 }
 
