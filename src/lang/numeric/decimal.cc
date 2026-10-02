@@ -1942,59 +1942,41 @@ auto Decimal::operator%=(const Decimal &other) -> Decimal & {
 
   const bool dividend_negative = (this->flags_ & FLAG_SIGN) != 0;
 
-  Decimal quotient{*this};
-  quotient /= other;
-
-  if (quotient.is_finite() && !quotient.is_zero()) {
-    if (quotient.exponent_ < 0) {
-      if (quotient.flags_ & FLAG_BIG) {
-        auto digit_string = coefficient_to_digit_string(
-            quotient.coefficient_, quotient.coefficient_high_, quotient.flags_);
-        auto number_of_digits = static_cast<std::int32_t>(digit_string.size());
-        auto digits_to_remove = -quotient.exponent_;
-        if (digits_to_remove >= number_of_digits) {
-          quotient = Decimal{};
-        } else {
-          auto integer_string = digit_string.substr(
-              0, static_cast<std::size_t>(number_of_digits - digits_to_remove));
-          auto old_sign =
-              static_cast<std::uint8_t>(quotient.flags_ & FLAG_SIGN);
-          free_big_coefficient(quotient.coefficient_, quotient.flags_);
-          quotient = Decimal{integer_string};
-          quotient.flags_ =
-              static_cast<std::uint8_t>(quotient.flags_ | old_sign);
-        }
-
-      } else {
-        auto coefficient = quotient.coefficient_;
-        auto exponent = quotient.exponent_;
-        while (exponent < 0 && coefficient > 0) {
-          coefficient /= 10;
-          exponent++;
-        }
-
-        if (exponent < 0) {
-          quotient = Decimal{};
-        } else {
-          quotient.coefficient_ = coefficient;
-          quotient.exponent_ = exponent;
-        }
-      }
-    }
-  }
-
-  Decimal product{quotient};
-  product *= other;
-  *this -= product;
-
   if (this->is_zero()) {
     if (dividend_negative) {
       this->flags_ |= FLAG_SIGN;
     } else {
       this->flags_ = static_cast<std::uint8_t>(this->flags_ & ~FLAG_SIGN);
     }
+
+    return *this;
   }
 
+  auto dividend_big = coefficient_as_big(this->coefficient_,
+                                         this->coefficient_high_, this->flags_);
+  auto divisor_big = coefficient_as_big(other.coefficient_,
+                                        other.coefficient_high_, other.flags_);
+
+  auto dividend_exponent = this->exponent_;
+  auto divisor_exponent = other.exponent_;
+  BigCoefficient::align_exponents(dividend_big, divisor_big, dividend_exponent,
+                                  divisor_exponent);
+
+  auto [quotient, remainder] = dividend_big.divide_modulo(divisor_big);
+  static_cast<void>(quotient);
+
+  free_big_coefficient(this->coefficient_, this->flags_);
+  Decimal result;
+  store_big_result(result.coefficient_, result.coefficient_high_, result.flags_,
+                   std::move(remainder), dividend_negative);
+  result.exponent_ = dividend_exponent;
+  if (result.is_zero()) {
+    result.flags_ = dividend_negative ? FLAG_SIGN : 0;
+  }
+
+  round_to_precision(result.coefficient_, result.coefficient_high_,
+                     result.exponent_, result.flags_);
+  *this = std::move(result);
   return *this;
 }
 

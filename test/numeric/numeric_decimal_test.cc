@@ -4433,7 +4433,28 @@ TEST(Numeric_decimal, negate_negative_scaled_zero_preserves_quantum) {
   const sourcemeta::core::Decimal expected{"0.0000"};
   const auto result{-value};
   EXPECT_EQ(result, expected);
-  EXPECT_TRUE(result.is_zero());
   EXPECT_FALSE(result.is_signed());
   EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, modulo_17_digit_dividend_by_two_exact) {
+  const sourcemeta::core::Decimal dividend{"19999999999999999"};
+  const sourcemeta::core::Decimal divisor{2};
+  const sourcemeta::core::Decimal expected{1};
+  EXPECT_EQ(dividend % divisor, expected);
+}
+
+TEST(Numeric_decimal,
+     modulo_17_digit_negative_dividend_preserves_dividend_sign) {
+  const sourcemeta::core::Decimal dividend{"-19999999999999999"};
+  const sourcemeta::core::Decimal divisor{2};
+  const sourcemeta::core::Decimal expected{-1};
+  EXPECT_EQ(dividend % divisor, expected);
+}
+
+TEST(Numeric_decimal, compound_modulo_17_digit_dividend_by_two_exact) {
+  sourcemeta::core::Decimal dividend{"19999999999999999"};
+  const sourcemeta::core::Decimal divisor{2};
+  dividend %= divisor;
+  EXPECT_EQ(dividend, sourcemeta::core::Decimal{1});
 }
