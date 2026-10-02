@@ -2512,6 +2512,7 @@ TEST(Numeric_decimal, parse_oversized_positive_exponent_safe) {
   try {
     const sourcemeta::core::Decimal value{"1e10000000000000000000"};
     EXPECT_TRUE(value.is_finite());
+    EXPECT_FALSE(value.is_signed());
   } catch (const sourcemeta::core::DecimalParseError &) {
   } catch (const sourcemeta::core::NumericOverflowError &) {
   }
