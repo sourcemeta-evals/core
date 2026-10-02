@@ -531,6 +531,21 @@ TEST(JSONLD_expand_error, invalid_container_array_combination) {
                              "/@context/a/@container");
 }
 
+TEST(JSONLD_expand_error, invalid_container_set_with_multiple_keywords) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": {
+        "@id": "http://example.com/a",
+        "@container": [ "@set", "@id", "@language" ]
+      }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid container mapping",
+                             "/@context/a/@container");
+}
+
 TEST(JSONLD_expand_error, unknown_entry_in_term_definition) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": { "a": { "@id": "http://example.com/a", "@bogus": true } }

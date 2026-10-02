@@ -415,13 +415,14 @@ auto create_term_definition(ExpansionState &state,
       }
       // Valid array combinations (JSON-LD 1.1 API Section 5.1.1 step 19.1): a
       // single keyword, or @graph with exactly one of @id or @index optionally
-      // with @set, or @set combined with any of @index, @graph, @id, @type, or
-      // @language.
+      // with @set, or @set combined with any one of @index, @graph, @id,
+      // @type, or @language.
       if (definition.container.size() != 1) {
         const bool graph_form{
             container_graph && (container_id != container_index) &&
             !container_list && !container_type && !container_language};
-        const bool set_form{container_set && !container_list};
+        const bool set_form{container_set && definition.container.size() == 2 &&
+                            !container_list};
         if (!graph_form && !set_form) {
           throw JSONLDError("Invalid container mapping", term_pointer,
                             {KEYWORD_CONTAINER});
