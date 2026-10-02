@@ -32,6 +32,10 @@ auto remote_resolver() -> sourcemeta::core::JSONLDResolver {
     if (identifier == "https://example.com/no-context") {
       return sourcemeta::core::parse_json(R"({ "foo": "bar" })");
     }
+    if (identifier == "https://example.com/invalid-term") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "a": { "@id": "http://example.com/a", "@bogus": true } } })");
+    }
     return std::nullopt;
   };
 }
@@ -287,6 +291,15 @@ TEST(JSONLD_expand_error, recursive_context_inclusion) {
   EXPECT_JSONLD_EXPAND_ERROR(
       sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
       "Recursive context inclusion", "/@context");
+}
+
+TEST(JSONLD_expand_error, error_inside_remote_context) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": "https://example.com/invalid-term" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Invalid term definition", "/@context");
 }
 
 TEST(JSONLD_expand_error, colliding_keywords) {

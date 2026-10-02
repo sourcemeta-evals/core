@@ -90,6 +90,11 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       try {
         // A loaded remote context is processed with the default propagation.
         process_context(state, active_context, *context_entry, location);
+      } catch (const JSONLDError &error) {
+        state.remote_context_chain.pop_back();
+        // The offending entries live in the remote document, so the error is
+        // reported at the input location of the reference that loaded it
+        throw JSONLDError(error.what(), location);
       } catch (...) {
         state.remote_context_chain.pop_back();
         throw;
