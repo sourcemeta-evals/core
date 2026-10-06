@@ -339,16 +339,6 @@ auto is_representable_as_floating_point(
   return decimal == roundtrip;
 }
 
-void check_exponent_overflow(std::int32_t left_exponent,
-                             std::int32_t right_exponent) {
-  if (left_exponent == std::numeric_limits<std::int32_t>::max() ||
-      left_exponent == std::numeric_limits<std::int32_t>::min() ||
-      right_exponent == std::numeric_limits<std::int32_t>::max() ||
-      right_exponent == std::numeric_limits<std::int32_t>::min()) {
-    throw sourcemeta::core::NumericOverflowError{};
-  }
-}
-
 auto format_special_value(std::string &result, std::uint8_t flags,
                           std::int64_t coefficient) -> bool {
   if (flags & FLAG_NAN) {
@@ -1634,8 +1624,6 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
     return *this;
   }
 
-  check_exponent_overflow(this->exponent_, other.exponent_);
-
   if (this->is_zero() && other.is_zero()) {
     this->exponent_ = std::min(this->exponent_, other.exponent_);
     const bool both_negative =
@@ -1798,8 +1786,6 @@ auto Decimal::operator*=(const Decimal &other) -> Decimal & {
 
     return *this;
   }
-
-  check_exponent_overflow(this->exponent_, other.exponent_);
 
   bool result_negative = ((this->flags_ ^ other.flags_) & FLAG_SIGN) != 0;
   auto result_exponent_64 =

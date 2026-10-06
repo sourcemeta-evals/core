@@ -1590,12 +1590,18 @@ TEST(Numeric_decimal, exception_overflow_multiplication) {
       sourcemeta::core::NumericOverflowError);
 }
 
-TEST(Numeric_decimal, exception_overflow_addition) {
+TEST(Numeric_decimal, add_at_int32_max_exponent_representable) {
   const sourcemeta::core::Decimal large{"9e2147483647"};
   const sourcemeta::core::Decimal addend{"9e2147483647"};
-  EXPECT_THROW(
-      { const auto result = large + addend; },
-      sourcemeta::core::NumericOverflowError);
+  const sourcemeta::core::Decimal expected{"18e2147483647"};
+  EXPECT_EQ(large + addend, expected);
+}
+
+TEST(Numeric_decimal, add_at_int32_min_exponent_representable) {
+  const sourcemeta::core::Decimal left{"1e-2147483648"};
+  const sourcemeta::core::Decimal right{"1e-2147483648"};
+  const sourcemeta::core::Decimal expected{"2e-2147483648"};
+  EXPECT_EQ(left + right, expected);
 }
 
 TEST(Numeric_decimal, copy_constructor_preserves_negative_sign) {
