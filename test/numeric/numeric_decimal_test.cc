@@ -2514,14 +2514,36 @@ TEST(Numeric_decimal, parse_very_large_negative_exponent) {
   EXPECT_TRUE(value.is_finite());
 }
 
-TEST(Numeric_decimal, parse_oversized_positive_exponent_safe) {
-  try {
-    const sourcemeta::core::Decimal value{"1e10000000000000000000"};
-    EXPECT_TRUE(value.is_finite());
-    EXPECT_FALSE(value.is_signed());
-  } catch (const sourcemeta::core::DecimalParseError &) {
-  } catch (const sourcemeta::core::NumericOverflowError &) {
-  }
+TEST(Numeric_decimal, parse_positive_exponent_above_int64_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e10000000000000000000"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, parse_negative_exponent_below_int64_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e-10000000000000000000"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, parse_positive_exponent_25_digits_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e1000000000000000000000000"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, parse_negative_exponent_25_digits_throws) {
+  EXPECT_THROW(
+      {
+        const sourcemeta::core::Decimal value{"1e-1000000000000000000000000"};
+      },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, parse_positive_exponent_with_plus_above_int64_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e+10000000000000000000"}; },
+      sourcemeta::core::DecimalParseError);
 }
 
 TEST(Numeric_decimal, parse_fractional_at_int32_min_exponent_throws) {
