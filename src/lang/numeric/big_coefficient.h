@@ -6,9 +6,11 @@
 #include <cstdint>   // std::int32_t, std::int64_t, std::uint32_t,
                      // std::uint64_t, std::uintptr_t, std::uint8_t
 #include <cstring>   // std::memcpy
+#include <limits>    // std::numeric_limits
 #include <string>    // std::string, std::to_string
 #include <utility>   // std::pair, std::move
 
+#include <sourcemeta/core/numeric_error.h>
 #include <sourcemeta/core/numeric_uint128.h>
 
 namespace {
@@ -691,6 +693,11 @@ auto round_to_precision(std::int64_t &coefficient,
 
     auto excess = total_digits - WORKING_PRECISION;
 
+    if (static_cast<std::int64_t>(exponent) + excess >
+        static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
+      throw sourcemeta::core::NumericOverflowError{};
+    }
+
     auto kept =
         digit_string.substr(0, static_cast<std::size_t>(WORKING_PRECISION));
     auto dropped =
@@ -742,6 +749,12 @@ auto round_to_precision(std::int64_t &coefficient,
   }
 
   auto excess = static_cast<std::int32_t>(digits) - WORKING_PRECISION;
+
+  if (static_cast<std::int64_t>(exponent) + excess >
+      static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
+    throw sourcemeta::core::NumericOverflowError{};
+  }
+
   std::int64_t divisor = 1;
   for (std::int32_t index = 0; index < excess; index++) {
     divisor *= 10;

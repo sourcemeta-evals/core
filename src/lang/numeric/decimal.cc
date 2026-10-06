@@ -1987,8 +1987,7 @@ auto Decimal::operator%=(const Decimal &other) -> Decimal & {
   BigCoefficient::align_exponents(dividend_big, divisor_big, this->exponent_,
                                   other.exponent_);
 
-  auto [quotient, remainder] = dividend_big.divide_modulo(divisor_big);
-  static_cast<void>(quotient);
+  auto remainder = dividend_big.divide_modulo(divisor_big).second;
 
   Decimal result;
   store_big_result(result.coefficient_, result.coefficient_high_, result.flags_,

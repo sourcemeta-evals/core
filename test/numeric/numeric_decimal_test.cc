@@ -2524,22 +2524,16 @@ TEST(Numeric_decimal, parse_oversized_positive_exponent_safe) {
   }
 }
 
-TEST(Numeric_decimal, parse_fractional_at_int32_min_exponent) {
-  try {
-    const sourcemeta::core::Decimal value{"0.1e-2147483648"};
-    EXPECT_TRUE(value.is_finite());
-  } catch (const sourcemeta::core::DecimalParseError &) {
-  } catch (const sourcemeta::core::NumericOverflowError &) {
-  }
+TEST(Numeric_decimal, parse_fractional_at_int32_min_exponent_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"0.1e-2147483648"}; },
+      sourcemeta::core::DecimalParseError);
 }
 
-TEST(Numeric_decimal, parse_fractional_one_at_int32_min_exponent) {
-  try {
-    const sourcemeta::core::Decimal value{"1.0e-2147483648"};
-    EXPECT_TRUE(value.is_finite());
-  } catch (const sourcemeta::core::DecimalParseError &) {
-  } catch (const sourcemeta::core::NumericOverflowError &) {
-  }
+TEST(Numeric_decimal, parse_fractional_one_at_int32_min_exponent_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1.0e-2147483648"}; },
+      sourcemeta::core::DecimalParseError);
 }
 
 TEST(Numeric_decimal, parse_exponent_at_int32_max_preserved) {
@@ -3531,8 +3525,12 @@ TEST(Numeric_decimal, logb_infinity) {
 }
 
 TEST(Numeric_decimal, logb_zero_throws) {
-  EXPECT_THROW(static_cast<void>(sourcemeta::core::Decimal{0}.logb()),
-               sourcemeta::core::NumericDivisionByZeroError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            sourcemeta::core::Decimal{0}.logb();
+      },
+      sourcemeta::core::NumericDivisionByZeroError);
 }
 
 TEST(Numeric_decimal, logb_nan) {
@@ -3568,59 +3566,83 @@ TEST(Numeric_decimal, scale_by_infinity_passthrough) {
 TEST(Numeric_decimal, scale_by_snan_throws) {
   const sourcemeta::core::Decimal value{1};
   EXPECT_THROW(
-      static_cast<void>(value.scale_by(sourcemeta::core::Decimal::snan())),
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal::snan());
+      },
       sourcemeta::core::NumericInvalidOperationError);
 }
 
 TEST(Numeric_decimal, scale_by_huge_scale_throws) {
   const sourcemeta::core::Decimal value{"1.23"};
   const sourcemeta::core::Decimal scale{"99999999999999999999"};
-  EXPECT_THROW(static_cast<void>(value.scale_by(scale)),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.scale_by(scale); },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, scale_by_int64_max_overflow_throws) {
   const sourcemeta::core::Decimal value{"10"};
-  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
-                   std::numeric_limits<std::int64_t>::max()})),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{
+                std::numeric_limits<std::int64_t>::max()});
+      },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, scale_by_int64_min_overflow_throws) {
   const sourcemeta::core::Decimal value{"10"};
-  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
-                   std::numeric_limits<std::int64_t>::min()})),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{
+                std::numeric_limits<std::int64_t>::min()});
+      },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, scale_by_two_e_eighteen_negative_scale_throws) {
   const sourcemeta::core::Decimal value{1};
-  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
-                   std::int64_t{-2000000000000000000}})),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result = value.scale_by(
+            sourcemeta::core::Decimal{std::int64_t{-2000000000000000000}});
+      },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, scale_by_two_e_eighteen_positive_scale_throws) {
   const sourcemeta::core::Decimal value{1};
-  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
-                   std::int64_t{2000000000000000000}})),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result = value.scale_by(
+            sourcemeta::core::Decimal{std::int64_t{2000000000000000000}});
+      },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal,
      scale_by_one_point_five_e_eighteen_negative_scale_throws) {
   const sourcemeta::core::Decimal value{1};
-  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
-                   std::int64_t{-1500000000000000000}})),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result = value.scale_by(
+            sourcemeta::core::Decimal{std::int64_t{-1500000000000000000}});
+      },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal,
      scale_by_one_point_five_e_eighteen_positive_scale_throws) {
   const sourcemeta::core::Decimal value{1};
-  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
-                   std::int64_t{1500000000000000000}})),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result = value.scale_by(
+            sourcemeta::core::Decimal{std::int64_t{1500000000000000000}});
+      },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, scale_by_double_constructor_canonical_scale_accepts) {
@@ -3651,8 +3673,9 @@ TEST(Numeric_decimal, scale_by_exponent_form_canonical_scale_accepts) {
 TEST(Numeric_decimal, scale_by_non_canonical_trailing_zero_scale_throws) {
   const sourcemeta::core::Decimal value{"1.5"};
   const sourcemeta::core::Decimal scale{"2.0"};
-  EXPECT_THROW(static_cast<void>(value.scale_by(scale)),
-               sourcemeta::core::NumericInvalidOperationError);
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.scale_by(scale); },
+      sourcemeta::core::NumericInvalidOperationError);
 }
 
 TEST(Numeric_decimal, same_quantum_same_exponent) {
@@ -3730,28 +3753,42 @@ TEST(Numeric_decimal, divide_integer_by_larger) {
 }
 
 TEST(Numeric_decimal, divide_integer_by_zero_throws) {
-  EXPECT_THROW(static_cast<void>(sourcemeta::core::Decimal{1}.divide_integer(
-                   sourcemeta::core::Decimal{0})),
-               sourcemeta::core::NumericDivisionByZeroError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            sourcemeta::core::Decimal{1}.divide_integer(
+                sourcemeta::core::Decimal{0});
+      },
+      sourcemeta::core::NumericDivisionByZeroError);
 }
 
 TEST(Numeric_decimal, divide_integer_infinity_by_infinity_throws) {
   EXPECT_THROW(
-      static_cast<void>(sourcemeta::core::Decimal::infinity().divide_integer(
-          sourcemeta::core::Decimal::infinity())),
+      {
+        [[maybe_unused]] const auto result =
+            sourcemeta::core::Decimal::infinity().divide_integer(
+                sourcemeta::core::Decimal::infinity());
+      },
       sourcemeta::core::NumericInvalidOperationError);
 }
 
 TEST(Numeric_decimal, divide_integer_zero_by_zero_throws) {
-  EXPECT_THROW(static_cast<void>(sourcemeta::core::Decimal{0}.divide_integer(
-                   sourcemeta::core::Decimal{0})),
-               sourcemeta::core::NumericInvalidOperationError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            sourcemeta::core::Decimal{0}.divide_integer(
+                sourcemeta::core::Decimal{0});
+      },
+      sourcemeta::core::NumericInvalidOperationError);
 }
 
 TEST(Numeric_decimal, divide_integer_snan_operand_throws) {
   EXPECT_THROW(
-      static_cast<void>(sourcemeta::core::Decimal::snan().divide_integer(
-          sourcemeta::core::Decimal{1})),
+      {
+        [[maybe_unused]] const auto result =
+            sourcemeta::core::Decimal::snan().divide_integer(
+                sourcemeta::core::Decimal{1});
+      },
       sourcemeta::core::NumericInvalidOperationError);
 }
 
@@ -4611,16 +4648,24 @@ TEST(Numeric_decimal, modulo_heap_backed_dividend_by_seven_nonzero) {
 
 TEST(Numeric_decimal, scale_by_nonzero_exponent_plus_int64_max_throws) {
   const sourcemeta::core::Decimal value{"1e1"};
-  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
-                   std::numeric_limits<std::int64_t>::max()})),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{
+                std::numeric_limits<std::int64_t>::max()});
+      },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, scale_by_negative_exponent_plus_int64_min_throws) {
   const sourcemeta::core::Decimal value{"1e-1"};
-  EXPECT_THROW(static_cast<void>(value.scale_by(sourcemeta::core::Decimal{
-                   std::numeric_limits<std::int64_t>::min()})),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{
+                std::numeric_limits<std::int64_t>::min()});
+      },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, divide_above_midpoint_501_rounds_up) {
@@ -4679,8 +4724,9 @@ TEST(Numeric_decimal, compound_subtract_right_signaling_nan_payload_wins) {
 
 TEST(Numeric_decimal, reduce_compact_exponent_overflow_throws) {
   const sourcemeta::core::Decimal value{"10e2147483647"};
-  EXPECT_THROW(static_cast<void>(value.reduce()),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.reduce(); },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, reduce_compact_exponent_at_boundary_passes) {
@@ -4692,22 +4738,25 @@ TEST(Numeric_decimal, reduce_compact_exponent_at_boundary_passes) {
 TEST(Numeric_decimal, divide_at_int32_min_exponent_overflow_throws) {
   const sourcemeta::core::Decimal dividend{"1e-2147483648"};
   const sourcemeta::core::Decimal divisor{10};
-  EXPECT_THROW(static_cast<void>(dividend / divisor),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = dividend / divisor; },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, divide_at_int32_max_exponent_overflow_throws) {
   const sourcemeta::core::Decimal dividend{"1e2147483647"};
   const sourcemeta::core::Decimal divisor{"0.1"};
-  EXPECT_THROW(static_cast<void>(dividend / divisor),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = dividend / divisor; },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, divide_at_int32_min_nonterminating_throws) {
   const sourcemeta::core::Decimal dividend{"1e-2147483648"};
   const sourcemeta::core::Decimal divisor{3};
-  EXPECT_THROW(static_cast<void>(dividend / divisor),
-               sourcemeta::core::NumericOverflowError);
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = dividend / divisor; },
+      sourcemeta::core::NumericOverflowError);
 }
 
 TEST(Numeric_decimal, to_integral_negative_small_fraction_preserves_sign) {
@@ -4808,4 +4857,88 @@ TEST(Numeric_decimal, is_integral_at_int32_min_exponent_negative_zero_true) {
   const sourcemeta::core::Decimal value{"-0e-2147483648"};
   EXPECT_TRUE(value.is_integral());
   EXPECT_FALSE(value.is_real());
+}
+
+TEST(Numeric_decimal, add_rounding_at_int32_max_exponent_overflows) {
+  const sourcemeta::core::Decimal left{"9999999999999999e2147483647"};
+  const sourcemeta::core::Decimal right{"1e2147483647"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = left + right; },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
+  const sourcemeta::core::Decimal value{1};
+  const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};
+  EXPECT_TRUE(result.is_finite());
+}
+
+TEST(Numeric_decimal,
+     scale_by_positive_int32_max_plus_one_rejects_with_compensating_exponent) {
+  const sourcemeta::core::Decimal value{"1e-1"};
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{"2147483648"});
+      },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     scale_by_negative_int32_min_minus_one_rejects_with_compensating_exponent) {
+  const sourcemeta::core::Decimal value{"1e1"};
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{"-2147483649"});
+      },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, multiply_zero_with_exponent_above_int32_max_throws) {
+  const sourcemeta::core::Decimal left{"0e2147483646"};
+  const sourcemeta::core::Decimal right{"1e2"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = left * right; },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     multiply_negative_zero_with_exponent_below_int32_min_throws) {
+  const sourcemeta::core::Decimal left{"-0e-2147483647"};
+  const sourcemeta::core::Decimal right{"1e-2"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = left * right; },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, multiply_nonzero_with_exponent_below_int32_min_throws) {
+  const sourcemeta::core::Decimal left{"1e-2147483647"};
+  const sourcemeta::core::Decimal right{"0.01"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = left * right; },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, reduce_compact_multiple_trailing_zeros_throws) {
+  const sourcemeta::core::Decimal value{"1000e2147483645"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.reduce(); },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, reduce_heap_backed_single_zero_overflow_throws) {
+  const sourcemeta::core::Decimal value{
+      "99999999999999999999999999999999999990e2147483647"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.reduce(); },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, reduce_heap_backed_multiple_trailing_zeros_throws) {
+  const sourcemeta::core::Decimal value{
+      "99999999999999999999999999999999999900e2147483646"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.reduce(); },
+      sourcemeta::core::NumericOverflowError);
 }
