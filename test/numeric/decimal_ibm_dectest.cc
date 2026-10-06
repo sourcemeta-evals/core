@@ -215,6 +215,27 @@ static auto decimal_trim(const sourcemeta::core::Decimal &value)
   return sourcemeta::core::Decimal{text};
 }
 
+static auto decimal_propagate_nan(const sourcemeta::core::Decimal &left,
+                                  const sourcemeta::core::Decimal &right)
+    -> sourcemeta::core::Decimal {
+  const sourcemeta::core::Decimal *source;
+  if (left.is_snan()) {
+    source = &left;
+  } else if (right.is_snan()) {
+    source = &right;
+  } else if (left.is_nan()) {
+    source = &left;
+  } else {
+    source = &right;
+  }
+
+  auto result = sourcemeta::core::Decimal::nan(source->nan_payload());
+  if (source->is_signed()) {
+    result = -result;
+  }
+  return result;
+}
+
 static auto expect_comparison_result(const sourcemeta::core::Decimal &left,
                                      const sourcemeta::core::Decimal &right,
                                      const std::string &expected) -> bool {
@@ -489,12 +510,12 @@ private:
     const auto expected{make_decimal(this->test_case_.expected)};
 
     if (left.is_snan() || right.is_snan()) {
-      EXPECT_TRUE(expected.is_nan());
+      expect_decimal_eq(decimal_propagate_nan(left, right), expected);
       return;
     }
 
     if (left.is_qnan() && right.is_qnan()) {
-      EXPECT_TRUE(expected.is_nan());
+      expect_decimal_eq(decimal_propagate_nan(left, right), expected);
       return;
     }
 
