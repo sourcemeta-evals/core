@@ -4709,3 +4709,26 @@ TEST(Numeric_decimal, divide_at_int32_min_nonterminating_throws) {
   EXPECT_THROW(static_cast<void>(dividend / divisor),
                sourcemeta::core::NumericOverflowError);
 }
+
+TEST(Numeric_decimal, to_integral_negative_small_fraction_preserves_sign) {
+  const sourcemeta::core::Decimal value{"-0.01"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(Numeric_decimal, to_integral_positive_small_fraction_is_unsigned_zero) {
+  const sourcemeta::core::Decimal value{"0.01"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+}
+
+TEST(Numeric_decimal,
+     to_integral_negative_half_long_coefficient_preserves_sign) {
+  const sourcemeta::core::Decimal value{
+      "-0.5000000000000000000000000000000000000000"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}

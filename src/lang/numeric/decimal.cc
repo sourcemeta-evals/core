@@ -882,7 +882,7 @@ auto Decimal::to_integral() const -> Decimal {
     }
 
     Decimal result{integer_string};
-    if ((this->flags_ & FLAG_SIGN) && !result.is_zero()) {
+    if (this->flags_ & FLAG_SIGN) {
       result.flags_ |= FLAG_SIGN;
     }
 
@@ -894,7 +894,12 @@ auto Decimal::to_integral() const -> Decimal {
 
   if (static_cast<std::uint32_t>(digits_to_remove) >
       digit_count(static_cast<std::uint64_t>(coefficient))) {
-    return Decimal{};
+    Decimal result;
+    if (this->flags_ & FLAG_SIGN) {
+      result.flags_ = FLAG_SIGN;
+    }
+
+    return result;
   }
 
   std::int64_t divisor = 1;
