@@ -34,7 +34,8 @@ auto same_definition(const TermDefinition &left, const TermDefinition &right)
          left.has_direction == right.has_direction &&
          left.context == right.context &&
          left.context_base == right.context_base && left.index == right.index &&
-         left.reverse == right.reverse && left.prefix == right.prefix;
+         left.nest == right.nest && left.reverse == right.reverse &&
+         left.prefix == right.prefix;
 }
 
 // Store a freshly-built term definition, enforcing protected-term redefinition.
@@ -148,29 +149,17 @@ auto create_term_definition(ExpansionState &state,
 
   const auto *id_entry{
       value.is_object() ? value.try_at(KEYWORD_ID, KEYWORD_ID_HASH) : nullptr};
-  if (value.is_null() || (id_entry != nullptr && id_entry->is_null())) {
+  if (value.is_null()) {
     TermDefinition empty;
     empty.is_protected = state.context_protected;
-    // @protected is processed before the null @id is handled, so an explicitly
-    // protected term that maps to null stays protected.
-    if (id_entry != nullptr) {
-      if (const auto *protected_entry{
-              value.try_at(KEYWORD_PROTECTED, KEYWORD_PROTECTED_HASH)}) {
-        if (!protected_entry->is_boolean()) {
-          throw JSONLDError("Invalid @protected value", term_pointer,
-                            {KEYWORD_PROTECTED});
-        }
-        if (state.processing_1_0) {
-          throw JSONLDError("Invalid term definition", term_pointer,
-                            {KEYWORD_PROTECTED});
-        }
-        empty.is_protected = protected_entry->to_boolean();
-      }
-    }
     finalize_definition(state, active_context, defined, term, term_pointer,
                         previous, std::move(empty));
     return;
   }
+  // An explicit null mapping retains the term while removing it from IRI
+  // expansion, and its remaining entries are still validated (JSON-LD 1.1 API
+  // Section 5.1.1 step 14.1)
+  const bool explicit_null_id{id_entry != nullptr && id_entry->is_null()};
 
   TermDefinition definition;
   definition.is_protected = state.context_protected;
@@ -311,6 +300,8 @@ auto create_term_definition(ExpansionState &state,
           }
         }
       }
+    } else if (explicit_null_id) {
+      // The term keeps no IRI mapping, and no fallback derivation applies
     } else if (term.find(':') != JSON::String::npos && !term.starts_with(':') &&
                !term.ends_with(':')) {
       const auto colon{term.find(':')};
@@ -361,7 +352,19 @@ auto create_term_definition(ExpansionState &state,
     if (const auto *container_entry{
             value.try_at(KEYWORD_CONTAINER, KEYWORD_CONTAINER_HASH)}) {
       const auto &container{*container_entry};
-      if (container.is_array()) {
+      if (definition.reverse) {
+        // A reverse term only supports a single set or index container, or an
+        // explicit null (JSON-LD 1.1 API Section 5.1.1 step 13.5)
+        if (!container.is_null()) {
+          if (!container.is_string() ||
+              (container.to_string() != KEYWORD_SET &&
+               container.to_string() != KEYWORD_INDEX)) {
+            throw JSONLDError("Invalid reverse property", term_pointer,
+                              {KEYWORD_CONTAINER});
+          }
+          definition.container.push_back(container.to_string());
+        }
+      } else if (container.is_array()) {
         // Array containers are a 1.1 feature.
         if (state.processing_1_0) {
           throw JSONLDError("Invalid container mapping", term_pointer,
@@ -407,14 +410,6 @@ auto create_term_definition(ExpansionState &state,
       // Valid multi-keyword combinations are order-insensitive, so the stored
       // mapping is normalised for protected-term definition comparisons
       std::ranges::sort(definition.container);
-      if (definition.reverse) {
-        for (const auto &item : definition.container) {
-          if (item != KEYWORD_SET && item != KEYWORD_INDEX) {
-            throw JSONLDError("Invalid reverse property", term_pointer,
-                              {KEYWORD_CONTAINER});
-          }
-        }
-      }
       bool container_graph{false};
       bool container_id{false};
       bool container_index{false};
@@ -442,8 +437,9 @@ auto create_term_definition(ExpansionState &state,
       // Valid array combinations (JSON-LD 1.1 API Section 5.1.1 step 19.1): a
       // single keyword, or @graph with exactly one of @id or @index optionally
       // with @set, or @set combined with any one of @index, @graph, @id,
-      // @type, or @language.
-      if (definition.container.size() != 1) {
+      // @type, or @language. A reverse container is already fully validated,
+      // including its explicit null form, which stores no keyword at all
+      if (!definition.reverse && definition.container.size() != 1) {
         const bool graph_form{
             container_graph && (container_id != container_index) &&
             !container_list && !container_type && !container_language};
@@ -500,42 +496,46 @@ auto create_term_definition(ExpansionState &state,
         throw JSONLDError("Invalid term definition", term_pointer,
                           {KEYWORD_CONTEXT});
       }
-      // Validate the scoped context eagerly so that errors surface even when
-      // the term is never used. Remote scoped contexts (including recursive
-      // ones) are validated lazily when the term is used instead.
+      const bool imported{state.imported_keys.contains(term)};
+      const bool context_remote{!state.remote_context_chain.empty() ||
+                                state.remote_base_override || imported};
+      // Validate the scoped context eagerly, mirroring its use-time remote
+      // origin, so that errors surface even when the term is never used. Any
+      // failure, including a loading one, is an invalid scoped context
+      // (JSON-LD 1.1 API Section 5.1.1 step 21)
       const bool saved_override{state.protected_override};
       const bool saved_context_protected{state.context_protected};
+      const bool saved_remote_base{state.remote_base_override};
+      const bool saved_validate{state.validate_scoped_context};
       try {
         // The error raised here is always discarded below, so its location does
         // not matter.
         ActiveContext probe{active_context};
         state.protected_override = true;
+        state.remote_base_override = context_remote;
+        state.validate_scoped_context = false;
         process_context(state, probe, *context_entry, empty_weak_pointer);
+        state.validate_scoped_context = saved_validate;
+        state.remote_base_override = saved_remote_base;
         state.protected_override = saved_override;
         state.context_protected = saved_context_protected;
-      } catch (const JSONLDError &error) {
+      } catch (const JSONLDError &) {
+        state.validate_scoped_context = saved_validate;
+        state.remote_base_override = saved_remote_base;
         state.protected_override = saved_override;
         state.context_protected = saved_context_protected;
-        const JSON::StringView code{error.what()};
-        if (code != "Loading remote context failed" &&
-            code != "Recursive context inclusion" &&
-            code != "Context overflow" && code != "Invalid remote context") {
-          throw JSONLDError("Invalid scoped context", term_pointer,
-                            {KEYWORD_CONTEXT});
-        }
+        throw JSONLDError("Invalid scoped context", term_pointer,
+                          {KEYWORD_CONTEXT});
       }
       definition.context = *context_entry;
       definition.context_base = state.context_resolution_base();
-      const bool imported{state.imported_keys.contains(term)};
-      definition.context_remote = !state.remote_context_chain.empty() ||
-                                  state.remote_base_override || imported;
+      definition.context_remote = context_remote;
       // Remote definitions report at the input reference that loaded the
       // defining context, as the scoped entry itself is not in the input
       definition.context_location =
-          imported ? to_pointer(context_pointer.concat(TOKEN_IMPORT))
-          : definition.context_remote
-              ? to_pointer(context_pointer)
-              : to_pointer(term_pointer.concat(TOKEN_CONTEXT));
+          imported         ? to_pointer(context_pointer.concat(TOKEN_IMPORT))
+          : context_remote ? to_pointer(context_pointer)
+                           : to_pointer(term_pointer.concat(TOKEN_CONTEXT));
     }
 
     if (const auto *prefix_entry{
@@ -570,6 +570,7 @@ auto create_term_definition(ExpansionState &state,
       if (is_keyword(nest_string) && nest_string != KEYWORD_NEST) {
         throw JSONLDError("Invalid @nest value", term_pointer, {KEYWORD_NEST});
       }
+      definition.nest = nest_string;
     }
 
     if (const auto *index_entry{
@@ -637,7 +638,7 @@ auto create_term_definition(ExpansionState &state,
     definition.prefix = true;
   }
 
-  if (!definition.reverse && !definition.iri.has_value()) {
+  if (!definition.reverse && !explicit_null_id && !definition.iri.has_value()) {
     throw JSONLDError("Invalid IRI mapping", term_pointer);
   }
 

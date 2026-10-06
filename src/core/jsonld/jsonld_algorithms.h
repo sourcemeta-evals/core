@@ -32,6 +32,7 @@ struct TermDefinition {
   // processed after the fact are reported
   Pointer context_location;
   std::optional<JSON::String> index;
+  std::optional<JSON::String> nest;
   bool reverse{false};
   bool prefix{false};
   bool is_protected{false};
@@ -62,10 +63,15 @@ struct ExpansionState {
   // The keys of the context currently being processed that came from an
   // @import document rather than from the input, so their definitions carry
   // remote origin and report errors at the @import entry
-  std::set<JSON::String> imported_keys;
+  std::set<JSON::String, std::less<>> imported_keys;
   // Protected-term state for the context currently being processed.
   bool context_protected{false};
   bool protected_override{false};
+  // Whether a remote context reference already in the active chain is an
+  // error. Scoped-context validation at definition time clears it so that
+  // legitimately recursive scoped contexts are skipped rather than rejected
+  // (JSON-LD 1.1 API Section 5.1 step 5.2.3)
+  bool validate_scoped_context{true};
   bool processing_1_0{false};
 
   // Remote context references resolve against the URL of the document that

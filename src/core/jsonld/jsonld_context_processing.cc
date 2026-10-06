@@ -26,12 +26,22 @@ auto resolve_remote_document(
     -> std::optional<sourcemeta::core::JSON> {
   try {
     return (*state.resolver)(reference);
-  } catch (const sourcemeta::core::JSONLDError &) {
-    throw;
   } catch (...) {
+    // A JSONLDError raised by the callback is translated too: its code and
+    // pointer concern the resolver's own domain, not the input document
     throw sourcemeta::core::JSONLDError("Loading remote context failed",
                                         location, children);
   }
+}
+
+// The input location of a context keyword entry: the keyword itself when the
+// input supplied or overrode it, or the @import entry that merged it in
+auto keyword_error_token(const sourcemeta::core::ExpansionState &state,
+                         const sourcemeta::core::JSON::StringView keyword)
+    -> sourcemeta::core::JSON::StringView {
+  return state.imported_keys.contains(keyword)
+             ? sourcemeta::core::KEYWORD_IMPORT
+             : keyword;
 }
 
 } // namespace
@@ -81,9 +91,15 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         }
       }
       // Nullifying the context resets to the initial context, whose base is
-      // the document base.
-      active_context = ActiveContext{};
-      active_context.base = state.document_base;
+      // the document base. A non-propagated nullification keeps the saved
+      // context so that nested nodes can revert to it (JSON-LD 1.1 API
+      // Section 5.1 step 5.1.2)
+      ActiveContext fresh;
+      fresh.base = state.document_base;
+      if (!effective_propagate) {
+        fresh.previous = active_context.previous;
+      }
+      active_context = std::move(fresh);
       continue;
     }
 
@@ -95,21 +111,32 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
                         .resolve_from(URI::from_iri(resolution_base.value()))
                         .recompose();
       }
-      // The resolver contract only admits absolute IRIs, so a relative
-      // reference that no base can resolve is a loading failure
+      // A relative reference that no base can resolve cannot name a document
+      // at all (JSON-LD 1.1 API Section 5.1 step 5.2.1)
       if (!URI::from_iri(reference).is_absolute()) {
-        throw JSONLDError("Loading remote context failed", location);
+        throw JSONLDError("Loading document failed", location);
       }
+      bool already_loaded{false};
       for (const auto &loaded : state.remote_context_chain) {
         if (loaded == reference) {
-          // JSON-LD 1.1 replaced the recursive context inclusion error with
-          // context overflow, with re-inclusion in the active chain acting as
-          // the processor-defined limit
-          if (state.processing_1_0) {
-            throw JSONLDError("Recursive context inclusion", location);
-          }
-          throw JSONLDError("Context overflow", location);
+          already_loaded = true;
+          break;
         }
+      }
+      if (already_loaded) {
+        // When validating a scoped context at definition time, a reference
+        // already in the active chain is skipped rather than reprocessed, so
+        // legitimately recursive scoped contexts stay valid
+        if (!state.validate_scoped_context) {
+          continue;
+        }
+        // JSON-LD 1.1 replaced the recursive context inclusion error with
+        // context overflow, with re-inclusion in the active chain acting as
+        // the processor-defined limit
+        if (state.processing_1_0) {
+          throw JSONLDError("Recursive context inclusion", location);
+        }
+        throw JSONLDError("Context overflow", location);
       }
       if (state.resolver == nullptr || !*state.resolver) {
         throw JSONLDError("Loading remote context failed", location);
@@ -157,7 +184,8 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         version != nullptr &&
         !((version->is_real() && version->to_real() == 1.1) ||
           (version->is_decimal() && version->to_decimal() == Decimal{"1.1"}))) {
-      throw JSONLDError("Invalid @version value", location, {KEYWORD_VERSION});
+      throw JSONLDError("Invalid @version value", location,
+                        {keyword_error_token(state, KEYWORD_VERSION)});
     }
     if (state.processing_1_0 &&
         context.defines(KEYWORD_VERSION, KEYWORD_VERSION_HASH)) {
@@ -182,7 +210,7 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
             context.try_at(KEYWORD_PROPAGATE, KEYWORD_PROPAGATE_HASH)};
         propagate_entry != nullptr && !propagate_entry->is_boolean()) {
       throw JSONLDError("Invalid @propagate value", location,
-                        {KEYWORD_PROPAGATE});
+                        {keyword_error_token(state, KEYWORD_PROPAGATE)});
     }
 
     // @protected applies to imported terms too, so it is set before @import.
@@ -191,7 +219,7 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
             context.try_at(KEYWORD_PROTECTED, KEYWORD_PROTECTED_HASH)}) {
       if (!protected_entry->is_boolean()) {
         throw JSONLDError("Invalid @protected value", location,
-                          {KEYWORD_PROTECTED});
+                          {keyword_error_token(state, KEYWORD_PROTECTED)});
       }
       state.context_protected = protected_entry->to_boolean();
     }
@@ -305,13 +333,15 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       if (vocabulary.is_null()) {
         active_context.vocabulary = std::nullopt;
       } else if (!vocabulary.is_string()) {
-        throw JSONLDError("Invalid vocab mapping", location, {KEYWORD_VOCAB});
+        throw JSONLDError("Invalid vocab mapping", location,
+                          {keyword_error_token(state, KEYWORD_VOCAB)});
       } else {
         const auto &vocabulary_string{vocabulary.to_string()};
         // In 1.0, @vocab must be an absolute IRI or blank node identifier.
         if (state.processing_1_0 &&
             vocabulary_string.find(':') == JSON::String::npos) {
-          throw JSONLDError("Invalid vocab mapping", location, {KEYWORD_VOCAB});
+          throw JSONLDError("Invalid vocab mapping", location,
+                            {keyword_error_token(state, KEYWORD_VOCAB)});
         }
         active_context.vocabulary =
             expand_iri(state, active_context, vocabulary_string, true, true,
@@ -326,7 +356,7 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         active_context.default_language = std::nullopt;
       } else if (!language.is_string()) {
         throw JSONLDError("Invalid default language", location,
-                          {KEYWORD_LANGUAGE});
+                          {keyword_error_token(state, KEYWORD_LANGUAGE)});
       } else {
         active_context.default_language = language.to_string();
       }
@@ -339,12 +369,12 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         active_context.default_direction = std::nullopt;
       } else if (!direction.is_string()) {
         throw JSONLDError("Invalid base direction", location,
-                          {KEYWORD_DIRECTION});
+                          {keyword_error_token(state, KEYWORD_DIRECTION)});
       } else {
         const auto &direction_string{direction.to_string()};
         if (direction_string != "ltr" && direction_string != "rtl") {
           throw JSONLDError("Invalid base direction", location,
-                            {KEYWORD_DIRECTION});
+                            {keyword_error_token(state, KEYWORD_DIRECTION)});
         }
         active_context.default_direction = direction_string;
       }
