@@ -841,7 +841,12 @@ auto Decimal::to_integral() const -> Decimal {
     auto digits_to_remove = -this->exponent_;
 
     if (digits_to_remove > number_of_digits) {
-      return Decimal{};
+      Decimal result;
+      if (this->flags_ & FLAG_SIGN) {
+        result.flags_ = FLAG_SIGN;
+      }
+
+      return result;
     }
 
     const auto keep_count =
