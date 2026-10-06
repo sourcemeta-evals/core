@@ -2570,6 +2570,45 @@ TEST(Numeric_decimal, parse_exponent_at_int32_min_preserved) {
   EXPECT_FALSE(value.is_zero());
 }
 
+TEST(Numeric_decimal, to_scientific_string_at_int32_max_exponent) {
+  const sourcemeta::core::Decimal value{"10e2147483647"};
+  EXPECT_EQ(value.to_scientific_string(), "1.0e+2147483648");
+}
+
+TEST(Numeric_decimal, to_string_engineering_at_int32_max_exponent) {
+  const sourcemeta::core::Decimal value{"10e2147483647"};
+  EXPECT_EQ(value.to_string(), "100e+2147483646");
+}
+
+TEST(Numeric_decimal, to_string_at_int32_min_exponent) {
+  const sourcemeta::core::Decimal value{"1e-2147483648"};
+  EXPECT_EQ(value.to_string(), "10e-2147483649");
+}
+
+TEST(Numeric_decimal, compare_total_boundary_exponents_ordering) {
+  const sourcemeta::core::Decimal left{"10e2147483647"};
+  const sourcemeta::core::Decimal right{"9e2147483646"};
+  EXPECT_EQ(left.compare_total(right), sourcemeta::core::Decimal{1});
+}
+
+TEST(Numeric_decimal, compare_total_boundary_exponents_reverse_ordering) {
+  const sourcemeta::core::Decimal left{"9e2147483646"};
+  const sourcemeta::core::Decimal right{"10e2147483647"};
+  EXPECT_EQ(left.compare_total(right), sourcemeta::core::Decimal{-1});
+}
+
+TEST(Numeric_decimal, compare_operator_boundary_exponents_greater) {
+  const sourcemeta::core::Decimal left{"10e2147483647"};
+  const sourcemeta::core::Decimal right{"9e2147483646"};
+  EXPECT_TRUE(left > right);
+  EXPECT_FALSE(right > left);
+}
+
+TEST(Numeric_decimal, is_integral_long_coefficient_at_int32_min_exponent) {
+  const sourcemeta::core::Decimal value{"1000000000000000000e-2147483648"};
+  EXPECT_FALSE(value.is_integral());
+}
+
 TEST(Numeric_decimal, parse_positive_exponent_above_int32_max_throws) {
   EXPECT_THROW(
       { const sourcemeta::core::Decimal value{"1e2147483648"}; },

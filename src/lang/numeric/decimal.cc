@@ -577,8 +577,9 @@ auto Decimal::to_scientific_string() const -> std::string {
 
   auto digit_string = coefficient_to_digit_string(
       this->coefficient_, this->coefficient_high_, this->flags_);
-  auto number_of_digits = static_cast<std::int32_t>(digit_string.size());
-  auto adjusted_exponent = this->exponent_ + number_of_digits - 1;
+  auto number_of_digits = static_cast<std::int64_t>(digit_string.size());
+  auto adjusted_exponent =
+      static_cast<std::int64_t>(this->exponent_) + number_of_digits - 1;
 
   if (this->flags_ & FLAG_SIGN) {
     result += '-';
@@ -612,18 +613,17 @@ auto Decimal::to_string() const -> std::string {
 
   auto digit_string = coefficient_to_digit_string(
       this->coefficient_, this->coefficient_high_, this->flags_);
-  auto number_of_digits = static_cast<std::int32_t>(digit_string.size());
-  auto integer_digit_count = number_of_digits + this->exponent_;
+  auto number_of_digits = static_cast<std::int64_t>(digit_string.size());
+  auto integer_digit_count =
+      number_of_digits + static_cast<std::int64_t>(this->exponent_);
 
-  std::int32_t decimal_place;
+  std::int64_t decimal_place;
   if (this->exponent_ <= 0 && integer_digit_count > -6) {
     decimal_place = integer_digit_count;
   } else if (this->coefficient_ == 0 && !(this->flags_ & FLAG_BIG)) {
-    decimal_place = -1 + ((this->exponent_ + 2) % 3 + 3) % 3;
+    decimal_place =
+        -1 + ((static_cast<std::int64_t>(this->exponent_) + 2) % 3 + 3) % 3;
   } else {
-    decimal_place = integer_digit_count +
-                    ((integer_digit_count - 1) % 3 + 3) % 3 -
-                    ((integer_digit_count - 1) % 3 + 3) % 3;
     auto adjusted = integer_digit_count - 1;
     auto remainder = ((adjusted % 3) + 3) % 3;
     decimal_place = 1 + remainder;
@@ -635,14 +635,14 @@ auto Decimal::to_string() const -> std::string {
 
   if (decimal_place <= 0) {
     result += "0.";
-    for (std::int32_t index = 0; index < -decimal_place; index++) {
+    for (std::int64_t index = 0; index < -decimal_place; index++) {
       result += '0';
     }
 
     result += digit_string;
   } else if (decimal_place >= number_of_digits) {
     result += digit_string;
-    for (std::int32_t index = 0; index < decimal_place - number_of_digits;
+    for (std::int64_t index = 0; index < decimal_place - number_of_digits;
          index++) {
       result += '0';
     }
@@ -780,7 +780,8 @@ auto Decimal::is_integral() const -> bool {
     auto big = coefficient_as_big(this->coefficient_, this->coefficient_high_,
                                   this->flags_);
     auto stripped = big.strip_trailing_zeros();
-    return stripped >= -this->exponent_;
+    return static_cast<std::int64_t>(stripped) >=
+           -static_cast<std::int64_t>(this->exponent_);
   }
 
   auto coefficient = this->coefficient_;
@@ -1259,10 +1260,10 @@ auto Decimal::compare_total(const Decimal &other) const -> Decimal {
           digit_count(static_cast<std::uint64_t>(this->coefficient_));
       auto right_digits =
           digit_count(static_cast<std::uint64_t>(other.coefficient_));
-      auto left_adjusted =
-          this->exponent_ + static_cast<std::int32_t>(left_digits) - 1;
-      auto right_adjusted =
-          other.exponent_ + static_cast<std::int32_t>(right_digits) - 1;
+      auto left_adjusted = static_cast<std::int64_t>(this->exponent_) +
+                           static_cast<std::int64_t>(left_digits) - 1;
+      auto right_adjusted = static_cast<std::int64_t>(other.exponent_) +
+                            static_cast<std::int64_t>(right_digits) - 1;
 
       if (left_adjusted != right_adjusted) {
         magnitude_compare = left_adjusted < right_adjusted ? -1 : 1;
@@ -1543,10 +1544,10 @@ auto Decimal::operator<(const Decimal &other) const -> bool {
           digit_count(static_cast<std::uint64_t>(this->coefficient_));
       auto right_digits =
           digit_count(static_cast<std::uint64_t>(other.coefficient_));
-      auto left_adjusted =
-          this->exponent_ + static_cast<std::int32_t>(left_digits) - 1;
-      auto right_adjusted =
-          other.exponent_ + static_cast<std::int32_t>(right_digits) - 1;
+      auto left_adjusted = static_cast<std::int64_t>(this->exponent_) +
+                           static_cast<std::int64_t>(left_digits) - 1;
+      auto right_adjusted = static_cast<std::int64_t>(other.exponent_) +
+                            static_cast<std::int64_t>(right_digits) - 1;
 
       if (left_adjusted != right_adjusted) {
         magnitude_compare = left_adjusted < right_adjusted ? -1 : 1;
