@@ -1909,10 +1909,20 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
 
   const auto ten = BigCoefficient::from_uint64(10);
   if (!remainder.is_zero()) {
-    auto [stripped, last_digit] = quotient.divide_modulo(ten);
-    static_cast<void>(stripped);
-    if (last_digit.is_zero()) {
-      quotient = quotient.add(BigCoefficient::from_uint64(1));
+    const auto quotient_digits = quotient.digit_count();
+    if (quotient_digits > static_cast<std::uint64_t>(WORKING_PRECISION)) {
+      const auto excess =
+          quotient_digits - static_cast<std::uint64_t>(WORKING_PRECISION);
+      auto divisor_power = BigCoefficient::from_uint64(1);
+      for (std::uint64_t index = 0; index < excess; ++index) {
+        divisor_power = divisor_power.multiply(ten);
+      }
+
+      auto tail = quotient.divide_modulo(divisor_power).second;
+      auto tail_doubled = tail.add(tail);
+      if (tail_doubled.compare(divisor_power) == 0) {
+        quotient = quotient.add(BigCoefficient::from_uint64(1));
+      }
     }
   } else {
     while (final_exponent_64 < preferred_exponent_64 && !quotient.is_zero()) {

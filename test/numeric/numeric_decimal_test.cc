@@ -4732,3 +4732,31 @@ TEST(Numeric_decimal,
   EXPECT_TRUE(result.is_zero());
   EXPECT_TRUE(result.is_signed());
 }
+
+TEST(Numeric_decimal, divide_one_by_seven_rounds_half_even) {
+  const sourcemeta::core::Decimal numerator{1};
+  const sourcemeta::core::Decimal denominator{7};
+  const sourcemeta::core::Decimal expected{"0.1428571428571429"};
+  EXPECT_EQ(numerator / denominator, expected);
+}
+
+TEST(Numeric_decimal, divide_negative_one_by_seven_rounds_half_even) {
+  const sourcemeta::core::Decimal numerator{-1};
+  const sourcemeta::core::Decimal denominator{7};
+  const sourcemeta::core::Decimal expected{"-0.1428571428571429"};
+  EXPECT_EQ(numerator / denominator, expected);
+}
+
+TEST(Numeric_decimal, compound_divide_one_by_seven_rounds_half_even) {
+  sourcemeta::core::Decimal numerator{1};
+  const sourcemeta::core::Decimal denominator{7};
+  numerator /= denominator;
+  EXPECT_EQ(numerator, sourcemeta::core::Decimal{"0.1428571428571429"});
+}
+
+TEST(Numeric_decimal, divide_above_midpoint_with_guard_digit_five_rounds_up) {
+  const sourcemeta::core::Decimal dividend{"100000000000000011"};
+  const sourcemeta::core::Decimal divisor{"200000000000000000"};
+  const sourcemeta::core::Decimal expected{"0.5000000000000001"};
+  EXPECT_EQ(dividend / divisor, expected);
+}
