@@ -4676,3 +4676,36 @@ TEST(Numeric_decimal, compound_subtract_right_signaling_nan_payload_wins) {
   EXPECT_TRUE(left.is_nan());
   EXPECT_EQ(left.nan_payload(), 2U);
 }
+
+TEST(Numeric_decimal, reduce_compact_exponent_overflow_throws) {
+  const sourcemeta::core::Decimal value{"10e2147483647"};
+  EXPECT_THROW(static_cast<void>(value.reduce()),
+               sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, reduce_compact_exponent_at_boundary_passes) {
+  const sourcemeta::core::Decimal value{"100e2147483645"};
+  const auto reduced{value.reduce()};
+  EXPECT_EQ(reduced, sourcemeta::core::Decimal{"1e2147483647"});
+}
+
+TEST(Numeric_decimal, divide_at_int32_min_exponent_overflow_throws) {
+  const sourcemeta::core::Decimal dividend{"1e-2147483648"};
+  const sourcemeta::core::Decimal divisor{10};
+  EXPECT_THROW(static_cast<void>(dividend / divisor),
+               sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, divide_at_int32_max_exponent_overflow_throws) {
+  const sourcemeta::core::Decimal dividend{"1e2147483647"};
+  const sourcemeta::core::Decimal divisor{"0.1"};
+  EXPECT_THROW(static_cast<void>(dividend / divisor),
+               sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, divide_at_int32_min_nonterminating_throws) {
+  const sourcemeta::core::Decimal dividend{"1e-2147483648"};
+  const sourcemeta::core::Decimal divisor{3};
+  EXPECT_THROW(static_cast<void>(dividend / divisor),
+               sourcemeta::core::NumericOverflowError);
+}

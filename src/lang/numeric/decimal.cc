@@ -1056,12 +1056,21 @@ auto Decimal::reduce() const -> Decimal {
   }
 
   auto coefficient = this->coefficient_;
-  auto exponent = this->exponent_;
-  strip_trailing_zeros(coefficient, exponent);
+  std::int64_t new_exponent_64 = this->exponent_;
+
+  while (coefficient != 0 && coefficient % 10 == 0 &&
+         new_exponent_64 < std::numeric_limits<std::int32_t>::max()) {
+    coefficient /= 10;
+    new_exponent_64++;
+  }
+
+  if (coefficient != 0 && coefficient % 10 == 0) {
+    throw NumericOverflowError{};
+  }
 
   Decimal result;
   result.coefficient_ = coefficient;
-  result.exponent_ = exponent;
+  result.exponent_ = static_cast<std::int32_t>(new_exponent_64);
   if (this->flags_ & FLAG_SIGN) {
     result.flags_ = FLAG_SIGN;
   }
@@ -1888,9 +1897,10 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
   auto scaled = dividend_big.multiply_pow10(guard_digits);
   auto [quotient, remainder] = scaled.divide_modulo(divisor_big);
 
-  const auto preferred_exponent = this->exponent_ - other.exponent_;
-  auto final_exponent =
-      preferred_exponent - static_cast<std::int32_t>(guard_digits);
+  const auto preferred_exponent_64 =
+      static_cast<std::int64_t>(this->exponent_) - other.exponent_;
+  auto final_exponent_64 =
+      preferred_exponent_64 - static_cast<std::int64_t>(guard_digits);
 
   const auto ten = BigCoefficient::from_uint64(10);
   if (!remainder.is_zero()) {
@@ -1900,22 +1910,35 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
       quotient = quotient.add(BigCoefficient::from_uint64(1));
     }
   } else {
-    while (final_exponent < preferred_exponent && !quotient.is_zero()) {
+    while (final_exponent_64 < preferred_exponent_64 && !quotient.is_zero()) {
       auto [stripped, strip_remainder] = quotient.divide_modulo(ten);
       if (!strip_remainder.is_zero()) {
         break;
       }
 
       quotient = std::move(stripped);
-      final_exponent++;
+      final_exponent_64++;
     }
+  }
+
+  const auto quotient_digits =
+      static_cast<std::int64_t>(quotient.digit_count());
+  std::int64_t rounding_excess = 0;
+  if (quotient_digits > WORKING_PRECISION) {
+    rounding_excess = quotient_digits - WORKING_PRECISION;
+  }
+
+  if (final_exponent_64 + rounding_excess >
+          std::numeric_limits<std::int32_t>::max() ||
+      final_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
+    throw NumericOverflowError{};
   }
 
   free_big_coefficient(this->coefficient_, this->flags_);
   store_big_result(this->coefficient_, this->coefficient_high_, this->flags_,
                    std::move(quotient), result_negative);
 
-  this->exponent_ = final_exponent;
+  this->exponent_ = static_cast<std::int32_t>(final_exponent_64);
 
   round_to_precision(this->coefficient_, this->coefficient_high_,
                      this->exponent_, this->flags_);
