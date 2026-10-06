@@ -2621,6 +2621,31 @@ TEST(Numeric_decimal, parse_negative_exponent_below_int32_min_throws) {
       sourcemeta::core::DecimalParseError);
 }
 
+TEST(Numeric_decimal, parse_reject_double_negative_exponent_sign_before_zero) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e--0"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, parse_reject_mixed_exponent_signs_before_zero) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e+-0"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal,
+     parse_reject_double_negative_exponent_sign_with_uppercase_marker) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1E--000"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal, parse_single_signed_zero_exponent_equals_one) {
+  EXPECT_EQ(sourcemeta::core::Decimal{"1e-0"}, sourcemeta::core::Decimal{1});
+  EXPECT_EQ(sourcemeta::core::Decimal{"1e+0"}, sourcemeta::core::Decimal{1});
+  EXPECT_EQ(sourcemeta::core::Decimal{"1e0"}, sourcemeta::core::Decimal{1});
+}
+
 TEST(Numeric_decimal, parse_reject_whitespace_leading) {
   EXPECT_THROW(
       { const sourcemeta::core::Decimal value{" 123"}; },
