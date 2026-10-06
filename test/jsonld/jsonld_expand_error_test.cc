@@ -1461,3 +1461,96 @@ TEST(JSONLD_expand_error, malformed_expansion_context_base) {
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input, context),
                              "Invalid base IRI", "");
 }
+
+TEST(JSONLD_expand_error, malformed_context_reference) {
+  std::size_t invocations{0};
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&invocations](const sourcemeta::core::JSON::StringView)
+      -> std::optional<sourcemeta::core::JSON> {
+    invocations += 1;
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": "https://example.com/%zz" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver),
+      "Loading document failed", "/@context");
+  EXPECT_EQ(invocations, 0);
+}
+
+TEST(JSONLD_expand_error, malformed_context_reference_with_base) {
+  std::size_t invocations{0};
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&invocations](const sourcemeta::core::JSON::StringView)
+      -> std::optional<sourcemeta::core::JSON> {
+    invocations += 1;
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": "https://example.com/%zz" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "https://example.com/", resolver),
+      "Loading document failed", "/@context");
+  EXPECT_EQ(invocations, 0);
+}
+
+TEST(JSONLD_expand_error, malformed_context_reference_in_array) {
+  std::size_t invocations{0};
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&invocations](const sourcemeta::core::JSON::StringView)
+      -> std::optional<sourcemeta::core::JSON> {
+    invocations += 1;
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": [ {}, "https://example.com/%zz" ] })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver),
+      "Loading document failed", "/@context/1");
+  EXPECT_EQ(invocations, 0);
+}
+
+TEST(JSONLD_expand_error, malformed_import_reference) {
+  std::size_t invocations{0};
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&invocations](const sourcemeta::core::JSON::StringView)
+      -> std::optional<sourcemeta::core::JSON> {
+    invocations += 1;
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@import": "https://example.com/%zz" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver),
+      "Loading remote context failed", "/@context/@import");
+  EXPECT_EQ(invocations, 0);
+}
+
+TEST(JSONLD_expand_error, context_direction_in_1_0) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@direction": "rtl", "p": "https://example.com/p" },
+    "p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Invalid context entry", "/@context/@direction");
+}
+
+TEST(JSONLD_expand_error, reverse_keyword_mapping) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@reverse": "@id" } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/p/@reverse");
+}

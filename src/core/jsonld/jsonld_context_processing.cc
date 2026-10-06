@@ -106,14 +106,21 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
     if (context.is_string()) {
       auto reference{context.to_string()};
       const auto resolution_base{state.context_resolution_base()};
-      if (resolution_base.has_value()) {
-        reference = URI::from_iri(reference)
-                        .resolve_from(URI::from_iri(resolution_base.value()))
-                        .recompose();
+      // A reference that cannot be parsed, resolved, or made absolute cannot
+      // name a document at all (JSON-LD 1.1 API Section 5.1 step 5.2.1), and
+      // the parser's own exception never escapes the public error contract
+      bool resolvable{true};
+      try {
+        if (resolution_base.has_value()) {
+          reference = URI::from_iri(reference)
+                          .resolve_from(URI::from_iri(resolution_base.value()))
+                          .recompose();
+        }
+        resolvable = URI::from_iri(reference).is_absolute();
+      } catch (...) {
+        resolvable = false;
       }
-      // A relative reference that no base can resolve cannot name a document
-      // at all (JSON-LD 1.1 API Section 5.1 step 5.2.1)
-      if (!URI::from_iri(reference).is_absolute()) {
+      if (!resolvable) {
         throw JSONLDError("Loading document failed", location);
       }
       bool already_loaded{false};
@@ -193,6 +200,10 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
                         {KEYWORD_VERSION});
     }
     if (state.processing_1_0) {
+      if (context.defines(KEYWORD_DIRECTION, KEYWORD_DIRECTION_HASH)) {
+        throw JSONLDError("Invalid context entry", location,
+                          {KEYWORD_DIRECTION});
+      }
       if (context.defines(KEYWORD_PROPAGATE, KEYWORD_PROPAGATE_HASH)) {
         throw JSONLDError("Invalid context entry", location,
                           {KEYWORD_PROPAGATE});
@@ -232,14 +243,20 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       }
       auto reference{import.to_string()};
       const auto resolution_base{state.context_resolution_base()};
-      if (resolution_base.has_value()) {
-        reference = URI::from_iri(reference)
-                        .resolve_from(URI::from_iri(resolution_base.value()))
-                        .recompose();
+      // The resolver contract only admits absolute IRIs, so a reference that
+      // cannot be parsed, resolved, or made absolute is a loading failure
+      bool resolvable{true};
+      try {
+        if (resolution_base.has_value()) {
+          reference = URI::from_iri(reference)
+                          .resolve_from(URI::from_iri(resolution_base.value()))
+                          .recompose();
+        }
+        resolvable = URI::from_iri(reference).is_absolute();
+      } catch (...) {
+        resolvable = false;
       }
-      // The resolver contract only admits absolute IRIs, so a relative
-      // reference that no base can resolve is a loading failure
-      if (!URI::from_iri(reference).is_absolute()) {
+      if (!resolvable) {
         throw JSONLDError("Loading remote context failed", location,
                           {KEYWORD_IMPORT});
       }

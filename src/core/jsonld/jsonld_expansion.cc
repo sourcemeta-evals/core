@@ -754,6 +754,16 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       }
     } else if (entry.second.is_object() &&
                container_includes(definition, KEYWORD_LANGUAGE)) {
+      // The property's scoped context supplies the direction default for the
+      // language map values (a disclosed task behaviour), while the keys keep
+      // the element-level context
+      auto direction_default{active_context.default_direction};
+      if (definition->context.has_value()) {
+        ActiveContext scoped{active_context};
+        scoped.previous = nullptr;
+        apply_scoped_context(state, scoped, *definition, entry_pointer);
+        direction_default = scoped.default_direction;
+      }
       expanded_value = JSON::make_array();
       for (const auto &[language_key, language_value] :
            sorted_entries(entry.second)) {
@@ -780,9 +790,8 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
             value.assign_assume_new(JSON::String{KEYWORD_LANGUAGE},
                                     JSON{language}, KEYWORD_LANGUAGE_HASH);
           }
-          const auto direction{definition->has_direction
-                                   ? definition->direction
-                                   : active_context.default_direction};
+          const auto direction{definition->has_direction ? definition->direction
+                                                         : direction_default};
           if (direction.has_value()) {
             value.assign_assume_new(JSON::String{KEYWORD_DIRECTION},
                                     JSON{direction.value()},

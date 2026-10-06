@@ -897,27 +897,133 @@ TEST(JSONLD_expand, language_map_direction_uses_term_definition) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
-TEST(JSONLD_expand, scoped_context_invisible_to_language_map_keys) {
+TEST(JSONLD_expand, scoped_alias_invisible_to_language_map_keys) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {
       "p": {
         "@id": "http://example.com/p",
         "@container": "@language",
-        "@context": { "none": "@none", "@direction": "rtl" }
+        "@context": { "none": "@none" }
       }
     },
-    "p": { "en": "y" }
+    "p": { "none": "x" }
   })");
 
-  // Language map keys and the direction default read the element's own active
-  // context, not the property-scoped one, which only applies when values are
-  // expanded recursively (JSON-LD 1.1 API Section 5.1.2 step 13.7)
+  // Language map keys read the element's own active context, so an alias
+  // defined only in the property-scoped context does not strip @language
   const auto expected = sourcemeta::core::parse_json(R"([
     {
       "http://example.com/p": [
-        { "@value": "y", "@language": "en" }
+        { "@value": "x", "@language": "none" }
       ]
     }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, language_map_direction_uses_property_scoped_context) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@direction": "ltr",
+      "p": {
+        "@id": "http://example.com/p",
+        "@container": "@language",
+        "@context": { "@direction": "rtl" }
+      },
+      "q": { "@id": "http://example.com/q", "@container": "@language" }
+    },
+    "p": { "en": "hello" },
+    "q": { "en": "world" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [
+        { "@value": "hello", "@language": "en", "@direction": "rtl" }
+      ],
+      "http://example.com/q": [
+        { "@value": "world", "@language": "en", "@direction": "ltr" }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, scoped_null_direction_clears_language_map_direction) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@direction": "ltr",
+      "p": {
+        "@id": "http://example.com/p",
+        "@container": "@language",
+        "@context": { "@direction": null }
+      }
+    },
+    "p": { "en": "hello" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [
+        { "@value": "hello", "@language": "en" }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, language_map_term_direction_wins_over_scoped) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": {
+        "@id": "http://example.com/p",
+        "@container": "@language",
+        "@direction": "rtl",
+        "@context": { "@direction": "ltr" }
+      }
+    },
+    "p": { "en": "hello" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [
+        { "@value": "hello", "@language": "en", "@direction": "rtl" }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, context_direction_applies_in_1_1) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@direction": "rtl", "p": "https://example.com/p" },
+    "p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "https://example.com/p": [
+        { "@value": "v", "@direction": "rtl" }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, reverse_keyword_form_value_is_ignored) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@reverse": "@foo" } },
+    "http://example.com/q": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/q": [ { "@value": "v" } ] }
   ])");
 
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
