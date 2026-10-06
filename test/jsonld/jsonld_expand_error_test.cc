@@ -5,6 +5,7 @@
 #include <sourcemeta/core/jsonpointer.h>
 
 #include <algorithm> // std::ranges::fill
+#include <cstddef>   // std::size_t
 #include <optional>  // std::optional, std::nullopt
 #include <stdexcept> // std::runtime_error
 #include <string>    // std::string
@@ -40,6 +41,12 @@ auto remote_resolver() -> sourcemeta::core::JSONLDResolver {
     }
     if (identifier == "https://example.com/throws") {
       throw std::runtime_error("network failure");
+    }
+    if (identifier == "https://example.com/throws-int") {
+      throw 42;
+    }
+    if (identifier == "https://example.com/import-invalid") {
+      return sourcemeta::core::parse_json(R"({ "@context": { "a": "bad" } })");
     }
     if (identifier == "https://example.com/scoped-missing") {
       return sourcemeta::core::parse_json(R"({
@@ -298,6 +305,37 @@ TEST(JSONLD_expand_error, processing_mode_conflict) {
       "Processing mode conflict", "/@context/@version");
 }
 
+TEST(JSONLD_expand_error, malformed_base_with_space) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@base": "bad base" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid base IRI", "/@context/@base");
+}
+
+TEST(JSONLD_expand_error, malformed_base_with_bad_percent_escape) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@base": "https://example.com/%zz" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid base IRI", "/@context/@base");
+}
+
+TEST(JSONLD_expand_error, decimal_version_in_1_0) {
+  auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": "http://example.com/p" },
+    "p": "v"
+  })");
+  input.at("@context")
+      .assign("@version",
+              sourcemeta::core::JSON{sourcemeta::core::Decimal{"1.1"}});
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Processing mode conflict", "/@context/@version");
+}
+
 TEST(JSONLD_expand_error, invalid_context_entry) {
   const auto input =
       sourcemeta::core::parse_json(R"({ "@context": { "@protected": true } })");
@@ -356,6 +394,25 @@ TEST(JSONLD_expand_error, recursive_context_inclusion_in_1_0) {
       "Recursive context inclusion", "/@context");
 }
 
+TEST(JSONLD_expand_error, unbounded_remote_context_chain) {
+  const sourcemeta::core::JSONLDResolver resolver =
+      [](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    auto next{sourcemeta::core::JSON::String{identifier}};
+    next += "x";
+    auto document{sourcemeta::core::JSON::make_object()};
+    document.assign("@context", sourcemeta::core::JSON{std::move(next)});
+    return document;
+  };
+
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": "https://example.com/chain" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver), "Context overflow",
+      "/@context");
+}
+
 TEST(JSONLD_expand_error, context_overflow) {
   const auto input = sourcemeta::core::parse_json(
       R"({ "@context": "https://example.com/recursive" })");
@@ -390,21 +447,76 @@ TEST(JSONLD_expand_error, error_inside_wrapped_expansion_context) {
 }
 
 TEST(JSONLD_expand_error, relative_context_without_base) {
+  std::size_t invocations{0};
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&invocations](const sourcemeta::core::JSON::StringView)
+      -> std::optional<sourcemeta::core::JSON> {
+    invocations += 1;
+    return sourcemeta::core::parse_json(
+        R"({ "@context": { "p": "http://example.com/p" } })");
+  };
+
   const auto input =
       sourcemeta::core::parse_json(R"({ "@context": "context.jsonld" })");
 
   EXPECT_JSONLD_EXPAND_ERROR(
-      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      sourcemeta::core::jsonld_expand(input, "", resolver),
       "Loading remote context failed", "/@context");
+  // The resolver contract only admits absolute IRIs, so even a permissive
+  // resolver must never see the unresolved relative reference
+  EXPECT_EQ(invocations, 0);
 }
 
 TEST(JSONLD_expand_error, relative_import_without_base) {
+  std::size_t invocations{0};
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&invocations](const sourcemeta::core::JSON::StringView)
+      -> std::optional<sourcemeta::core::JSON> {
+    invocations += 1;
+    return sourcemeta::core::parse_json(
+        R"({ "@context": { "p": "http://example.com/p" } })");
+  };
+
   const auto input = sourcemeta::core::parse_json(
       R"({ "@context": { "@import": "context.jsonld" } })");
 
   EXPECT_JSONLD_EXPAND_ERROR(
-      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      sourcemeta::core::jsonld_expand(input, "", resolver),
       "Loading remote context failed", "/@context/@import");
+  EXPECT_EQ(invocations, 0);
+}
+
+TEST(JSONLD_expand_error, imported_invalid_mapping) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@import": "https://example.com/import-invalid" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Invalid IRI mapping", "/@context/@import");
+}
+
+TEST(JSONLD_expand_error, imported_invalid_mapping_in_context_array) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [ { "@import": "https://example.com/import-invalid" } ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Invalid IRI mapping", "/@context/0/@import");
+}
+
+TEST(JSONLD_expand_error, local_override_of_imported_term) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@import": "https://example.com/import-invalid",
+      "a": { "@id": true }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Invalid IRI mapping", "/@context/a/@id");
 }
 
 TEST(JSONLD_expand_error, deferred_scoped_context_error_from_remote_term) {
@@ -441,6 +553,25 @@ TEST(JSONLD_expand_error, throwing_resolver) {
   EXPECT_JSONLD_EXPAND_ERROR(
       sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
       "Loading remote context failed", "/@context");
+}
+
+TEST(JSONLD_expand_error, resolver_throwing_a_non_standard_exception) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": "https://example.com/throws-int" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Loading remote context failed", "/@context");
+}
+
+TEST(JSONLD_expand_error,
+     resolver_throwing_a_non_standard_exception_on_import) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@import": "https://example.com/throws-int" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Loading remote context failed", "/@context/@import");
 }
 
 TEST(JSONLD_expand_error, throwing_resolver_on_import) {
@@ -575,6 +706,43 @@ TEST(JSONLD_expand_error, invalid_reverse_property_value) {
                              "/@reverse/http:~1~1example.com~1p");
 }
 
+TEST(JSONLD_expand_error, aliased_reverse_property_value) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": "http://example.com/p" },
+    "@reverse": { "p": "x" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value", "/@reverse/p");
+}
+
+TEST(JSONLD_expand_error, merged_aliased_reverse_property_value) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": "http://example.com/p",
+      "b": "http://example.com/p"
+    },
+    "@reverse": {
+      "a": { "@id": "http://example.com/ok" },
+      "b": "x"
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value", "/@reverse/b");
+}
+
+TEST(JSONLD_expand_error, aliased_reverse_keyword_property_value) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "rev": "@reverse" },
+    "rev": { "http://example.com/p": "x" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value",
+                             "/rev/http:~1~1example.com~1p");
+}
+
 TEST(JSONLD_expand_error, keyword_inside_reverse_map) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@reverse": { "@id": "http://example.com/x" }
@@ -600,6 +768,38 @@ TEST(JSONLD_expand_error, invalid_nest_value_expansion) {
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid @nest value", "/nest");
+}
+
+TEST(JSONLD_expand_error, aliased_value_inside_nest) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "v": "@value" },
+    "@nest": { "v": "x" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @nest value", "/@nest");
+}
+
+TEST(JSONLD_expand_error, aliased_value_inside_aliased_nest) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "v": "@value", "data": "@nest" },
+    "data": { "v": "x" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @nest value", "/data");
+}
+
+TEST(JSONLD_expand_error, invalid_language_map_value_in_array) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "label": { "@id": "http://example.com/label", "@container": "@language" }
+    },
+    "label": { "en": [ "ok", 5 ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid language map value", "/label/en");
 }
 
 TEST(JSONLD_expand_error, invalid_id_inside_nest_array) {
@@ -747,6 +947,27 @@ TEST(JSONLD_expand_error, invalid_container_set_with_multiple_keywords) {
                              "/@context/a/@container");
 }
 
+TEST(JSONLD_expand_error, explicit_json_literal_in_1_0) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": { "@value": { "x": 1 }, "@type": "@json" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Invalid typed value", "/http:~1~1example.com~1p/@type");
+}
+
+TEST(JSONLD_expand_error, relative_typed_value_datatype_without_base) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": { "@value": "x", "@type": "relative" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid typed value",
+                             "/http:~1~1example.com~1p/@type");
+}
+
 TEST(JSONLD_expand_error, list_object_with_type) {
   const auto input = sourcemeta::core::parse_json(R"({
     "http://example.com/p": { "@list": [ "a" ], "@type": "http://example.com/T" }
@@ -760,6 +981,16 @@ TEST(JSONLD_expand_error, list_object_with_type) {
 TEST(JSONLD_expand_error, set_object_with_type) {
   const auto input = sourcemeta::core::parse_json(R"({
     "http://example.com/p": { "@set": [ "a" ], "@type": "http://example.com/T" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid set or list object",
+                             "/http:~1~1example.com~1p");
+}
+
+TEST(JSONLD_expand_error, list_object_with_set) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/p": { "@list": [ "a" ], "@set": [ "b" ] }
   })");
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),

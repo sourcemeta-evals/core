@@ -9,6 +9,7 @@
 #include <map>        // std::map
 #include <memory>     // std::shared_ptr
 #include <optional>   // std::optional
+#include <set>        // std::set
 #include <vector>     // std::vector
 
 namespace sourcemeta::core {
@@ -58,6 +59,10 @@ struct ExpansionState {
   // Whether the scoped context being processed after the fact came from a
   // remotely-loaded context, so its @base stays ignored at use time
   bool remote_base_override{false};
+  // The keys of the context currently being processed that came from an
+  // @import document rather than from the input, so their definitions carry
+  // remote origin and report errors at the @import entry
+  std::set<JSON::String> imported_keys;
   // Protected-term state for the context currently being processed.
   bool context_protected{false};
   bool protected_override{false};

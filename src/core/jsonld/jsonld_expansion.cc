@@ -1,6 +1,8 @@
 #include "jsonld_algorithms.h"
 #include "jsonld_keywords.h"
 
+#include <sourcemeta/core/uri.h>
+
 #include <algorithm> // std::ranges::sort
 #include <cstddef>   // std::size_t
 #include <optional>  // std::optional
@@ -78,6 +80,21 @@ struct ValueMemberPointers {
   std::optional<WeakPointer> value;
   std::optional<WeakPointer> type;
 };
+
+// Whether any key of the given nested object expands to @value, which the
+// @nest validation forbids, including through keyword aliases
+auto nest_defines_value(ExpansionState &state, ActiveContext &active_context,
+                        const JSON &nest_value) -> bool {
+  for (const auto &nested_entry : nest_value.as_object()) {
+    const auto expanded{expand_iri(state, active_context, nested_entry.first,
+                                   false, true, nullptr, nullptr,
+                                   empty_weak_pointer)};
+    if (expanded.has_value() && expanded.value() == KEYWORD_VALUE) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // Expand the direct (and deferred @nest) entries of a map into the result,
 // mutating it in place. Mutually recursive with expand_object.
@@ -160,7 +177,10 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
     const bool has_type{type != nullptr};
     const JSON::String *const type_string{
         type != nullptr && type->is_string() ? &type->to_string() : nullptr};
-    const bool is_json{type_string != nullptr && *type_string == KEYWORD_JSON};
+    // JSON literals are a 1.1 feature, so in 1.0 mode an explicit @json
+    // datatype is an ordinary non-IRI type and fails the typed-value check
+    const bool is_json{type_string != nullptr && *type_string == KEYWORD_JSON &&
+                       !state.processing_1_0};
     for (const auto &entry : result.as_object()) {
       const auto &name{entry.first};
       if (name != KEYWORD_VALUE && name != KEYWORD_TYPE &&
@@ -183,8 +203,19 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
                             ? value_members.value.value()
                             : pointer);
     }
-    if (has_type && (type_string == nullptr || type_string->starts_with("_:") ||
-                     type_string->find(' ') != JSON::String::npos)) {
+    // The datatype of a typed value must be an absolute IRI, except for the
+    // @json datatype
+    bool type_is_absolute{true};
+    if (has_type && type_string != nullptr && !is_json) {
+      try {
+        type_is_absolute = URI::from_iri(*type_string).is_absolute();
+      } catch (...) {
+        type_is_absolute = false;
+      }
+    }
+    if (has_type &&
+        (type_string == nullptr || type_string->starts_with("_:") ||
+         type_string->find(' ') != JSON::String::npos || !type_is_absolute)) {
       throw JSONLDError("Invalid typed value", value_members.type.has_value()
                                                    ? value_members.type.value()
                                                    : pointer);
@@ -204,9 +235,14 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
   }
 
   // A set or list object may only carry an @index entry besides, and this is
-  // validated before any value is dropped.
+  // validated before any value is dropped. Carrying both collection keywords
+  // at once is equally invalid.
   if (result.defines(KEYWORD_LIST, KEYWORD_LIST_HASH) ||
       result.defines(KEYWORD_SET, KEYWORD_SET_HASH)) {
+    if (result.defines(KEYWORD_LIST, KEYWORD_LIST_HASH) &&
+        result.defines(KEYWORD_SET, KEYWORD_SET_HASH)) {
+      throw JSONLDError("Invalid set or list object", pointer);
+    }
     for (const auto &entry : result.as_object()) {
       const auto &name{entry.first};
       if (name != KEYWORD_LIST && name != KEYWORD_SET &&
@@ -288,14 +324,14 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         std::size_t nest_index{0};
         for (const auto &nest_value : entry.second.as_array()) {
           if (!nest_value.is_object() ||
-              nest_value.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
+              nest_defines_value(state, active_context, nest_value)) {
             throw JSONLDError("Invalid @nest value", entry_pointer);
           }
           nests.emplace_back(&property, &nest_value, nest_index);
           nest_index += 1;
         }
       } else if (entry.second.is_object() &&
-                 !entry.second.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
+                 !nest_defines_value(state, active_context, entry.second)) {
         nests.emplace_back(&property, &entry.second, std::nullopt);
       } else {
         throw JSONLDError("Invalid @nest value", entry_pointer);
@@ -523,6 +559,32 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
               if (item.is_object() &&
                   (item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH) ||
                    item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH))) {
+                // The expanded map merges aliases, so the offending input
+                // entry is located by re-expanding each input entry whose key
+                // maps to this property, preserving the input's own spelling
+                for (const auto &input_entry : entry.second.as_object()) {
+                  const auto input_property{expand_iri(
+                      state, active_context, input_entry.first, false, true,
+                      nullptr, nullptr, empty_weak_pointer)};
+                  if (!input_property.has_value() ||
+                      input_property.value() != reverse_property) {
+                    continue;
+                  }
+                  const WeakPointer input_pointer{
+                      entry_pointer.concat(input_entry.first)};
+                  const auto probe{into_array(
+                      expand(state, active_context, input_entry.first,
+                             input_entry.second, input_pointer))};
+                  for (const auto &probe_item : probe.as_array()) {
+                    if (probe_item.is_object() &&
+                        (probe_item.defines(KEYWORD_VALUE,
+                                            KEYWORD_VALUE_HASH) ||
+                         probe_item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH))) {
+                      throw JSONLDError("Invalid reverse property value",
+                                        input_pointer);
+                    }
+                  }
+                }
                 throw JSONLDError("Invalid reverse property value",
                                   entry_pointer, {reverse_property});
               }
@@ -618,6 +680,10 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
             into_array(expand(state, value_context, property, *graph_value,
                               entry_pointer.concat(index)))};
         for (auto &item : graph_items.as_array()) {
+          // A null map value expands to nothing
+          if (item.is_null()) {
+            continue;
+          }
           // Wrap the item in a graph object, unless it is already one.
           JSON graph{nullptr};
           if (item.is_object() &&
@@ -815,6 +881,10 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                 into_array(expand(state, entry_context, property, raw,
                                   entry_pointer.concat(index)))};
             for (auto &expanded : expanded_items.as_array()) {
+              // A null map value expands to nothing
+              if (expanded.is_null()) {
+                continue;
+              }
               entries.push_back(expanded);
             }
           }
@@ -848,6 +918,10 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       auto graph_items{into_array(
           expand(state, value_context, property, entry.second, entry_pointer))};
       for (auto &item : graph_items.as_array()) {
+        // A null expansion result contributes no graph entry
+        if (item.is_null()) {
+          continue;
+        }
         auto graph{JSON::make_object()};
         graph.assign_assume_new(JSON::String{KEYWORD_GRAPH},
                                 into_array(std::move(item)),

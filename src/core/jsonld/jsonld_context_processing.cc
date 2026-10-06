@@ -3,6 +3,7 @@
 
 #include <sourcemeta/core/uri.h>
 
+#include <cstddef>          // std::size_t
 #include <initializer_list> // std::initializer_list
 #include <memory>           // std::make_shared
 #include <optional>         // std::optional
@@ -10,6 +11,10 @@
 #include <vector>           // std::vector
 
 namespace {
+
+// The processor-defined limit on the remote context chain, which bounds
+// resolver-controlled recursion over distinct context IRIs
+constexpr std::size_t REMOTE_CONTEXT_LIMIT{32};
 
 // Invoke the resolver callback, translating any failure it raises into the
 // public loading error at the given input location
@@ -121,6 +126,9 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       if (context_entry == nullptr) {
         throw JSONLDError("Invalid remote context", location);
       }
+      if (state.remote_context_chain.size() >= REMOTE_CONTEXT_LIMIT) {
+        throw JSONLDError("Context overflow", location);
+      }
       state.remote_context_chain.push_back(reference);
       try {
         // A loaded remote context is processed with the default propagation.
@@ -142,10 +150,13 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       throw JSONLDError("Invalid local context", location);
     }
 
+    // The version number 1.1 is accepted in both numeric representations the
+    // JSON library supports
     if (const auto *version{
             context.try_at(KEYWORD_VERSION, KEYWORD_VERSION_HASH)};
         version != nullptr &&
-        (!version->is_real() || version->to_real() != 1.1)) {
+        !((version->is_real() && version->to_real() == 1.1) ||
+          (version->is_decimal() && version->to_decimal() == Decimal{"1.1"}))) {
       throw JSONLDError("Invalid @version value", location, {KEYWORD_VERSION});
     }
     if (state.processing_1_0 &&
@@ -231,12 +242,27 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       // merged context is processed outside the remote chain, so the imported
       // entry is dropped before merging
       merged.erase(KEYWORD_BASE);
+      // The keys that the import contributes carry remote origin and are not
+      // present in the input document, unlike the local ones overriding them
+      auto saved_imported{std::move(state.imported_keys)};
+      state.imported_keys.clear();
+      for (const auto &imported_entry : merged.as_object()) {
+        if (!context.defines(imported_entry.first)) {
+          state.imported_keys.insert(imported_entry.first);
+        }
+      }
       for (const auto &entry : context.as_object()) {
         if (JSON::StringView{entry.first} != KEYWORD_IMPORT) {
           merged.assign(entry.first, entry.second);
         }
       }
-      process_context(state, active_context, merged, location, propagate);
+      try {
+        process_context(state, active_context, merged, location, propagate);
+      } catch (...) {
+        state.imported_keys = std::move(saved_imported);
+        throw;
+      }
+      state.imported_keys = std::move(saved_imported);
       state.context_protected = saved_protected;
       continue;
     }
@@ -252,14 +278,22 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         throw JSONLDError("Invalid base IRI", location, {KEYWORD_BASE});
       } else {
         const auto &base_string{base.to_string()};
-        if (active_context.base.has_value()) {
-          active_context.base =
-              URI::from_iri(base_string)
-                  .resolve_from(URI::from_iri(active_context.base.value()))
-                  .recompose();
-        } else if (URI::from_iri(base_string).is_absolute()) {
-          active_context.base = base_string;
-        } else {
+        // A string the URI parser rejects is an invalid base, not a parser
+        // exception escaping the public error contract
+        try {
+          if (active_context.base.has_value()) {
+            active_context.base =
+                URI::from_iri(base_string)
+                    .resolve_from(URI::from_iri(active_context.base.value()))
+                    .recompose();
+          } else if (URI::from_iri(base_string).is_absolute()) {
+            active_context.base = base_string;
+          } else {
+            throw JSONLDError("Invalid base IRI", location, {KEYWORD_BASE});
+          }
+        } catch (const JSONLDError &) {
+          throw;
+        } catch (...) {
           throw JSONLDError("Invalid base IRI", location, {KEYWORD_BASE});
         }
       }
@@ -323,6 +357,18 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
           name == KEYWORD_LANGUAGE || name == KEYWORD_VERSION ||
           name == KEYWORD_DIRECTION || name == KEYWORD_IMPORT ||
           name == KEYWORD_PROPAGATE || name == KEYWORD_PROTECTED) {
+        continue;
+      }
+      if (state.imported_keys.contains(name)) {
+        static const JSON::String TOKEN_IMPORT{KEYWORD_IMPORT};
+        try {
+          create_term_definition(state, active_context, context, name, defined,
+                                 location, location.concat(name));
+        } catch (const JSONLDError &error) {
+          // Imported entries are not in the input document, so their
+          // definition errors report at the @import entry that pulled them in
+          throw JSONLDError(error.what(), location.concat(TOKEN_IMPORT));
+        }
         continue;
       }
       create_term_definition(state, active_context, context, name, defined,
