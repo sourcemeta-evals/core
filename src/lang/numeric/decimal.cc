@@ -1370,15 +1370,6 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
     return result;
   }
 
-  if (this->is_zero()) {
-    Decimal result;
-    if (result_negative) {
-      result.flags_ = FLAG_SIGN;
-    }
-
-    return result;
-  }
-
   if (this->exponent_ >= 0) {
     const Decimal one{1};
     Decimal other_abs = other;
@@ -1393,6 +1384,15 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
       }
       return result;
     }
+  }
+
+  if (this->is_zero()) {
+    Decimal result;
+    if (result_negative) {
+      result.flags_ = FLAG_SIGN;
+    }
+
+    return result;
   }
 
   auto dividend_big = coefficient_as_big(this->coefficient_,

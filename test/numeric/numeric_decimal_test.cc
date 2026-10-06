@@ -3813,6 +3813,45 @@ TEST(Numeric_decimal, divide_integer_by_larger) {
   EXPECT_EQ(left.divide_integer(right), sourcemeta::core::Decimal{0});
 }
 
+TEST(Numeric_decimal,
+     divide_integer_scaled_negative_zero_by_one_preserves_quantum_and_sign) {
+  const sourcemeta::core::Decimal dividend{"-0e20"};
+  const sourcemeta::core::Decimal divisor{1};
+  const auto result{dividend.divide_integer(divisor)};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(dividend));
+}
+
+TEST(Numeric_decimal, divide_integer_scaled_zero_by_one_preserves_quantum) {
+  const sourcemeta::core::Decimal dividend{"0e20"};
+  const sourcemeta::core::Decimal divisor{1};
+  const auto result{dividend.divide_integer(divisor)};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(dividend));
+}
+
+TEST(Numeric_decimal,
+     divide_integer_scaled_negative_zero_by_negative_one_flips_sign) {
+  const sourcemeta::core::Decimal dividend{"-0e20"};
+  const sourcemeta::core::Decimal divisor{-1};
+  const auto result{dividend.divide_integer(divisor)};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(dividend));
+}
+
+TEST(Numeric_decimal,
+     divide_integer_negative_zero_by_non_unit_returns_scalar_zero) {
+  const sourcemeta::core::Decimal dividend{"-0e20"};
+  const sourcemeta::core::Decimal divisor{2};
+  const auto result{dividend.divide_integer(divisor)};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{0}));
+}
+
 TEST(Numeric_decimal, divide_integer_by_zero_throws) {
   EXPECT_THROW(
       {
