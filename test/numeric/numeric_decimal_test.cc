@@ -1590,6 +1590,14 @@ TEST(Numeric_decimal, exception_overflow_multiplication) {
       sourcemeta::core::NumericOverflowError);
 }
 
+TEST(Numeric_decimal, exception_overflow_addition) {
+  const sourcemeta::core::Decimal large{"9999999999999999e2147483647"};
+  const sourcemeta::core::Decimal addend{"1e2147483647"};
+  EXPECT_THROW(
+      { const auto result = large + addend; },
+      sourcemeta::core::NumericOverflowError);
+}
+
 TEST(Numeric_decimal, add_at_int32_max_exponent_representable) {
   const sourcemeta::core::Decimal large{"9e2147483647"};
   const sourcemeta::core::Decimal addend{"9e2147483647"};
