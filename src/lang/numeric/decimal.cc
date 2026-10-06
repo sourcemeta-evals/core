@@ -1879,6 +1879,22 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
 
   bool result_negative = ((this->flags_ ^ other.flags_) & FLAG_SIGN) != 0;
 
+  if (this->is_zero()) {
+    const auto preferred_exponent_64 =
+        static_cast<std::int64_t>(this->exponent_) - other.exponent_;
+    if (preferred_exponent_64 > std::numeric_limits<std::int32_t>::max() ||
+        preferred_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
+      throw NumericOverflowError{};
+    }
+
+    free_big_coefficient(this->coefficient_, this->flags_);
+    this->coefficient_ = 0;
+    this->coefficient_high_ = 0;
+    this->exponent_ = static_cast<std::int32_t>(preferred_exponent_64);
+    this->flags_ = result_negative ? FLAG_SIGN : 0;
+    return *this;
+  }
+
   auto dividend_big = coefficient_as_big(this->coefficient_,
                                          this->coefficient_high_, this->flags_);
   auto divisor_big = coefficient_as_big(other.coefficient_,
@@ -1936,10 +1952,38 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
     rounding_excess = quotient_digits - WORKING_PRECISION;
   }
 
-  if (final_exponent_64 + rounding_excess >
-          std::numeric_limits<std::int32_t>::max() ||
-      final_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
+  const auto narrowed_exponent_64 = final_exponent_64 + rounding_excess;
+  if (narrowed_exponent_64 > std::numeric_limits<std::int32_t>::max() ||
+      narrowed_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
     throw NumericOverflowError{};
+  }
+
+  if (rounding_excess > 0 &&
+      final_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
+    auto power = BigCoefficient::from_uint64(1);
+    for (std::int64_t index = 0; index < rounding_excess; ++index) {
+      power = power.multiply(ten);
+    }
+
+    auto [reduced, dropped] = quotient.divide_modulo(power);
+    auto dropped_doubled = dropped.add(dropped);
+    const auto half_comparison = dropped_doubled.compare(power);
+    bool round_up = false;
+    if (half_comparison > 0) {
+      round_up = true;
+    } else if (half_comparison == 0) {
+      auto mod_two =
+          reduced.divide_modulo(BigCoefficient::from_uint64(2)).second;
+      round_up = !mod_two.is_zero();
+    }
+
+    if (round_up) {
+      quotient = reduced.add(BigCoefficient::from_uint64(1));
+    } else {
+      quotient = std::move(reduced);
+    }
+
+    final_exponent_64 += rounding_excess;
   }
 
   free_big_coefficient(this->coefficient_, this->flags_);

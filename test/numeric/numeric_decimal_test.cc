@@ -4877,6 +4877,49 @@ TEST(Numeric_decimal, compound_divide_one_by_seven_rounds_half_even) {
   EXPECT_EQ(numerator, sourcemeta::core::Decimal{"0.1428571428571429"});
 }
 
+TEST(Numeric_decimal, divide_quotient_rounds_back_into_minimum_exponent) {
+  const sourcemeta::core::Decimal dividend{"1e-2147483632"};
+  const sourcemeta::core::Decimal divisor{3};
+  const sourcemeta::core::Decimal expected{"3333333333333333e-2147483648"};
+  EXPECT_EQ(dividend / divisor, expected);
+}
+
+TEST(Numeric_decimal,
+     compound_divide_quotient_rounds_back_into_minimum_exponent) {
+  sourcemeta::core::Decimal dividend{"1e-2147483632"};
+  const sourcemeta::core::Decimal divisor{3};
+  dividend /= divisor;
+  EXPECT_EQ(dividend,
+            sourcemeta::core::Decimal{"3333333333333333e-2147483648"});
+}
+
+TEST(Numeric_decimal, divide_rounding_at_minimum_exponent) {
+  const sourcemeta::core::Decimal dividend{"12345678901234567e-2147483648"};
+  const sourcemeta::core::Decimal divisor{2};
+  const sourcemeta::core::Decimal expected{"6172839450617284e-2147483648"};
+  EXPECT_EQ(dividend / divisor, expected);
+}
+
+TEST(Numeric_decimal,
+     divide_zero_dividend_at_minimum_exponent_preserves_quantum) {
+  const sourcemeta::core::Decimal dividend{"0e-2147483648"};
+  const sourcemeta::core::Decimal divisor{1};
+  const auto result{dividend / divisor};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"0e-2147483648"});
+}
+
+TEST(Numeric_decimal,
+     divide_negative_zero_dividend_at_minimum_exponent_preserves_sign) {
+  const sourcemeta::core::Decimal dividend{"-0e-2147483648"};
+  const sourcemeta::core::Decimal divisor{1};
+  const auto result{dividend / divisor};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"-0e-2147483648"});
+}
+
 TEST(Numeric_decimal, divide_above_midpoint_with_guard_digit_five_rounds_up) {
   const sourcemeta::core::Decimal dividend{"100000000000000011"};
   const sourcemeta::core::Decimal divisor{"200000000000000000"};
