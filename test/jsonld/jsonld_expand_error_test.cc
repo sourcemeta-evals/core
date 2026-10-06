@@ -78,8 +78,18 @@ TEST(JSONLD_expand_error, cyclic_iri_mapping_shorthand) {
     "@context": { "a": "b:x", "b": "a:x" }
   })");
 
-  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Cyclic IRI mapping", "/@context/b");
+  // Either participating entry validly identifies a mutual cycle, as the
+  // traversal order that determines which one completes it is unspecified
+  try {
+    [[maybe_unused]] const auto result{sourcemeta::core::jsonld_expand(input)};
+    FAIL() << "Expected JSON-LD error: Cyclic IRI mapping";
+  } catch (const sourcemeta::core::JSONLDError &error) {
+    EXPECT_STREQ(error.what(), "Cyclic IRI mapping");
+    const auto pointer{sourcemeta::core::to_string(error.pointer())};
+    EXPECT_TRUE(pointer == "/@context/a" || pointer == "/@context/b");
+  } catch (...) {
+    FAIL() << "Expected a JSONLDError: Cyclic IRI mapping";
+  }
 }
 
 TEST(JSONLD_expand_error, invalid_term_definition_empty) {
