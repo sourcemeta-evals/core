@@ -4785,3 +4785,27 @@ TEST(Numeric_decimal, add_zero_preserves_preferred_quantum_from_this) {
   EXPECT_EQ(result, expected);
   EXPECT_TRUE(result.same_quantum(expected));
 }
+
+TEST(Numeric_decimal, is_integral_at_int32_min_exponent_positive_false) {
+  const sourcemeta::core::Decimal value{"1e-2147483648"};
+  EXPECT_FALSE(value.is_integral());
+  EXPECT_TRUE(value.is_real());
+}
+
+TEST(Numeric_decimal, is_integral_at_int32_min_exponent_negative_false) {
+  const sourcemeta::core::Decimal value{"-1e-2147483648"};
+  EXPECT_FALSE(value.is_integral());
+  EXPECT_TRUE(value.is_real());
+}
+
+TEST(Numeric_decimal, is_integral_at_int32_min_exponent_positive_zero_true) {
+  const sourcemeta::core::Decimal value{"0e-2147483648"};
+  EXPECT_TRUE(value.is_integral());
+  EXPECT_FALSE(value.is_real());
+}
+
+TEST(Numeric_decimal, is_integral_at_int32_min_exponent_negative_zero_true) {
+  const sourcemeta::core::Decimal value{"-0e-2147483648"};
+  EXPECT_TRUE(value.is_integral());
+  EXPECT_FALSE(value.is_real());
+}
