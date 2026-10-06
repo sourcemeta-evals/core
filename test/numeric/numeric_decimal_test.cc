@@ -4238,6 +4238,45 @@ TEST(Numeric_decimal, to_uint64_normalizes_negative_exponent_form_string) {
   EXPECT_EQ(value.to_uint64(), 10U);
 }
 
+TEST(Numeric_decimal, zero_with_large_positive_exponent_fits_signed_integers) {
+  const sourcemeta::core::Decimal value{"0e40"};
+  ASSERT_TRUE(value.is_integral());
+  EXPECT_TRUE(value.is_int32());
+  EXPECT_TRUE(value.is_int64());
+  EXPECT_EQ(value.to_int32(), 0);
+  EXPECT_EQ(value.to_int64(), 0);
+}
+
+TEST(Numeric_decimal,
+     zero_with_large_positive_exponent_fits_unsigned_integers) {
+  const sourcemeta::core::Decimal value{"0e40"};
+  ASSERT_TRUE(value.is_integral());
+  EXPECT_TRUE(value.is_uint32());
+  EXPECT_TRUE(value.is_uint64());
+  EXPECT_EQ(value.to_uint32(), 0U);
+  EXPECT_EQ(value.to_uint64(), 0U);
+}
+
+TEST(Numeric_decimal,
+     negative_zero_with_large_positive_exponent_fits_signed_integers) {
+  const sourcemeta::core::Decimal value{"-0e40"};
+  ASSERT_TRUE(value.is_integral());
+  EXPECT_TRUE(value.is_int32());
+  EXPECT_TRUE(value.is_int64());
+  EXPECT_EQ(value.to_int32(), 0);
+  EXPECT_EQ(value.to_int64(), 0);
+}
+
+TEST(Numeric_decimal,
+     negative_zero_with_large_positive_exponent_fits_unsigned_integers) {
+  const sourcemeta::core::Decimal value{"-0e40"};
+  ASSERT_TRUE(value.is_integral());
+  EXPECT_TRUE(value.is_uint32());
+  EXPECT_TRUE(value.is_uint64());
+  EXPECT_EQ(value.to_uint32(), 0U);
+  EXPECT_EQ(value.to_uint64(), 0U);
+}
+
 TEST(Numeric_decimal, parse_nan_rejects_non_digit_payload_suffix) {
   EXPECT_THROW(sourcemeta::core::Decimal{"NaNx"},
                sourcemeta::core::DecimalParseError);
