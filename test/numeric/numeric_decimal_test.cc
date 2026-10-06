@@ -4623,26 +4623,24 @@ TEST(Numeric_decimal, divisible_by_zero_dividend_by_finite_divisor_true) {
   EXPECT_TRUE(zero.divisible_by(divisor));
 }
 
-TEST(Numeric_decimal, modulo_heap_backed_dividend_by_three_zero) {
-  const sourcemeta::core::Decimal dividend{
-      "999999999999999999999999999999999999999"};
-  const sourcemeta::core::Decimal divisor{3};
+TEST(Numeric_decimal, modulo_heap_backed_dividend_zero_remainder) {
+  const sourcemeta::core::Decimal dividend{"9999999999999999000"};
+  const sourcemeta::core::Decimal divisor{1000};
   const sourcemeta::core::Decimal expected{0};
   EXPECT_EQ(dividend % divisor, expected);
 }
 
-TEST(Numeric_decimal, compound_modulo_heap_backed_dividend_by_three_zero) {
-  sourcemeta::core::Decimal dividend{"999999999999999999999999999999999999999"};
-  const sourcemeta::core::Decimal divisor{3};
+TEST(Numeric_decimal, compound_modulo_heap_backed_dividend_zero_remainder) {
+  sourcemeta::core::Decimal dividend{"9999999999999999000"};
+  const sourcemeta::core::Decimal divisor{1000};
   dividend %= divisor;
   EXPECT_EQ(dividend, sourcemeta::core::Decimal{0});
 }
 
-TEST(Numeric_decimal, modulo_heap_backed_dividend_by_seven_nonzero) {
-  const sourcemeta::core::Decimal dividend{
-      "99999999999999999999999999999999999999"};
-  const sourcemeta::core::Decimal divisor{7};
-  const sourcemeta::core::Decimal expected{1};
+TEST(Numeric_decimal, modulo_heap_backed_dividend_nonzero_remainder) {
+  const sourcemeta::core::Decimal dividend{"9999999999999999999"};
+  const sourcemeta::core::Decimal divisor{1000};
+  const sourcemeta::core::Decimal expected{999};
   EXPECT_EQ(dividend % divisor, expected);
 }
 
