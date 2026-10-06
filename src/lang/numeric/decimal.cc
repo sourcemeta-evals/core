@@ -1650,19 +1650,6 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
     return *this;
   }
 
-  if (other.is_zero()) {
-    this->flags_ =
-        static_cast<std::uint8_t>(this->flags_ & ~FLAG_INTEGER_LITERAL);
-    return *this;
-  }
-
-  if (this->is_zero()) {
-    *this = other;
-    this->flags_ =
-        static_cast<std::uint8_t>(this->flags_ & ~FLAG_INTEGER_LITERAL);
-    return *this;
-  }
-
   bool left_negative = (this->flags_ & FLAG_SIGN) != 0;
   bool right_negative = (other.flags_ & FLAG_SIGN) != 0;
 

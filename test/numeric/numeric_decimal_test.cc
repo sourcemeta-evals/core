@@ -4760,3 +4760,28 @@ TEST(Numeric_decimal, divide_above_midpoint_with_guard_digit_five_rounds_up) {
   const sourcemeta::core::Decimal expected{"0.5000000000000001"};
   EXPECT_EQ(dividend / divisor, expected);
 }
+
+TEST(Numeric_decimal, add_zero_rounds_half_even_to_working_precision) {
+  const sourcemeta::core::Decimal left{"1000000000000000.5"};
+  const sourcemeta::core::Decimal right{0};
+  const sourcemeta::core::Decimal expected{"1000000000000000"};
+  EXPECT_EQ(left + right, expected);
+}
+
+TEST(Numeric_decimal, add_zero_preserves_preferred_quantum_from_other) {
+  const sourcemeta::core::Decimal left{1};
+  const sourcemeta::core::Decimal right{"0.00"};
+  const sourcemeta::core::Decimal expected{"1.00"};
+  const auto result{left + right};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, add_zero_preserves_preferred_quantum_from_this) {
+  const sourcemeta::core::Decimal left{"0.00"};
+  const sourcemeta::core::Decimal right{1};
+  const sourcemeta::core::Decimal expected{"1.00"};
+  const auto result{left + right};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
