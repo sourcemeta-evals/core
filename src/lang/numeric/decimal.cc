@@ -1465,6 +1465,13 @@ auto Decimal::operator==(const Decimal &other) const -> bool {
                                        this->coefficient_high_, this->flags_);
     auto right_big = coefficient_as_big(other.coefficient_,
                                         other.coefficient_high_, other.flags_);
+    auto left_digit_count = static_cast<std::int64_t>(left_big.digit_count());
+    auto right_digit_count = static_cast<std::int64_t>(right_big.digit_count());
+    auto left_adjusted = left_exponent + left_digit_count - 1;
+    auto right_adjusted = right_exponent + right_digit_count - 1;
+    if (left_adjusted != right_adjusted) {
+      return false;
+    }
     BigCoefficient::align_exponents(left_big, right_big, this->exponent_,
                                     other.exponent_);
     return left_big.compare(right_big) == 0;

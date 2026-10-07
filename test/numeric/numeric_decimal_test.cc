@@ -2700,6 +2700,31 @@ TEST(Numeric_decimal,
   EXPECT_TRUE(right == left);
 }
 
+TEST(Numeric_decimal,
+     equal_rejects_distant_bigint_magnitudes_without_alignment) {
+  const sourcemeta::core::Decimal left{"1000000000000000000e2147483647"};
+  const sourcemeta::core::Decimal right{"1e-2147483648"};
+  EXPECT_FALSE(left == right);
+  EXPECT_FALSE(right == left);
+  EXPECT_TRUE(left != right);
+  EXPECT_TRUE(right != left);
+}
+
+TEST(Numeric_decimal,
+     equal_rejects_distant_bigint_magnitudes_at_opposite_boundaries) {
+  const sourcemeta::core::Decimal left{"9999999999999999e2147483647"};
+  const sourcemeta::core::Decimal right{"1e-2147483648"};
+  EXPECT_FALSE(left == right);
+  EXPECT_FALSE(right == left);
+}
+
+TEST(Numeric_decimal, equal_bigint_same_magnitude_with_moderate_gap) {
+  const sourcemeta::core::Decimal left{"1000000000000000000"};
+  const sourcemeta::core::Decimal right{"1e18"};
+  EXPECT_TRUE(left == right);
+  EXPECT_TRUE(right == left);
+}
+
 TEST(Numeric_decimal, parse_positive_exponent_above_int32_max_throws) {
   EXPECT_THROW(
       { const sourcemeta::core::Decimal value{"1e2147483648"}; },
