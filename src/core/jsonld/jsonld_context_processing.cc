@@ -445,18 +445,6 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
                       });
     for (const auto *name_pointer : term_names) {
       const auto &name{*name_pointer};
-      if (state.imported_keys.contains(name)) {
-        static const JSON::String TOKEN_IMPORT{KEYWORD_IMPORT};
-        try {
-          create_term_definition(state, active_context, context, name, defined,
-                                 location, location.concat(name));
-        } catch (const JSONLDError &error) {
-          // Imported entries are not in the input document, so their
-          // definition errors report at the @import entry that pulled them in
-          throw JSONLDError(error.what(), location.concat(TOKEN_IMPORT));
-        }
-        continue;
-      }
       create_term_definition(state, active_context, context, name, defined,
                              location, location.concat(name));
     }

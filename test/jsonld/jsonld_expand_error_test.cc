@@ -1681,3 +1681,96 @@ TEST(JSONLD_expand_error, protected_context_nullification_mid_array) {
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid context nullification", "/@context/1");
 }
+
+TEST(JSONLD_expand_error, invalid_value_object_in_array) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:foo": [ { "@value": "a" }, { "@value": "b", "@id": "urn:x" } ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid value object", "/urn:foo/1");
+}
+
+TEST(JSONLD_expand_error, invalid_member_in_array_object) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:foo": [ {}, { "@id": false } ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @id value", "/urn:foo/1/@id");
+}
+
+TEST(JSONLD_expand_error, invalid_context_protected_value) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@protected": "yes", "p": "urn:p" },
+    "p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @protected value",
+                             "/@context/@protected");
+}
+
+TEST(JSONLD_expand_error, invalid_context_protected_value_in_array) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [ {}, { "@protected": 1, "p": "urn:p" } ],
+    "p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @protected value",
+                             "/@context/1/@protected");
+}
+
+TEST(JSONLD_expand_error, null_context_protected_value) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@protected": null, "p": "urn:p" },
+    "p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @protected value",
+                             "/@context/@protected");
+}
+
+TEST(JSONLD_expand_error, deferred_local_scoped_error_keeps_term_pointer) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@protected": true,
+      "a": "http://example.com/a",
+      "Type": {
+        "@id": "http://example.com/Type",
+        "@context": { "a": "http://example.com/other" }
+      }
+    },
+    "@type": "Type",
+    "a": "foo"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Protected term redefinition",
+                             "/@context/Type/@context/a");
+}
+
+TEST(JSONLD_expand_error, imported_dependency_error_points_to_import) {
+  const sourcemeta::core::JSONLDResolver resolver =
+      [](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    if (identifier == "https://example.com/import-dependency") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "z": { "@id": 12 } } })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@import": "https://example.com/import-dependency",
+      "a": "z"
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver),
+      "Invalid IRI mapping", "/@context/@import");
+}

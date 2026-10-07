@@ -1835,14 +1835,23 @@ TEST(JSONLD_expand, type_scoped_precedence_follows_input_keys) {
     "p": "x"
   })");
 
-  const auto expected = sourcemeta::core::parse_json(R"([
+  auto expected = sourcemeta::core::parse_json(R"([
     {
       "@type": [ "urn:Z", "urn:A" ],
       "urn:fromA": [ { "@value": "x" } ]
     }
   ])");
 
-  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+  auto result = sourcemeta::core::jsonld_expand(input);
+
+  // The @type values form an unordered set, so the comparison must not depend
+  // on emission order
+  std::sort(result.at(0).at("@type").as_array().begin(),
+            result.at(0).at("@type").as_array().end());
+  std::sort(expected.at(0).at("@type").as_array().begin(),
+            expected.at(0).at("@type").as_array().end());
+
+  EXPECT_EQ(result, expected);
 }
 
 TEST(JSONLD_expand, type_scoped_precedence_sorts_values_within_entry) {
@@ -1855,12 +1864,97 @@ TEST(JSONLD_expand, type_scoped_precedence_sorts_values_within_entry) {
     "p": "x"
   })");
 
-  const auto expected = sourcemeta::core::parse_json(R"([
+  auto expected = sourcemeta::core::parse_json(R"([
     {
       "@type": [ "urn:Z", "urn:A" ],
       "urn:fromZ": [ { "@value": "x" } ]
     }
   ])");
 
+  auto result = sourcemeta::core::jsonld_expand(input);
+
+  // The @type values form an unordered set, so the comparison must not depend
+  // on emission order
+  std::sort(result.at(0).at("@type").as_array().begin(),
+            result.at(0).at("@type").as_array().end());
+  std::sort(expected.at(0).at("@type").as_array().begin(),
+            expected.at(0).at("@type").as_array().end());
+
+  EXPECT_EQ(result, expected);
+}
+
+TEST(JSONLD_expand, term_direction_accepted_in_1_0) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@direction": "rtl" } },
+    "p": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "x", "@direction": "rtl" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(
+                input, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(JSONLD_expand, explicit_unprotected_type_definition_is_redefinable) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      { "@protected": true, "@type": { "@protected": false } },
+      { "@type": { "@container": "@set" } }
+    ],
+    "@type": "urn:T"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "@type": [ "urn:T" ] }
+  ])");
+
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, null_set_drops_property) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@set": null },
+    "urn:q": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:q": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, empty_set_keeps_empty_property) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@set": [] },
+    "urn:q": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [],
+      "urn:q": [ { "@value": "x" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, error_message_survives_buffer_destruction_and_copy) {
+  std::optional<sourcemeta::core::JSONLDError> copy;
+
+  {
+    std::string code{
+        "A custom error code longer than small string optimization"};
+    const sourcemeta::core::JSONLDError error{
+        code.c_str(), sourcemeta::core::Pointer{"where"}};
+    copy.emplace(error);
+  }
+
+  EXPECT_STREQ(copy->what(),
+               "A custom error code longer than small string optimization");
+  EXPECT_EQ(sourcemeta::core::to_string(copy->pointer()), "/where");
 }

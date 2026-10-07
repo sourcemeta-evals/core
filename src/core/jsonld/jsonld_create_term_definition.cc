@@ -58,13 +58,14 @@ auto finalize_definition(ExpansionState &state, ActiveContext &active_context,
 
 } // namespace
 
+namespace {
+
 // Create Term Definition (JSON-LD 1.1 API Section 5.1.1)
-auto create_term_definition(ExpansionState &state,
-                            ActiveContext &active_context,
-                            const JSON &local_context, const JSON::String &term,
-                            DefinedTerms &defined,
-                            const WeakPointer &context_pointer,
-                            const WeakPointer &reference_pointer) -> void {
+auto create_term_definition_internal(
+    ExpansionState &state, ActiveContext &active_context,
+    const JSON &local_context, const JSON::String &term, DefinedTerms &defined,
+    const WeakPointer &context_pointer, const WeakPointer &reference_pointer)
+    -> void {
   const auto status{defined.find(term)};
   if (status != defined.cend()) {
     if (status->second) {
@@ -128,7 +129,9 @@ auto create_term_definition(ExpansionState &state,
         // Either or both of a set container and a protected flag are valid
         // (JSON-LD 1.1 API Section 5.1.1 step 4)
         throw JSONLDError("Keyword redefinition", term_pointer);
-      } else if (!type_definition.is_protected) {
+      } else if (!has_protected) {
+        // An explicit @protected flag, including false, wins over the
+        // context-wide default
         type_definition.is_protected = state.context_protected;
       }
       active_context.terms[JSON::String{KEYWORD_TYPE}] =
@@ -668,6 +671,33 @@ auto create_term_definition(ExpansionState &state,
 
   finalize_definition(state, active_context, defined, term, term_pointer,
                       previous, std::move(definition));
+}
+
+} // namespace
+
+// An imported term is not present in the input document, so every error its
+// definition raises, including through recursive dependency creation, reports
+// at the @import entry that merged it in
+auto create_term_definition(ExpansionState &state,
+                            ActiveContext &active_context,
+                            const JSON &local_context, const JSON::String &term,
+                            DefinedTerms &defined,
+                            const WeakPointer &context_pointer,
+                            const WeakPointer &reference_pointer) -> void {
+  if (state.imported_keys.contains(term)) {
+    static const JSON::String TOKEN_IMPORT_ENTRY{KEYWORD_IMPORT};
+    try {
+      create_term_definition_internal(state, active_context, local_context,
+                                      term, defined, context_pointer,
+                                      reference_pointer);
+    } catch (const JSONLDError &error) {
+      throw JSONLDError(error.what(),
+                        context_pointer.concat(TOKEN_IMPORT_ENTRY));
+    }
+    return;
+  }
+  create_term_definition_internal(state, active_context, local_context, term,
+                                  defined, context_pointer, reference_pointer);
 }
 
 } // namespace sourcemeta::core

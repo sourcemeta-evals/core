@@ -81,28 +81,49 @@ struct ValueMemberPointers {
   std::optional<WeakPointer> type;
 };
 
-// Apply a property-scoped context to the given context copy, carrying the
-// definition's remote origin and reporting deferred errors at the defining
-// input location
-auto apply_scoped_context(ExpansionState &state, ActiveContext &context,
-                          const TermDefinition &definition,
-                          const WeakPointer &pointer) -> void {
-  const auto saved_override{state.protected_override};
+// Process a deferred scoped context, carrying the definition's remote origin.
+// A locally defined scoped context lives in the input, so it is processed
+// against its definition location and errors keep their specific pointers,
+// while remote, imported, and external origins report at the stored defining
+// reference
+auto process_deferred_scoped_context(ExpansionState &state,
+                                     ActiveContext &context,
+                                     const TermDefinition &definition,
+                                     const bool propagate) -> void {
   const auto saved_base{state.context_base_override};
   const auto saved_remote{state.remote_base_override};
-  state.protected_override = true;
   state.context_base_override = definition.context_base;
   state.remote_base_override = definition.context_remote;
+  const bool local{!definition.context_remote &&
+                   !definition.context_location.empty()};
+  const auto location{to_weak_pointer(definition.context_location)};
   try {
-    process_context(state, context, definition.context.value(), pointer);
+    process_context(state, context, definition.context.value(), location,
+                    propagate);
   } catch (const JSONLDError &error) {
     state.remote_base_override = saved_remote;
     state.context_base_override = saved_base;
-    state.protected_override = saved_override;
+    if (local) {
+      throw;
+    }
     throw JSONLDError(error.what(), definition.context_location);
   }
   state.remote_base_override = saved_remote;
   state.context_base_override = saved_base;
+}
+
+// Apply a property-scoped context to the given context copy, overriding
+// protected terms as the specification requires
+auto apply_scoped_context(ExpansionState &state, ActiveContext &context,
+                          const TermDefinition &definition) -> void {
+  const auto saved_override{state.protected_override};
+  state.protected_override = true;
+  try {
+    process_deferred_scoped_context(state, context, definition, true);
+  } catch (...) {
+    state.protected_override = saved_override;
+    throw;
+  }
   state.protected_override = saved_override;
 }
 
@@ -183,21 +204,8 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
     const auto definition{type_context.terms.find(type)};
     if (definition != type_context.terms.cend() &&
         definition->second.context.has_value()) {
-      const auto &scoped{definition->second.context.value()};
-      const auto saved_base{state.context_base_override};
-      const auto saved_remote{state.remote_base_override};
-      state.context_base_override = definition->second.context_base;
-      state.remote_base_override = definition->second.context_remote;
-      try {
-        process_context(state, active_context, scoped, pointer, false);
-      } catch (const JSONLDError &error) {
-        state.remote_base_override = saved_remote;
-        state.context_base_override = saved_base;
-        // Deferred scoped-context errors report at the defining input location
-        throw JSONLDError(error.what(), definition->second.context_location);
-      }
-      state.remote_base_override = saved_remote;
-      state.context_base_override = saved_base;
+      process_deferred_scoped_context(state, active_context, definition->second,
+                                      false);
     }
   }
 
@@ -536,6 +544,13 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         continue;
       }
 
+      // A null @set value keeps its null expansion, so the bare-set collapse
+      // turns the whole element into null and the property disappears
+      if (name == KEYWORD_SET && entry.second.is_null()) {
+        result.assign(name, JSON{nullptr});
+        continue;
+      }
+
       auto elements{JSON::make_array()};
       const auto values{into_array(JSON{entry.second})};
       std::size_t value_index{0};
@@ -785,7 +800,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       if (definition->context.has_value()) {
         ActiveContext scoped{active_context};
         scoped.previous = nullptr;
-        apply_scoped_context(state, scoped, *definition, entry_pointer);
+        apply_scoped_context(state, scoped, *definition);
         direction_default = scoped.default_direction;
       }
       expanded_value = JSON::make_array();
@@ -911,24 +926,8 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
           const auto type_definition{base_context.terms.find(index)};
           if (type_definition != base_context.terms.cend() &&
               type_definition->second.context.has_value()) {
-            const auto saved_base{state.context_base_override};
-            const auto saved_remote{state.remote_base_override};
-            state.context_base_override = type_definition->second.context_base;
-            state.remote_base_override = type_definition->second.context_remote;
-            try {
-              process_context(state, entry_context,
-                              type_definition->second.context.value(),
-                              entry_pointer.concat(index));
-            } catch (const JSONLDError &error) {
-              state.remote_base_override = saved_remote;
-              state.context_base_override = saved_base;
-              // Deferred scoped-context errors report at the defining input
-              // location
-              throw JSONLDError(error.what(),
-                                type_definition->second.context_location);
-            }
-            state.remote_base_override = saved_remote;
-            state.context_base_override = saved_base;
+            process_deferred_scoped_context(state, entry_context,
+                                            type_definition->second, true);
             entry_context.previous = nullptr;
           }
         }
@@ -1074,8 +1073,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       // Process the scoped context into a copy so the term that owns it is not
       // freed while it is being read.
       ActiveContext nested{active_context};
-      apply_scoped_context(state, nested, definition->second,
-                           nest_property_pointer);
+      apply_scoped_context(state, nested, definition->second);
       nested.previous = nullptr;
       expand_entries(state, nested, type_context, result, value_members,
                      active_property, *nest, nest_pointer);
@@ -1116,7 +1114,7 @@ auto expand(ExpansionState &state, ActiveContext &active_context,
     if (scoped_definition != nullptr) {
       ActiveContext scoped{active_context};
       scoped.previous = nullptr;
-      apply_scoped_context(state, scoped, *scoped_definition, pointer);
+      apply_scoped_context(state, scoped, *scoped_definition);
       return expand_value(state, scoped, active_property, element);
     }
     return expand_value(state, active_context, active_property, element);
@@ -1198,7 +1196,7 @@ auto expand(ExpansionState &state, ActiveContext &active_context,
     // an enclosing type-scoped revert. It may, however, set its own revert
     // when it specifies @propagate: false.
     scoped.previous = nullptr;
-    apply_scoped_context(state, scoped, *scoped_definition, pointer);
+    apply_scoped_context(state, scoped, *scoped_definition);
     current = &scoped;
   }
 
