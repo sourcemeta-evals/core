@@ -124,12 +124,35 @@ static auto decimal_abs(const sourcemeta::core::Decimal &value)
   return value.is_signed() ? -value : value;
 }
 
+static auto zero_at_operand_quantum(const sourcemeta::core::Decimal &value)
+    -> sourcemeta::core::Decimal {
+  if (!value.is_finite()) {
+    return sourcemeta::core::Decimal{0};
+  }
+  const auto scientific = value.to_scientific_string();
+  const auto e_pos = scientific.find('e');
+  if (e_pos == std::string::npos) {
+    return sourcemeta::core::Decimal{0};
+  }
+  std::size_t digit_count = 0;
+  for (std::size_t index = 0; index < e_pos; index++) {
+    const auto character = scientific[index];
+    if (character >= '0' && character <= '9') {
+      digit_count++;
+    }
+  }
+  const auto adjusted_exp = std::stoll(scientific.substr(e_pos + 1));
+  const auto stored_exp =
+      adjusted_exp - static_cast<std::int64_t>(digit_count) + 1;
+  return sourcemeta::core::Decimal{"0e" + std::to_string(stored_exp)};
+}
+
 static auto decimal_minus(const sourcemeta::core::Decimal &value)
     -> sourcemeta::core::Decimal {
   if (value.is_nan() || value.is_snan()) {
     return value;
   }
-  return sourcemeta::core::Decimal{0} - value;
+  return zero_at_operand_quantum(value) - value;
 }
 
 static auto decimal_plus(const sourcemeta::core::Decimal &value)
@@ -137,7 +160,7 @@ static auto decimal_plus(const sourcemeta::core::Decimal &value)
   if (value.is_nan() || value.is_snan()) {
     return value;
   }
-  return sourcemeta::core::Decimal{0} + value;
+  return zero_at_operand_quantum(value) + value;
 }
 
 static auto decimal_copyabs(const sourcemeta::core::Decimal &value)
@@ -312,8 +335,8 @@ static auto expect_comparison_result(const sourcemeta::core::Decimal &left,
 }
 
 static auto expect_decimal_eq(const sourcemeta::core::Decimal &result,
-                              const sourcemeta::core::Decimal &expected)
-    -> void {
+                              const sourcemeta::core::Decimal &expected,
+                              bool check_quantum = true) -> void {
   if (expected.is_nan()) {
     EXPECT_TRUE(result.is_nan());
     if (expected.is_snan()) {
@@ -332,6 +355,9 @@ static auto expect_decimal_eq(const sourcemeta::core::Decimal &result,
     EXPECT_EQ(result, expected);
     if (expected.is_zero()) {
       EXPECT_EQ(result.is_signed(), expected.is_signed());
+    }
+    if (check_quantum) {
+      EXPECT_TRUE(result.same_quantum(expected));
     }
   }
 }
@@ -547,7 +573,7 @@ private:
     }
 
     expect_decimal_eq(sourcemeta::core::Decimal{input},
-                      make_decimal(this->test_case_.expected));
+                      make_decimal(this->test_case_.expected), false);
   }
 
   auto run_copysign() -> void {

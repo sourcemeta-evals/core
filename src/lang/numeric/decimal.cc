@@ -833,6 +833,10 @@ auto Decimal::is_uint64() const -> bool {
 }
 
 auto Decimal::to_integral() const -> Decimal {
+  if (this->is_snan()) {
+    throw NumericInvalidOperationError{};
+  }
+
   if (!this->is_finite()) {
     return *this;
   }
@@ -1384,6 +1388,15 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
     return result;
   }
 
+  if (this->is_zero()) {
+    Decimal result;
+    if (result_negative) {
+      result.flags_ = FLAG_SIGN;
+    }
+
+    return result;
+  }
+
   if (this->exponent_ >= 0) {
     const Decimal one{1};
     Decimal other_abs = other;
@@ -1398,15 +1411,6 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
       }
       return result;
     }
-  }
-
-  if (this->is_zero()) {
-    Decimal result;
-    if (result_negative) {
-      result.flags_ = FLAG_SIGN;
-    }
-
-    return result;
   }
 
   auto dividend_big = coefficient_as_big(this->coefficient_,
@@ -1966,14 +1970,7 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
     rounding_excess = quotient_digits - WORKING_PRECISION;
   }
 
-  const auto narrowed_exponent_64 = final_exponent_64 + rounding_excess;
-  if (narrowed_exponent_64 > std::numeric_limits<std::int32_t>::max() ||
-      narrowed_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
-    throw NumericOverflowError{};
-  }
-
-  if (rounding_excess > 0 &&
-      final_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
+  if (rounding_excess > 0) {
     auto power = BigCoefficient::from_uint64(1);
     for (std::int64_t index = 0; index < rounding_excess; ++index) {
       power = power.multiply(ten);
@@ -1992,12 +1989,25 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
     }
 
     if (round_up) {
-      quotient = reduced.add(BigCoefficient::from_uint64(1));
+      const auto reduced_digits = reduced.digit_count();
+      auto bumped = reduced.add(BigCoefficient::from_uint64(1));
+      const auto bumped_digits = bumped.digit_count();
+      if (bumped_digits > reduced_digits) {
+        quotient = bumped.divide_modulo(ten).first;
+        rounding_excess++;
+      } else {
+        quotient = std::move(bumped);
+      }
     } else {
       quotient = std::move(reduced);
     }
 
     final_exponent_64 += rounding_excess;
+  }
+
+  if (final_exponent_64 > std::numeric_limits<std::int32_t>::max() ||
+      final_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
+    throw NumericOverflowError{};
   }
 
   free_big_coefficient(this->coefficient_, this->flags_);
@@ -2033,6 +2043,10 @@ auto Decimal::operator%=(const Decimal &other) -> Decimal & {
   const bool dividend_negative = (this->flags_ & FLAG_SIGN) != 0;
 
   if (this->is_zero()) {
+    if (this->exponent_ > other.exponent_) {
+      this->exponent_ = other.exponent_;
+    }
+
     if (dividend_negative) {
       this->flags_ |= FLAG_SIGN;
     } else {

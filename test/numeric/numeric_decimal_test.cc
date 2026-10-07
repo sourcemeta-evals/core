@@ -605,6 +605,29 @@ TEST(Numeric_decimal, to_integral_half_even_big) {
             sourcemeta::core::Decimal{"10000000000000000002"});
 }
 
+TEST(Numeric_decimal, to_integral_signaling_nan_throws_invalid_operation) {
+  const sourcemeta::core::Decimal value{"sNaN"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.to_integral(); },
+      sourcemeta::core::NumericInvalidOperationError);
+}
+
+TEST(Numeric_decimal,
+     to_integral_signaling_nan_with_payload_throws_invalid_operation) {
+  const sourcemeta::core::Decimal value{"sNaN80"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.to_integral(); },
+      sourcemeta::core::NumericInvalidOperationError);
+}
+
+TEST(Numeric_decimal, to_integral_quiet_nan_preserves_payload) {
+  const sourcemeta::core::Decimal value{"NaN80"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_nan());
+  EXPECT_FALSE(result.is_snan());
+  EXPECT_EQ(result.nan_payload(), 80U);
+}
+
 TEST(Numeric_decimal, factory_nan) {
   const auto nan_value{sourcemeta::core::Decimal::nan()};
   EXPECT_TRUE(nan_value.is_nan());
@@ -3989,22 +4012,22 @@ TEST(Numeric_decimal, divide_integer_by_larger) {
 }
 
 TEST(Numeric_decimal,
-     divide_integer_scaled_negative_zero_by_one_preserves_quantum_and_sign) {
+     divide_integer_scaled_negative_zero_by_one_preserves_sign) {
   const sourcemeta::core::Decimal dividend{"-0e20"};
   const sourcemeta::core::Decimal divisor{1};
   const auto result{dividend.divide_integer(divisor)};
   EXPECT_TRUE(result.is_zero());
   EXPECT_TRUE(result.is_signed());
-  EXPECT_TRUE(result.same_quantum(dividend));
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{0}));
 }
 
-TEST(Numeric_decimal, divide_integer_scaled_zero_by_one_preserves_quantum) {
+TEST(Numeric_decimal, divide_integer_scaled_zero_by_one_produces_zero_quantum) {
   const sourcemeta::core::Decimal dividend{"0e20"};
   const sourcemeta::core::Decimal divisor{1};
   const auto result{dividend.divide_integer(divisor)};
   EXPECT_TRUE(result.is_zero());
   EXPECT_FALSE(result.is_signed());
-  EXPECT_TRUE(result.same_quantum(dividend));
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{0}));
 }
 
 TEST(Numeric_decimal,
@@ -4014,7 +4037,7 @@ TEST(Numeric_decimal,
   const auto result{dividend.divide_integer(divisor)};
   EXPECT_TRUE(result.is_zero());
   EXPECT_FALSE(result.is_signed());
-  EXPECT_TRUE(result.same_quantum(dividend));
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{0}));
 }
 
 TEST(Numeric_decimal,
@@ -5243,6 +5266,32 @@ TEST(Numeric_decimal, divide_rounding_at_minimum_exponent) {
   const sourcemeta::core::Decimal divisor{2};
   const sourcemeta::core::Decimal expected{"6172839450617284e-2147483648"};
   EXPECT_EQ(dividend / divisor, expected);
+}
+
+TEST(Numeric_decimal, divide_round_carry_at_minimum_exponent) {
+  const sourcemeta::core::Decimal dividend{"99999999999999995e-2147483648"};
+  const sourcemeta::core::Decimal divisor{100};
+  const sourcemeta::core::Decimal expected{"1000000000000000e-2147483648"};
+  const auto result{dividend / divisor};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, divide_round_carry_at_minimum_exponent_negative) {
+  const sourcemeta::core::Decimal dividend{"-99999999999999995e-2147483648"};
+  const sourcemeta::core::Decimal divisor{100};
+  const sourcemeta::core::Decimal expected{"-1000000000000000e-2147483648"};
+  const auto result{dividend / divisor};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, compound_divide_round_carry_at_minimum_exponent) {
+  sourcemeta::core::Decimal dividend{"99999999999999995e-2147483648"};
+  const sourcemeta::core::Decimal divisor{100};
+  dividend /= divisor;
+  EXPECT_EQ(dividend,
+            sourcemeta::core::Decimal{"1000000000000000e-2147483648"});
 }
 
 TEST(Numeric_decimal,
