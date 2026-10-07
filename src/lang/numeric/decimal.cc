@@ -3,6 +3,7 @@
 
 #include "big_coefficient.h"
 
+#include <algorithm> // std::clamp, std::max, std::min
 #include <array>     // std::array
 #include <cassert>   // assert
 #include <charconv>  // std::to_chars
@@ -973,19 +974,21 @@ auto Decimal::divisible_by(const Decimal &divisor) const -> bool {
     }
 
     if (this->exponent_ >= divisor.exponent_) {
-      auto difference =
-          static_cast<std::uint32_t>(this->exponent_ - divisor.exponent_);
+      const auto difference_64 = static_cast<std::int64_t>(this->exponent_) -
+                                 static_cast<std::int64_t>(divisor.exponent_);
+      auto difference = static_cast<std::uint32_t>(difference_64);
       auto pow_mod = modular_pow10(difference, divisor_value);
       return static_cast<std::uint64_t>(
                  static_cast<sourcemeta::core::uint128_t>(dividend_mod) *
                  pow_mod % divisor_value) == 0;
     }
 
-    auto difference =
-        static_cast<std::uint32_t>(divisor.exponent_ - this->exponent_);
-    if (difference > 36) {
+    const auto difference_64 = static_cast<std::int64_t>(divisor.exponent_) -
+                               static_cast<std::int64_t>(this->exponent_);
+    if (difference_64 > 36) {
       return false;
     }
+    auto difference = static_cast<std::uint32_t>(difference_64);
 
     sourcemeta::core::uint128_t remaining;
     if (this->flags_ & FLAG_BIG) {
@@ -1155,10 +1158,6 @@ auto Decimal::scale_by(const Decimal &scale) const -> Decimal {
     throw NumericInvalidOperationError{};
   }
 
-  if (this->is_infinite()) {
-    return *this;
-  }
-
   if (!scale.is_int64()) {
     throw NumericOverflowError{};
   }
@@ -1167,6 +1166,10 @@ auto Decimal::scale_by(const Decimal &scale) const -> Decimal {
   if (scale_value > std::numeric_limits<std::int32_t>::max() ||
       scale_value < std::numeric_limits<std::int32_t>::min()) {
     throw NumericOverflowError{};
+  }
+
+  if (this->is_infinite()) {
+    return *this;
   }
 
   auto new_exponent = static_cast<std::int64_t>(this->exponent_) + scale_value;
@@ -1691,9 +1694,10 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
 
   if (!needs_big) {
     if (this->exponent_ < other.exponent_) {
-      auto difference =
-          static_cast<std::uint32_t>(other.exponent_ - this->exponent_);
-      if (difference <= 18) {
+      const auto difference_64 = static_cast<std::int64_t>(other.exponent_) -
+                                 static_cast<std::int64_t>(this->exponent_);
+      if (difference_64 <= 18) {
+        const auto difference = static_cast<std::uint32_t>(difference_64);
         auto scaled =
             static_cast<sourcemeta::core::uint128_t>(right_coefficient) *
             POWERS_OF_10[difference];
@@ -1708,9 +1712,10 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
       }
 
     } else if (other.exponent_ < this->exponent_) {
-      auto difference =
-          static_cast<std::uint32_t>(this->exponent_ - other.exponent_);
-      if (difference <= 18) {
+      const auto difference_64 = static_cast<std::int64_t>(this->exponent_) -
+                                 static_cast<std::int64_t>(other.exponent_);
+      if (difference_64 <= 18) {
+        const auto difference = static_cast<std::uint32_t>(difference_64);
         auto scaled =
             static_cast<sourcemeta::core::uint128_t>(left_coefficient) *
             POWERS_OF_10[difference];
@@ -1744,25 +1749,76 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
             : static_cast<std::int64_t>(other.exponent_) - this->exponent_;
     constexpr std::int64_t MAX_STORED_GAP = WORKING_PRECISION + 2;
 
-    if (stored_gap_64 > MAX_STORED_GAP && left_digits <= WORKING_PRECISION &&
-        right_digits <= WORKING_PRECISION && !left_big.is_zero() &&
-        !right_big.is_zero()) {
-      const bool left_is_larger = this->exponent_ > other.exponent_;
-      const std::int32_t larger_exp =
-          left_is_larger ? this->exponent_ : other.exponent_;
-      const auto sticky_exp_64 =
-          static_cast<std::int64_t>(larger_exp) - (WORKING_PRECISION + 1);
-      if (sticky_exp_64 >= std::numeric_limits<std::int32_t>::min() &&
-          sticky_exp_64 <= std::numeric_limits<std::int32_t>::max()) {
-        const auto sticky_exp = static_cast<std::int32_t>(sticky_exp_64);
-        if (left_is_larger) {
-          right_big = BigCoefficient::from_uint64(1);
-          right_align_exp = sticky_exp;
-        } else {
-          left_big = BigCoefficient::from_uint64(1);
-          left_align_exp = sticky_exp;
+    if (stored_gap_64 > MAX_STORED_GAP &&
+        left_big.is_zero() != right_big.is_zero()) {
+      const bool left_is_zero_operand = left_big.is_zero();
+      const auto non_zero_exp =
+          left_is_zero_operand ? other.exponent_ : this->exponent_;
+      const auto non_zero_digits_64 =
+          left_is_zero_operand ? right_digits : left_digits;
+      const bool non_zero_negative =
+          left_is_zero_operand ? right_negative : left_negative;
+      auto non_zero_big =
+          left_is_zero_operand ? std::move(right_big) : std::move(left_big);
+
+      const auto non_zero_adj_64 =
+          static_cast<std::int64_t>(non_zero_exp) + non_zero_digits_64 - 1;
+      const auto min_exp_64 =
+          std::min(static_cast<std::int64_t>(this->exponent_),
+                   static_cast<std::int64_t>(other.exponent_));
+      const auto quantum_floor_64 =
+          non_zero_adj_64 - static_cast<std::int64_t>(WORKING_PRECISION) + 1;
+      const auto preferred_quantum_64 = std::max(min_exp_64, quantum_floor_64);
+      const auto preferred_quantum = static_cast<std::int32_t>(std::clamp(
+          preferred_quantum_64,
+          static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::min()),
+          static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())));
+
+      const auto pad_64 =
+          static_cast<std::int64_t>(non_zero_exp) - preferred_quantum;
+      if (pad_64 > 0) {
+        non_zero_big =
+            non_zero_big.multiply_pow10(static_cast<std::uint32_t>(pad_64));
+      }
+
+      free_big_coefficient(this->coefficient_, this->flags_);
+      store_big_result(this->coefficient_, this->coefficient_high_,
+                       this->flags_, std::move(non_zero_big),
+                       non_zero_negative);
+      this->exponent_ = preferred_quantum;
+      round_to_precision(this->coefficient_, this->coefficient_high_,
+                         this->exponent_, this->flags_);
+      return *this;
+    }
+
+    if (!left_big.is_zero() && !right_big.is_zero() &&
+        left_digits <= WORKING_PRECISION && right_digits <= WORKING_PRECISION) {
+      const auto left_adj_64 =
+          static_cast<std::int64_t>(this->exponent_) + left_digits - 1;
+      const auto right_adj_64 =
+          static_cast<std::int64_t>(other.exponent_) + right_digits - 1;
+      const auto adjusted_gap_64 = left_adj_64 > right_adj_64
+                                       ? left_adj_64 - right_adj_64
+                                       : right_adj_64 - left_adj_64;
+      if (adjusted_gap_64 > MAX_STORED_GAP) {
+        const bool left_is_larger_adj = left_adj_64 > right_adj_64;
+        const std::int32_t larger_exp =
+            left_is_larger_adj ? this->exponent_ : other.exponent_;
+        const auto sticky_exp_64 =
+            static_cast<std::int64_t>(larger_exp) -
+            (static_cast<std::int64_t>(WORKING_PRECISION) + 1);
+        if (sticky_exp_64 >= std::numeric_limits<std::int32_t>::min() &&
+            sticky_exp_64 <= std::numeric_limits<std::int32_t>::max()) {
+          const auto sticky_exp = static_cast<std::int32_t>(sticky_exp_64);
+          if (left_is_larger_adj) {
+            right_big = BigCoefficient::from_uint64(1);
+            right_align_exp = sticky_exp;
+          } else {
+            left_big = BigCoefficient::from_uint64(1);
+            left_align_exp = sticky_exp;
+          }
+          result_exponent = sticky_exp;
         }
-        result_exponent = sticky_exp;
       }
     }
 
@@ -2162,9 +2218,17 @@ auto Decimal::operator-() const -> Decimal {
 }
 
 auto Decimal::operator+() const -> Decimal {
+  if (this->is_snan()) {
+    throw NumericInvalidOperationError{};
+  }
+
   Decimal result{*this};
   result.flags_ =
       static_cast<std::uint8_t>(result.flags_ & ~FLAG_INTEGER_LITERAL);
+  if (result.is_finite()) {
+    round_to_precision(result.coefficient_, result.coefficient_high_,
+                       result.exponent_, result.flags_);
+  }
   return result;
 }
 

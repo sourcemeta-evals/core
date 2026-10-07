@@ -425,34 +425,18 @@ public:
                         : estimate_big.multiply_pow10(shift * BASE_DIGITS);
         auto product = scaled.multiply(divisor);
 
-        while (product.compare(remainder) > 0 && estimate > 1U) {
-          estimate--;
-          estimate_big.words[0] = static_cast<std::uint64_t>(estimate % BASE);
-          estimate_big.words[1] = static_cast<std::uint64_t>(estimate / BASE);
-          estimate_big.length = (estimate_big.words[1] > 0U) ? 2U : 1U;
-          scaled = shift == 0U
-                       ? estimate_big.clone()
-                       : estimate_big.multiply_pow10(shift * BASE_DIGITS);
-          product = scaled.multiply(divisor);
+        remainder = remainder.subtract(product);
+        auto result_width = shift + estimate_big.length;
+        BigCoefficient estimated_quotient{result_width};
+        std::fill(estimated_quotient.words,
+                  estimated_quotient.words + result_width, 0ULL);
+        for (std::uint32_t limb_index = 0; limb_index < estimate_big.length;
+             limb_index++) {
+          estimated_quotient.words[shift + limb_index] =
+              estimate_big.words[limb_index];
         }
-
-        if (product.compare(remainder) > 0) {
-          remainder = remainder.subtract(divisor);
-          quotient.words[0]++;
-        } else {
-          remainder = remainder.subtract(product);
-          auto result_width = shift + estimate_big.length;
-          BigCoefficient estimated_quotient{result_width};
-          std::fill(estimated_quotient.words,
-                    estimated_quotient.words + result_width, 0ULL);
-          for (std::uint32_t limb_index = 0; limb_index < estimate_big.length;
-               limb_index++) {
-            estimated_quotient.words[shift + limb_index] =
-                estimate_big.words[limb_index];
-          }
-          estimated_quotient.length = result_width;
-          quotient = quotient.add(estimated_quotient);
-        }
+        estimated_quotient.length = result_width;
+        quotient = quotient.add(estimated_quotient);
 
       } else {
         auto divisor_top = divisor.words[divisor.length - 1];
@@ -467,13 +451,8 @@ public:
         estimate_big.length = 1;
 
         auto product = estimate_big.multiply(divisor);
-        if (product.compare(remainder) > 0) {
-          remainder = remainder.subtract(divisor);
-          quotient.words[0]++;
-        } else {
-          remainder = remainder.subtract(product);
-          quotient = quotient.add(estimate_big);
-        }
+        remainder = remainder.subtract(product);
+        quotient = quotient.add(estimate_big);
       }
     }
 
@@ -586,11 +565,13 @@ auto BigCoefficient::align_exponents(BigCoefficient &left,
                                      std::int32_t left_exponent,
                                      std::int32_t right_exponent) -> void {
   if (left_exponent > right_exponent) {
-    left = left.multiply_pow10(
-        static_cast<std::uint32_t>(left_exponent - right_exponent));
+    const auto difference = static_cast<std::int64_t>(left_exponent) -
+                            static_cast<std::int64_t>(right_exponent);
+    left = left.multiply_pow10(static_cast<std::uint32_t>(difference));
   } else if (right_exponent > left_exponent) {
-    right = right.multiply_pow10(
-        static_cast<std::uint32_t>(right_exponent - left_exponent));
+    const auto difference = static_cast<std::int64_t>(right_exponent) -
+                            static_cast<std::int64_t>(left_exponent);
+    right = right.multiply_pow10(static_cast<std::uint32_t>(difference));
   }
 }
 

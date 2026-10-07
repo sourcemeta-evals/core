@@ -5607,6 +5607,117 @@ TEST(Numeric_decimal,
   EXPECT_EQ(result, sourcemeta::core::Decimal{std::string(36, '9')});
 }
 
+TEST(Numeric_decimal, add_zero_rhs_huge_stored_gap_bounded_memory) {
+  sourcemeta::core::Decimal value{1};
+  value += sourcemeta::core::Decimal{"0e-1000000000"};
+  EXPECT_TRUE(value.is_finite());
+  EXPECT_EQ(value, sourcemeta::core::Decimal{1});
+}
+
+TEST(Numeric_decimal, add_zero_lhs_huge_stored_gap_bounded_memory) {
+  sourcemeta::core::Decimal value{"0e-1000000000"};
+  value += sourcemeta::core::Decimal{1};
+  EXPECT_TRUE(value.is_finite());
+  EXPECT_EQ(value, sourcemeta::core::Decimal{1});
+}
+
+TEST(Numeric_decimal, add_zero_at_opposite_boundary_exponents_bounded_memory) {
+  sourcemeta::core::Decimal value{"0e-2147483648"};
+  value += sourcemeta::core::Decimal{"1e2147483647"};
+  EXPECT_TRUE(value.is_finite());
+  EXPECT_EQ(value, sourcemeta::core::Decimal{"1e2147483647"});
+}
+
+TEST(Numeric_decimal,
+     add_nonzero_compact_opposite_boundary_exponents_bounded_memory) {
+  sourcemeta::core::Decimal value{"1e2147483647"};
+  value += sourcemeta::core::Decimal{"1e-2147483648"};
+  EXPECT_TRUE(value.is_finite());
+  EXPECT_EQ(value, sourcemeta::core::Decimal{"1e2147483647"});
+}
+
+TEST(Numeric_decimal,
+     add_unequal_coefficient_width_retains_significant_digits) {
+  const auto result{sourcemeta::core::Decimal{"1e19"} +
+                    sourcemeta::core::Decimal{"1000000000000000"}};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1.0001e19"});
+}
+
+TEST(Numeric_decimal,
+     subtract_unequal_coefficient_width_retains_significant_digits) {
+  const auto result{sourcemeta::core::Decimal{"1e19"} -
+                    sourcemeta::core::Decimal{"1000000000000000"}};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"9.999e18"});
+}
+
+TEST(Numeric_decimal,
+     add_unequal_coefficient_width_rounds_half_even_up_into_carry) {
+  const auto result{sourcemeta::core::Decimal{"1e20"} +
+                    sourcemeta::core::Decimal{"9999999999999999"}};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1.0001e20"});
+}
+
+TEST(Numeric_decimal, divisible_by_opposite_boundary_integer_quotient) {
+  const sourcemeta::core::Decimal dividend{"6e2147483647"};
+  const sourcemeta::core::Decimal divisor{"3e-2147483648"};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(Numeric_decimal, divisible_by_opposite_boundary_non_integer_quotient) {
+  const sourcemeta::core::Decimal dividend{"6e-2147483648"};
+  const sourcemeta::core::Decimal divisor{"3e2147483647"};
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
+TEST(Numeric_decimal,
+     scale_by_positive_infinity_rejects_oversized_positive_scale) {
+  const auto value = sourcemeta::core::Decimal::infinity();
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{"2147483648"});
+      },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     scale_by_negative_infinity_rejects_oversized_negative_scale) {
+  const auto value = sourcemeta::core::Decimal::negative_infinity();
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{"-2147483649"});
+      },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, unary_plus_rounds_half_even_tie_to_even_down) {
+  const sourcemeta::core::Decimal value{"1.2345678901234565"};
+  const auto result = +value;
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1.234567890123456"});
+}
+
+TEST(Numeric_decimal, unary_plus_rounds_half_even_tie_to_even_up) {
+  const sourcemeta::core::Decimal value{"1.2345678901234575"};
+  const auto result = +value;
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1.234567890123458"});
+}
+
+TEST(Numeric_decimal, unary_plus_signaling_nan_raises_invalid_operation) {
+  const auto value = sourcemeta::core::Decimal::snan();
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = +value; },
+      sourcemeta::core::NumericInvalidOperationError);
+}
+
+TEST(Numeric_decimal, unary_plus_clears_integer_literal_origin) {
+  const sourcemeta::core::Decimal value{3};
+  EXPECT_TRUE(value.is_integer());
+  const auto result = +value;
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.is_integral());
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};
