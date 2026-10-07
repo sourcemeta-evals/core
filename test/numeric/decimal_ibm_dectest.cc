@@ -200,19 +200,42 @@ static auto decimal_trim(const sourcemeta::core::Decimal &value)
   }
 
   auto text = value.to_string();
-  const auto dot = text.find('.');
+  const auto exponent_marker = text.find('e');
+  auto coefficient_part = exponent_marker == std::string::npos
+                              ? text
+                              : text.substr(0, exponent_marker);
+  const auto exponent_suffix = exponent_marker == std::string::npos
+                                   ? std::string{}
+                                   : text.substr(exponent_marker);
+  const auto dot = coefficient_part.find('.');
   if (dot == std::string::npos) {
     return value;
   }
-  auto end = text.size();
-  while (end > dot && text[end - 1] == '0') {
+  auto end = coefficient_part.size();
+  while (end > dot && coefficient_part[end - 1] == '0') {
     end--;
   }
-  if (end > 0 && text[end - 1] == '.') {
+  if (end > 0 && coefficient_part[end - 1] == '.') {
     end--;
   }
-  text.resize(end);
-  return sourcemeta::core::Decimal{text};
+  coefficient_part.resize(end);
+  return sourcemeta::core::Decimal{coefficient_part + exponent_suffix};
+}
+
+TEST(DecimalTrimHelper, four_digit_coefficient_small_negative_exponent) {
+  const sourcemeta::core::Decimal input{"1.2300e-30"};
+  const sourcemeta::core::Decimal expected{"1.23e-30"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, three_digit_coefficient_small_negative_exponent) {
+  const sourcemeta::core::Decimal input{"1.200e-30"};
+  const sourcemeta::core::Decimal expected{"1.2e-30"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
 }
 
 static auto decimal_propagate_nan(const sourcemeta::core::Decimal &left,
