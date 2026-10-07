@@ -2548,6 +2548,28 @@ TEST(Numeric_decimal, parse_negative_exponent_25_digits_throws) {
       sourcemeta::core::DecimalParseError);
 }
 
+TEST(Numeric_decimal,
+     parse_positive_exponent_above_int64_overflow_accumulator_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e92233720368547758080"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_decimal,
+     parse_negative_exponent_above_int64_overflow_accumulator_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e-92233720368547758080"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
+TEST(
+    Numeric_decimal,
+    parse_positive_exponent_above_int64_overflow_accumulator_plus_sign_throws) {
+  EXPECT_THROW(
+      { const sourcemeta::core::Decimal value{"1e+92233720368547758080"}; },
+      sourcemeta::core::DecimalParseError);
+}
+
 TEST(Numeric_decimal, parse_positive_exponent_with_plus_above_int64_throws) {
   EXPECT_THROW(
       { const sourcemeta::core::Decimal value{"1e+10000000000000000000"}; },
@@ -2824,6 +2846,42 @@ TEST(Numeric_decimal, to_scientific_string_negative) {
 
 TEST(Numeric_decimal, to_scientific_string_nan) {
   EXPECT_EQ(sourcemeta::core::Decimal::nan().to_scientific_string(), "NaN");
+}
+
+TEST(Numeric_decimal, scientific_string_round_trip_quiet_nan_with_payload) {
+  const auto value{sourcemeta::core::Decimal::nan(123)};
+  const sourcemeta::core::Decimal round_trip{value.to_scientific_string()};
+  EXPECT_TRUE(round_trip.is_nan());
+  EXPECT_FALSE(round_trip.is_snan());
+  EXPECT_EQ(round_trip.nan_payload(), 123U);
+  EXPECT_EQ(round_trip.is_signed(), value.is_signed());
+}
+
+TEST(Numeric_decimal, scientific_string_round_trip_signaling_nan_with_payload) {
+  const auto value{sourcemeta::core::Decimal::snan(42)};
+  const sourcemeta::core::Decimal round_trip{value.to_scientific_string()};
+  EXPECT_TRUE(round_trip.is_snan());
+  EXPECT_EQ(round_trip.nan_payload(), 42U);
+  EXPECT_EQ(round_trip.is_signed(), value.is_signed());
+}
+
+TEST(Numeric_decimal,
+     scientific_string_round_trip_signed_quiet_nan_with_payload) {
+  const auto value{-sourcemeta::core::Decimal::nan(7)};
+  const sourcemeta::core::Decimal round_trip{value.to_scientific_string()};
+  EXPECT_TRUE(round_trip.is_nan());
+  EXPECT_FALSE(round_trip.is_snan());
+  EXPECT_EQ(round_trip.nan_payload(), 7U);
+  EXPECT_TRUE(round_trip.is_signed());
+}
+
+TEST(Numeric_decimal, scientific_string_round_trip_signaling_nan_max_payload) {
+  const auto value{sourcemeta::core::Decimal::snan(
+      std::numeric_limits<std::uint64_t>::max())};
+  const sourcemeta::core::Decimal round_trip{value.to_scientific_string()};
+  EXPECT_TRUE(round_trip.is_snan());
+  EXPECT_EQ(round_trip.nan_payload(),
+            std::numeric_limits<std::uint64_t>::max());
 }
 
 TEST(Numeric_decimal, to_scientific_string_infinity) {
@@ -5345,6 +5403,54 @@ TEST(Numeric_decimal, add_round_carry_near_int32_max_exponent_throws) {
   EXPECT_THROW(
       { [[maybe_unused]] const auto result = left + right; },
       sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, multiply_rounding_before_exponent_check_throws) {
+  const sourcemeta::core::Decimal left{"10000000000000000e-2147483648"};
+  const sourcemeta::core::Decimal right{"0.1"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = left * right; },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, multiply_assign_rounding_before_exponent_check_throws) {
+  sourcemeta::core::Decimal left{"10000000000000000e-2147483648"};
+  const sourcemeta::core::Decimal right{"0.1"};
+  EXPECT_THROW({ left *= right; }, sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, multiply_in_range_control_succeeds) {
+  const sourcemeta::core::Decimal left{"1e100"};
+  const sourcemeta::core::Decimal right{"1e100"};
+  const sourcemeta::core::Decimal expected{"1e200"};
+  EXPECT_EQ(left * right, expected);
+}
+
+TEST(Numeric_decimal, add_widely_separated_zero_preserves_quantum) {
+  const sourcemeta::core::Decimal left{1};
+  const sourcemeta::core::Decimal right{"0e-100"};
+  const sourcemeta::core::Decimal expected{"1.000000000000000"};
+  const auto result{left + right};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, add_widely_separated_zero_reversed_preserves_quantum) {
+  const sourcemeta::core::Decimal left{"0e-100"};
+  const sourcemeta::core::Decimal right{1};
+  const sourcemeta::core::Decimal expected{"1.000000000000000"};
+  const auto result{left + right};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, add_assign_widely_separated_zero_preserves_quantum) {
+  sourcemeta::core::Decimal left{1};
+  const sourcemeta::core::Decimal right{"0e-100"};
+  left += right;
+  EXPECT_EQ(left, sourcemeta::core::Decimal{"1.000000000000000"});
+  EXPECT_TRUE(
+      left.same_quantum(sourcemeta::core::Decimal{"1.000000000000000"}));
 }
 
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
