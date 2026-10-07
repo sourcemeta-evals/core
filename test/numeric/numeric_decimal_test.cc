@@ -3700,7 +3700,9 @@ TEST(Numeric_decimal, reduce_negative_zero_preserves_sign) {
 TEST(Numeric_decimal, reduce_integer) {
   const sourcemeta::core::Decimal value{"1200"};
   const sourcemeta::core::Decimal expected{"12E+2"};
-  EXPECT_EQ(value.reduce(), expected);
+  const auto reduced{value.reduce()};
+  EXPECT_EQ(reduced, expected);
+  EXPECT_TRUE(reduced.same_quantum(expected));
 }
 
 TEST(Numeric_decimal, reduce_negative) {
