@@ -1091,6 +1091,10 @@ auto Decimal::reduce() const -> Decimal {
 }
 
 auto Decimal::logb() const -> Decimal {
+  if (this->is_snan()) {
+    throw NumericInvalidOperationError{};
+  }
+
   if (this->is_nan()) {
     return *this;
   }

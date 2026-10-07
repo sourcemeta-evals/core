@@ -3660,6 +3660,29 @@ TEST(Numeric_decimal, logb_nan) {
   EXPECT_TRUE(sourcemeta::core::Decimal::nan().logb().is_nan());
 }
 
+TEST(Numeric_decimal, logb_signaling_nan_throws_invalid_operation) {
+  const sourcemeta::core::Decimal value{"sNaN"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.logb(); },
+      sourcemeta::core::NumericInvalidOperationError);
+}
+
+TEST(Numeric_decimal,
+     logb_signaling_nan_with_payload_throws_invalid_operation) {
+  const sourcemeta::core::Decimal value{"sNaN123"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.logb(); },
+      sourcemeta::core::NumericInvalidOperationError);
+}
+
+TEST(Numeric_decimal, logb_quiet_nan_preserves_payload) {
+  const sourcemeta::core::Decimal value{"NaN123"};
+  const auto result{value.logb()};
+  EXPECT_TRUE(result.is_nan());
+  EXPECT_FALSE(result.is_snan());
+  EXPECT_EQ(result.nan_payload(), 123U);
+}
+
 TEST(Numeric_decimal, scale_by_positive) {
   const sourcemeta::core::Decimal value{"1.23"};
   const sourcemeta::core::Decimal scale{2};
