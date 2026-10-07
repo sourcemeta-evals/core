@@ -4824,6 +4824,35 @@ TEST(Numeric_decimal, divide_inexact_does_not_strip_zeros) {
   EXPECT_TRUE(result.same_quantum(expected));
 }
 
+TEST(Numeric_decimal,
+     divide_inexact_rounded_result_preserves_trailing_zero_quantum) {
+  const sourcemeta::core::Decimal numerator{"100000000000000001"};
+  const sourcemeta::core::Decimal denominator{"100000000000000000"};
+  const sourcemeta::core::Decimal expected{"1.000000000000000"};
+  const auto result{numerator / denominator};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal,
+     divide_inexact_rounded_result_preserves_trailing_zero_quantum_negative) {
+  const sourcemeta::core::Decimal numerator{"-100000000000000001"};
+  const sourcemeta::core::Decimal denominator{"100000000000000000"};
+  const sourcemeta::core::Decimal expected{"-1.000000000000000"};
+  const auto result{numerator / denominator};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal,
+     divide_exact_integer_control_strips_to_preferred_quantum) {
+  const sourcemeta::core::Decimal numerator{"100000000000000000"};
+  const sourcemeta::core::Decimal denominator{"100000000000000000"};
+  const auto result{numerator / denominator};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{1});
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{1}));
+}
+
 TEST(Numeric_decimal, divisible_by_rejects_quiet_nan_divisor_on_zero_dividend) {
   const sourcemeta::core::Decimal zero;
   EXPECT_FALSE(zero.divisible_by(sourcemeta::core::Decimal::nan()));
