@@ -655,8 +655,13 @@ auto Decimal::to_string() const -> std::string {
   }
 
   if (integer_digit_count != decimal_place) {
-    result += 'e';
     auto engineering_exponent = integer_digit_count - decimal_place;
+    if (engineering_exponent > std::numeric_limits<std::int32_t>::max() ||
+        engineering_exponent < std::numeric_limits<std::int32_t>::min()) {
+      return this->to_scientific_string();
+    }
+
+    result += 'e';
     if (engineering_exponent >= 0) {
       result += '+';
     }
@@ -1035,6 +1040,10 @@ auto Decimal::same_quantum(const Decimal &other) const -> bool {
 }
 
 auto Decimal::reduce() const -> Decimal {
+  if (this->is_snan()) {
+    throw NumericInvalidOperationError{};
+  }
+
   if (!this->is_finite()) {
     return *this;
   }

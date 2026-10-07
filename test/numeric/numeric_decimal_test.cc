@@ -2588,9 +2588,18 @@ TEST(Numeric_decimal, to_string_engineering_at_int32_max_exponent) {
   EXPECT_EQ(value.to_string(), "100e+2147483646");
 }
 
-TEST(Numeric_decimal, to_string_at_int32_min_exponent) {
+TEST(Numeric_decimal, to_string_at_int32_min_exponent_round_trips) {
   const sourcemeta::core::Decimal value{"1e-2147483648"};
-  EXPECT_EQ(value.to_string(), "10e-2147483649");
+  const sourcemeta::core::Decimal round_trip{value.to_string()};
+  EXPECT_EQ(round_trip, value);
+  EXPECT_EQ(round_trip.is_signed(), value.is_signed());
+}
+
+TEST(Numeric_decimal, to_string_at_int32_min_exponent_negative_round_trips) {
+  const sourcemeta::core::Decimal value{"-1e-2147483648"};
+  const sourcemeta::core::Decimal round_trip{value.to_string()};
+  EXPECT_EQ(round_trip, value);
+  EXPECT_TRUE(round_trip.is_signed());
 }
 
 TEST(Numeric_decimal, compare_total_boundary_exponents_ordering) {
@@ -3621,6 +3630,29 @@ TEST(Numeric_decimal, reduce_negative) {
 
 TEST(Numeric_decimal, reduce_infinity) {
   EXPECT_TRUE(sourcemeta::core::Decimal::infinity().reduce().is_infinite());
+}
+
+TEST(Numeric_decimal, reduce_signaling_nan_throws_invalid_operation) {
+  const sourcemeta::core::Decimal value{"sNaN"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.reduce(); },
+      sourcemeta::core::NumericInvalidOperationError);
+}
+
+TEST(Numeric_decimal,
+     reduce_signaling_nan_with_payload_throws_invalid_operation) {
+  const sourcemeta::core::Decimal value{"sNaN123"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = value.reduce(); },
+      sourcemeta::core::NumericInvalidOperationError);
+}
+
+TEST(Numeric_decimal, reduce_quiet_nan_preserves_payload) {
+  const sourcemeta::core::Decimal value{"NaN123"};
+  const auto result{value.reduce()};
+  EXPECT_TRUE(result.is_nan());
+  EXPECT_FALSE(result.is_snan());
+  EXPECT_EQ(result.nan_payload(), 123U);
 }
 
 TEST(Numeric_decimal, reduce_nan) {
@@ -5283,6 +5315,33 @@ TEST(Numeric_decimal, is_integral_at_int32_min_exponent_negative_zero_true) {
 TEST(Numeric_decimal, add_rounding_at_int32_max_exponent_overflows) {
   const sourcemeta::core::Decimal left{"9999999999999999e2147483647"};
   const sourcemeta::core::Decimal right{"1e2147483647"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = left + right; },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, add_round_carry_normalizes_coefficient_and_quantum) {
+  const sourcemeta::core::Decimal left{"99999999999999995"};
+  const sourcemeta::core::Decimal right{0};
+  const sourcemeta::core::Decimal expected{"1.000000000000000e17"};
+  const auto result{left + right};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal,
+     add_round_carry_negative_normalizes_coefficient_and_quantum) {
+  const sourcemeta::core::Decimal left{"-99999999999999995"};
+  const sourcemeta::core::Decimal right{0};
+  const sourcemeta::core::Decimal expected{"-1.000000000000000e17"};
+  const auto result{left + right};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal, add_round_carry_near_int32_max_exponent_throws) {
+  const sourcemeta::core::Decimal left{"99999999999999995e2147483646"};
+  const sourcemeta::core::Decimal right{"0e2147483646"};
   EXPECT_THROW(
       { [[maybe_unused]] const auto result = left + right; },
       sourcemeta::core::NumericOverflowError);

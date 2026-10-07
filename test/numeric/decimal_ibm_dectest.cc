@@ -173,23 +173,24 @@ static auto decimal_trim(const sourcemeta::core::Decimal &value)
   }
 
   // IBM General Decimal Arithmetic trim: strip trailing zeros from the
-  // coefficient, but stop at exponent 0 when the operand had a fractional
-  // part. Operands with a non-negative stored exponent strip freely like
-  // Decimal::reduce; operands with a negative stored exponent stop once the
-  // fractional zeros are gone so trim(10.0) is 10 (quantum E+0), not 1E+1.
-  // Recover the stored exponent via to_scientific_string's canonical form.
+  // coefficient, but stop once the stored exponent reaches zero when the
+  // operand had a fractional part. Operands with a non-negative stored
+  // exponent strip freely like Decimal::reduce; operands with a negative
+  // stored exponent stop once the fractional zeros are gone so trim(10.0) is
+  // 10 (quantum E+0), not 1E+1. Recover the stored coefficient digits and
+  // exponent via to_scientific_string's canonical form.
   const auto scientific = value.to_scientific_string();
   const auto e_pos = scientific.find('e');
-  std::size_t digit_count = 0;
+  std::string coefficient_digits;
   for (std::size_t index = 0; index < e_pos; index++) {
     const auto character = scientific[index];
     if (character >= '0' && character <= '9') {
-      digit_count++;
+      coefficient_digits.push_back(character);
     }
   }
   const auto adjusted_exp = std::stoi(scientific.substr(e_pos + 1));
   const auto original_exp =
-      adjusted_exp - static_cast<std::int32_t>(digit_count) + 1;
+      adjusted_exp - static_cast<std::int32_t>(coefficient_digits.size()) + 1;
 
   if (original_exp == 0) {
     return value;
@@ -199,27 +200,21 @@ static auto decimal_trim(const sourcemeta::core::Decimal &value)
     return value.reduce();
   }
 
-  auto text = value.to_string();
-  const auto exponent_marker = text.find('e');
-  auto coefficient_part = exponent_marker == std::string::npos
-                              ? text
-                              : text.substr(0, exponent_marker);
-  const auto exponent_suffix = exponent_marker == std::string::npos
-                                   ? std::string{}
-                                   : text.substr(exponent_marker);
-  const auto dot = coefficient_part.find('.');
-  if (dot == std::string::npos) {
-    return value;
+  std::size_t trailing_zeros = 0;
+  while (trailing_zeros < coefficient_digits.size() &&
+         coefficient_digits[coefficient_digits.size() - 1 - trailing_zeros] ==
+             '0') {
+    trailing_zeros++;
   }
-  auto end = coefficient_part.size();
-  while (end > dot && coefficient_part[end - 1] == '0') {
-    end--;
-  }
-  if (end > 0 && coefficient_part[end - 1] == '.') {
-    end--;
-  }
-  coefficient_part.resize(end);
-  return sourcemeta::core::Decimal{coefficient_part + exponent_suffix};
+  const auto max_strippable = -static_cast<std::int64_t>(original_exp);
+  const auto strippable =
+      std::min(static_cast<std::int64_t>(trailing_zeros), max_strippable);
+  const auto new_exp = static_cast<std::int64_t>(original_exp) + strippable;
+  const auto kept = coefficient_digits.substr(
+      0, coefficient_digits.size() - static_cast<std::size_t>(strippable));
+  const std::string sign_prefix = value.is_signed() ? "-" : "";
+  return sourcemeta::core::Decimal{sign_prefix + kept + "e" +
+                                   std::to_string(new_exp)};
 }
 
 TEST(DecimalTrimHelper, four_digit_coefficient_small_negative_exponent) {
@@ -233,6 +228,47 @@ TEST(DecimalTrimHelper, four_digit_coefficient_small_negative_exponent) {
 TEST(DecimalTrimHelper, three_digit_coefficient_small_negative_exponent) {
   const sourcemeta::core::Decimal input{"1.200e-30"};
   const sourcemeta::core::Decimal expected{"1.2e-30"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, trailing_zero_coefficient_no_decimal_small_fractional) {
+  const sourcemeta::core::Decimal input{"1000e-10"};
+  const sourcemeta::core::Decimal expected{"1e-7"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, trailing_zero_coefficient_very_small_fractional) {
+  const sourcemeta::core::Decimal input{"100e-21"};
+  const sourcemeta::core::Decimal expected{"1e-19"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, scientific_form_fractional_zeros) {
+  const sourcemeta::core::Decimal input{"1.00e-7"};
+  const sourcemeta::core::Decimal expected{"1e-7"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(DecimalTrimHelper, negative_trailing_zero_coefficient) {
+  const sourcemeta::core::Decimal input{"-1000e-10"};
+  const sourcemeta::core::Decimal expected{"-1e-7"};
+  const auto result{decimal_trim(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(DecimalTrimHelper, non_decimal_point_fractional_scientific_form) {
+  const sourcemeta::core::Decimal input{"10E+1"};
+  const sourcemeta::core::Decimal expected{"1e+2"};
   const auto result{decimal_trim(input)};
   EXPECT_EQ(result, expected);
   EXPECT_TRUE(result.same_quantum(expected));
@@ -374,7 +410,7 @@ public:
         return left.scale_by(right);
       });
     } else if (operation == "reduce") {
-      this->run_unary([](const auto &value) { return value.reduce(); });
+      this->run_reduce();
     } else if (operation == "trim") {
       this->run_trim();
     } else {
@@ -465,6 +501,21 @@ private:
 
     expect_decimal_eq(op(make_decimal(this->test_case_.operand1)),
                       make_decimal(this->test_case_.expected));
+  }
+
+  auto run_reduce() -> void {
+    const auto input = make_decimal(this->test_case_.operand1);
+    if (has_condition(this->test_case_.conditions, "invalid_operation")) {
+      try {
+        const auto result = input.reduce();
+        expect_decimal_eq(result, make_decimal(this->test_case_.expected));
+      } catch (const sourcemeta::core::NumericInvalidOperationError &) {
+        SUCCEED();
+      }
+      return;
+    }
+
+    expect_decimal_eq(input.reduce(), make_decimal(this->test_case_.expected));
   }
 
   auto run_trim() -> void {

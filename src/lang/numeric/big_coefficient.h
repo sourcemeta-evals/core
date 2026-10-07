@@ -693,11 +693,6 @@ auto round_to_precision(std::int64_t &coefficient,
 
     auto excess = total_digits - WORKING_PRECISION;
 
-    if (static_cast<std::int64_t>(exponent) + excess >
-        static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
-      throw sourcemeta::core::NumericOverflowError{};
-    }
-
     auto kept =
         digit_string.substr(0, static_cast<std::size_t>(WORKING_PRECISION));
     auto dropped =
@@ -724,10 +719,6 @@ auto round_to_precision(std::int64_t &coefficient,
       }
     }
 
-    if (flags & FLAG_HEAP) {
-      delete load_big_pointer(coefficient);
-    }
-
     std::int64_t new_coefficient = 0;
     for (auto character : kept) {
       new_coefficient = new_coefficient * 10 + (character - '0');
@@ -736,9 +727,25 @@ auto round_to_precision(std::int64_t &coefficient,
       new_coefficient++;
     }
 
+    std::int64_t final_excess = excess;
+    constexpr std::int64_t WORKING_PRECISION_POWER_OF_10 = 10000000000000000LL;
+    if (new_coefficient == WORKING_PRECISION_POWER_OF_10) {
+      new_coefficient /= 10;
+      final_excess++;
+    }
+
+    if (static_cast<std::int64_t>(exponent) + final_excess >
+        static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
+      throw sourcemeta::core::NumericOverflowError{};
+    }
+
+    if (flags & FLAG_HEAP) {
+      delete load_big_pointer(coefficient);
+    }
+
     coefficient = new_coefficient;
     coefficient_high = 0;
-    exponent += excess;
+    exponent += static_cast<std::int32_t>(final_excess);
     flags = static_cast<std::uint8_t>(flags & ~(FLAG_BIG | FLAG_HEAP));
     return;
   }
@@ -749,11 +756,6 @@ auto round_to_precision(std::int64_t &coefficient,
   }
 
   auto excess = static_cast<std::int32_t>(digits) - WORKING_PRECISION;
-
-  if (static_cast<std::int64_t>(exponent) + excess >
-      static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
-    throw sourcemeta::core::NumericOverflowError{};
-  }
 
   std::int64_t divisor = 1;
   for (std::int32_t index = 0; index < excess; index++) {
@@ -768,9 +770,21 @@ auto round_to_precision(std::int64_t &coefficient,
     quotient++;
   }
 
+  std::int64_t final_excess = excess;
+  constexpr std::int64_t WORKING_PRECISION_POWER_OF_10 = 10000000000000000LL;
+  if (quotient == WORKING_PRECISION_POWER_OF_10) {
+    quotient /= 10;
+    final_excess++;
+  }
+
+  if (static_cast<std::int64_t>(exponent) + final_excess >
+      static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
+    throw sourcemeta::core::NumericOverflowError{};
+  }
+
   coefficient = quotient;
   coefficient_high = 0;
-  exponent += excess;
+  exponent += static_cast<std::int32_t>(final_excess);
 }
 
 void free_big_coefficient(std::int64_t coefficient, std::uint8_t flags) {
