@@ -2617,6 +2617,35 @@ TEST(Numeric_decimal, is_integral_long_coefficient_at_int32_min_exponent) {
   EXPECT_FALSE(value.is_integral());
 }
 
+TEST(Numeric_decimal, equal_distinct_values_at_opposite_exponent_boundaries) {
+  const sourcemeta::core::Decimal left{"10e2147483647"};
+  const sourcemeta::core::Decimal right{"1e-2147483648"};
+  EXPECT_FALSE(left == right);
+  EXPECT_FALSE(right == left);
+  EXPECT_TRUE(left != right);
+  EXPECT_TRUE(right != left);
+}
+
+TEST(Numeric_decimal, equal_reflexive_at_int32_max_exponent) {
+  const sourcemeta::core::Decimal value{"10e2147483647"};
+  EXPECT_TRUE(value == value);
+  EXPECT_FALSE(value != value);
+}
+
+TEST(Numeric_decimal, equal_reflexive_at_int32_min_exponent) {
+  const sourcemeta::core::Decimal value{"1e-2147483648"};
+  EXPECT_TRUE(value == value);
+  EXPECT_FALSE(value != value);
+}
+
+TEST(Numeric_decimal,
+     equal_equivalent_representations_past_normalized_boundary) {
+  const sourcemeta::core::Decimal left{"10e2147483647"};
+  const sourcemeta::core::Decimal right{"100e2147483646"};
+  EXPECT_TRUE(left == right);
+  EXPECT_TRUE(right == left);
+}
+
 TEST(Numeric_decimal, parse_positive_exponent_above_int32_max_throws) {
   EXPECT_THROW(
       { const sourcemeta::core::Decimal value{"1e2147483648"}; },

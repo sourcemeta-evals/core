@@ -19,7 +19,7 @@
 
 namespace {
 
-auto strip_trailing_zeros(std::int64_t &coefficient, std::int32_t &exponent)
+auto strip_trailing_zeros(std::int64_t &coefficient, std::int64_t &exponent)
     -> void {
   if (coefficient == 0) {
     return;
@@ -1439,17 +1439,17 @@ auto Decimal::operator==(const Decimal &other) const -> bool {
   }
 
   auto left_coefficient = this->coefficient_;
-  auto left_exponent = this->exponent_;
+  auto left_exponent = static_cast<std::int64_t>(this->exponent_);
   auto right_coefficient = other.coefficient_;
-  auto right_exponent = other.exponent_;
+  auto right_exponent = static_cast<std::int64_t>(other.exponent_);
 
   if ((this->flags_ & FLAG_BIG) || (other.flags_ & FLAG_BIG)) {
     auto left_big = coefficient_as_big(this->coefficient_,
                                        this->coefficient_high_, this->flags_);
     auto right_big = coefficient_as_big(other.coefficient_,
                                         other.coefficient_high_, other.flags_);
-    BigCoefficient::align_exponents(left_big, right_big, left_exponent,
-                                    right_exponent);
+    BigCoefficient::align_exponents(left_big, right_big, this->exponent_,
+                                    other.exponent_);
     return left_big.compare(right_big) == 0;
   }
 
