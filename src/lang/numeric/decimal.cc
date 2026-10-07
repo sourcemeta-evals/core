@@ -15,6 +15,7 @@
 #include <sstream>   // std::ostringstream
 #include <stdexcept> // std::out_of_range
 #include <string>    // std::string, std::stof, std::stod
+#include <utility>   // std::cmp_greater
 
 namespace {
 
@@ -838,8 +839,8 @@ auto Decimal::to_integral() const -> Decimal {
   if (this->flags_ & FLAG_BIG) {
     auto digit_string = coefficient_to_digit_string(
         this->coefficient_, this->coefficient_high_, this->flags_);
-    auto number_of_digits = static_cast<std::int32_t>(digit_string.size());
-    auto digits_to_remove = -this->exponent_;
+    auto number_of_digits = static_cast<std::int64_t>(digit_string.size());
+    auto digits_to_remove = -static_cast<std::int64_t>(this->exponent_);
 
     if (digits_to_remove > number_of_digits) {
       Decimal result;
@@ -896,10 +897,10 @@ auto Decimal::to_integral() const -> Decimal {
   }
 
   auto coefficient = this->coefficient_;
-  auto digits_to_remove = -this->exponent_;
+  auto digits_to_remove = -static_cast<std::int64_t>(this->exponent_);
 
-  if (static_cast<std::uint32_t>(digits_to_remove) >
-      digit_count(static_cast<std::uint64_t>(coefficient))) {
+  if (std::cmp_greater(digits_to_remove,
+                       digit_count(static_cast<std::uint64_t>(coefficient)))) {
     Decimal result;
     if (this->flags_ & FLAG_SIGN) {
       result.flags_ = FLAG_SIGN;
@@ -909,7 +910,7 @@ auto Decimal::to_integral() const -> Decimal {
   }
 
   std::int64_t divisor = 1;
-  for (std::int32_t index = 0; index < digits_to_remove; index++) {
+  for (std::int64_t index = 0; index < digits_to_remove; index++) {
     divisor *= 10;
   }
 

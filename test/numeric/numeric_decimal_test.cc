@@ -4958,6 +4958,39 @@ TEST(Numeric_decimal,
   EXPECT_FALSE(result.is_signed());
 }
 
+TEST(Numeric_decimal, to_integral_compact_at_int32_min_exponent) {
+  const sourcemeta::core::Decimal value{"1e-2147483648"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{0}));
+}
+
+TEST(Numeric_decimal, to_integral_negative_compact_at_int32_min_exponent) {
+  const sourcemeta::core::Decimal value{"-1e-2147483648"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{0}));
+}
+
+TEST(Numeric_decimal, to_integral_long_coefficient_at_int32_min_exponent) {
+  const sourcemeta::core::Decimal value{"1000000000000000000e-2147483648"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{0}));
+}
+
+TEST(Numeric_decimal,
+     to_integral_negative_long_coefficient_at_int32_min_exponent) {
+  const sourcemeta::core::Decimal value{"-1000000000000000000e-2147483648"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{0}));
+}
+
 TEST(Numeric_decimal,
      to_integral_negative_half_long_coefficient_preserves_sign) {
   const sourcemeta::core::Decimal value{
