@@ -371,11 +371,15 @@ private:
     }
 
     const auto expected{strip_quotes(this->test_case_.expected)};
-    // TODO: The decTest spec defines compare(NaN, x) = NaN, but our
-    // comparison operators return bool, so we cannot represent a NaN
-    // comparison result
     if (to_lower(expected).find("nan") != std::string::npos) {
-      GTEST_SKIP() << "NaN comparison result";
+      EXPECT_FALSE(left == right);
+      EXPECT_TRUE(left != right);
+      EXPECT_FALSE(left < right);
+      EXPECT_FALSE(left > right);
+      EXPECT_FALSE(left <= right);
+      EXPECT_FALSE(left >= right);
+      const auto expected_decimal{make_decimal(this->test_case_.expected)};
+      EXPECT_TRUE(expected_decimal.is_nan());
       return;
     }
 
