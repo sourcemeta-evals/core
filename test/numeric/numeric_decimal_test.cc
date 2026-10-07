@@ -4044,6 +4044,36 @@ TEST(Numeric_decimal, strict_from_double_denorm_min) {
   EXPECT_FALSE(value.is_signed());
 }
 
+TEST(Numeric_decimal, strict_from_double_denorm_min_exact_value) {
+  const auto value{sourcemeta::core::Decimal::strict_from(
+      std::numeric_limits<double>::denorm_min())};
+  EXPECT_EQ(value, sourcemeta::core::Decimal{"5e-324"});
+}
+
+TEST(Numeric_decimal, strict_from_double_negative_denorm_min_exact_value) {
+  const auto value{sourcemeta::core::Decimal::strict_from(
+      -std::numeric_limits<double>::denorm_min())};
+  EXPECT_EQ(value, sourcemeta::core::Decimal{"-5e-324"});
+}
+
+TEST(Numeric_decimal, strict_from_double_max_exact_value) {
+  const auto value{sourcemeta::core::Decimal::strict_from(
+      std::numeric_limits<double>::max())};
+  EXPECT_EQ(value, sourcemeta::core::Decimal{"1.7976931348623157e+308"});
+}
+
+TEST(Numeric_decimal, strict_from_double_lowest_exact_value) {
+  const auto value{sourcemeta::core::Decimal::strict_from(
+      std::numeric_limits<double>::lowest())};
+  EXPECT_EQ(value, sourcemeta::core::Decimal{"-1.7976931348623157e+308"});
+}
+
+TEST(Numeric_decimal, strict_from_negative_zero_preserves_sign) {
+  const auto value{sourcemeta::core::Decimal::strict_from(-0.0)};
+  EXPECT_TRUE(value.is_zero());
+  EXPECT_TRUE(value.is_signed());
+}
+
 TEST(Numeric_decimal, strict_from_0_01) {
   const auto result{sourcemeta::core::Decimal::strict_from(0.01)};
   EXPECT_EQ(result, sourcemeta::core::Decimal{"0.01"});
@@ -5143,6 +5173,55 @@ TEST(Numeric_decimal,
   EXPECT_TRUE(result.is_zero());
   EXPECT_TRUE(result.is_signed());
   EXPECT_EQ(result, sourcemeta::core::Decimal{"-0e-2147483648"});
+}
+
+TEST(Numeric_decimal,
+     divide_zero_dividend_above_max_preferred_exponent_throws) {
+  const sourcemeta::core::Decimal dividend{"0e2147483647"};
+  const sourcemeta::core::Decimal divisor{"0.1"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = dividend / divisor; },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     divide_assign_zero_dividend_above_max_preferred_exponent_throws) {
+  sourcemeta::core::Decimal dividend{"0e2147483647"};
+  const sourcemeta::core::Decimal divisor{"0.1"};
+  EXPECT_THROW(
+      { dividend /= divisor; }, sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     divide_negative_zero_dividend_below_min_preferred_exponent_throws) {
+  const sourcemeta::core::Decimal dividend{"-0e-2147483648"};
+  const sourcemeta::core::Decimal divisor{"1e1"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = dividend / divisor; },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     divide_assign_negative_zero_dividend_below_min_preferred_exponent_throws) {
+  sourcemeta::core::Decimal dividend{"-0e-2147483648"};
+  const sourcemeta::core::Decimal divisor{"1e1"};
+  EXPECT_THROW(
+      { dividend /= divisor; }, sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, divide_representable_quotient_past_raw_exponent_bound) {
+  const sourcemeta::core::Decimal dividend{"1e2147483647"};
+  const sourcemeta::core::Decimal divisor{"10e-1"};
+  const sourcemeta::core::Decimal expected{"1e2147483647"};
+  EXPECT_EQ(dividend / divisor, expected);
+}
+
+TEST(Numeric_decimal,
+     divide_assign_representable_quotient_past_raw_exponent_bound) {
+  sourcemeta::core::Decimal dividend{"1e2147483647"};
+  const sourcemeta::core::Decimal divisor{"10e-1"};
+  dividend /= divisor;
+  EXPECT_EQ(dividend, sourcemeta::core::Decimal{"1e2147483647"});
 }
 
 TEST(Numeric_decimal, divide_above_midpoint_with_guard_digit_five_rounds_up) {
