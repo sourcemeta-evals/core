@@ -5301,9 +5301,22 @@ TEST(Numeric_decimal,
   const sourcemeta::core::Decimal dividend{"0e-2147483648"};
   const sourcemeta::core::Decimal divisor{1};
   const auto result{dividend / divisor};
+  const sourcemeta::core::Decimal expected{"0e-2147483648"};
   EXPECT_TRUE(result.is_zero());
   EXPECT_FALSE(result.is_signed());
-  EXPECT_EQ(result, sourcemeta::core::Decimal{"0e-2147483648"});
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(Numeric_decimal,
+     compound_divide_zero_dividend_at_minimum_exponent_preserves_quantum) {
+  sourcemeta::core::Decimal dividend{"0e-2147483648"};
+  const sourcemeta::core::Decimal divisor{1};
+  dividend /= divisor;
+  const sourcemeta::core::Decimal expected{"0e-2147483648"};
+  EXPECT_TRUE(dividend.is_zero());
+  EXPECT_FALSE(dividend.is_signed());
+  EXPECT_TRUE(dividend.same_quantum(expected));
 }
 
 TEST(Numeric_decimal,
@@ -5311,9 +5324,23 @@ TEST(Numeric_decimal,
   const sourcemeta::core::Decimal dividend{"-0e-2147483648"};
   const sourcemeta::core::Decimal divisor{1};
   const auto result{dividend / divisor};
+  const sourcemeta::core::Decimal expected{"-0e-2147483648"};
   EXPECT_TRUE(result.is_zero());
   EXPECT_TRUE(result.is_signed());
-  EXPECT_EQ(result, sourcemeta::core::Decimal{"-0e-2147483648"});
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(result.same_quantum(expected));
+}
+
+TEST(
+    Numeric_decimal,
+    compound_divide_negative_zero_dividend_at_minimum_exponent_preserves_sign) {
+  sourcemeta::core::Decimal dividend{"-0e-2147483648"};
+  const sourcemeta::core::Decimal divisor{1};
+  dividend /= divisor;
+  const sourcemeta::core::Decimal expected{"-0e-2147483648"};
+  EXPECT_TRUE(dividend.is_zero());
+  EXPECT_TRUE(dividend.is_signed());
+  EXPECT_TRUE(dividend.same_quantum(expected));
 }
 
 TEST(Numeric_decimal,
