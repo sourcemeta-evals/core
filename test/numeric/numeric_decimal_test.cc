@@ -5556,6 +5556,41 @@ TEST(Numeric_decimal, add_assign_widely_separated_zero_preserves_quantum) {
       left.same_quantum(sourcemeta::core::Decimal{"1.000000000000000"}));
 }
 
+TEST(Numeric_decimal, add_with_huge_exponent_gap_same_sign) {
+  const sourcemeta::core::Decimal left{"1e2000000000"};
+  const sourcemeta::core::Decimal right{"1e-2000000000"};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_finite());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1e2000000000"});
+}
+
+TEST(Numeric_decimal, add_with_huge_exponent_gap_reversed_same_sign) {
+  const sourcemeta::core::Decimal left{"1e-2000000000"};
+  const sourcemeta::core::Decimal right{"1e2000000000"};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_finite());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1e2000000000"});
+}
+
+TEST(Numeric_decimal, subtract_with_huge_exponent_gap_opposite_sign) {
+  const sourcemeta::core::Decimal left{"1e2000000000"};
+  const sourcemeta::core::Decimal right{"1e-2000000000"};
+  const auto result{left - right};
+  EXPECT_TRUE(result.is_finite());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1e2000000000"});
+}
+
+TEST(Numeric_decimal, add_with_huge_exponent_gap_at_boundaries_same_sign) {
+  const sourcemeta::core::Decimal left{"1e2147483647"};
+  const sourcemeta::core::Decimal right{"1"};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_finite());
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1e2147483647"});
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};

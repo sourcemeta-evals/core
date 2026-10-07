@@ -1731,8 +1731,43 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
                                        this->coefficient_high_, this->flags_);
     auto right_big = coefficient_as_big(other.coefficient_,
                                         other.coefficient_high_, other.flags_);
-    BigCoefficient::align_exponents(left_big, right_big, this->exponent_,
-                                    other.exponent_);
+
+    std::int32_t left_align_exp = this->exponent_;
+    std::int32_t right_align_exp = other.exponent_;
+
+    const auto left_digits = static_cast<std::int64_t>(left_big.digit_count());
+    const auto right_digits =
+        static_cast<std::int64_t>(right_big.digit_count());
+    const auto stored_gap_64 =
+        this->exponent_ > other.exponent_
+            ? static_cast<std::int64_t>(this->exponent_) - other.exponent_
+            : static_cast<std::int64_t>(other.exponent_) - this->exponent_;
+    constexpr std::int64_t MAX_STORED_GAP = WORKING_PRECISION + 2;
+
+    if (stored_gap_64 > MAX_STORED_GAP && left_digits <= WORKING_PRECISION &&
+        right_digits <= WORKING_PRECISION && !left_big.is_zero() &&
+        !right_big.is_zero()) {
+      const bool left_is_larger = this->exponent_ > other.exponent_;
+      const std::int32_t larger_exp =
+          left_is_larger ? this->exponent_ : other.exponent_;
+      const auto sticky_exp_64 =
+          static_cast<std::int64_t>(larger_exp) - (WORKING_PRECISION + 1);
+      if (sticky_exp_64 >= std::numeric_limits<std::int32_t>::min() &&
+          sticky_exp_64 <= std::numeric_limits<std::int32_t>::max()) {
+        const auto sticky_exp = static_cast<std::int32_t>(sticky_exp_64);
+        if (left_is_larger) {
+          right_big = BigCoefficient::from_uint64(1);
+          right_align_exp = sticky_exp;
+        } else {
+          left_big = BigCoefficient::from_uint64(1);
+          left_align_exp = sticky_exp;
+        }
+        result_exponent = sticky_exp;
+      }
+    }
+
+    BigCoefficient::align_exponents(left_big, right_big, left_align_exp,
+                                    right_align_exp);
     auto [result_big, result_negative] = BigCoefficient::add_signed(
         left_big, right_big, left_negative, right_negative);
     if (result_big.is_zero()) {
