@@ -5718,6 +5718,42 @@ TEST(Numeric_decimal, unary_plus_clears_integer_literal_origin) {
   EXPECT_TRUE(result.is_integral());
 }
 
+TEST(Numeric_decimal, unary_plus_rounds_nonzero_discarded_tail_above_halfway) {
+  const sourcemeta::core::Decimal value{"1.2345678901234566"};
+  const auto result = +value;
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1.234567890123457"});
+}
+
+TEST(Numeric_decimal, unary_plus_rounds_nonzero_discarded_tail_below_halfway) {
+  const sourcemeta::core::Decimal value{"1.2345678901234564"};
+  const auto result = +value;
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"1.234567890123456"});
+}
+
+TEST(Numeric_decimal, unary_plus_rounds_half_even_carries_into_next_digit) {
+  const sourcemeta::core::Decimal value{"9.9999999999999995"};
+  const auto result = +value;
+  EXPECT_EQ(result, sourcemeta::core::Decimal{10});
+}
+
+TEST(Numeric_decimal, divisible_by_zero_dividend_positive_infinite_divisor) {
+  const sourcemeta::core::Decimal dividend{0};
+  const auto divisor = sourcemeta::core::Decimal::infinity();
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
+TEST(Numeric_decimal, divisible_by_zero_dividend_negative_infinite_divisor) {
+  const sourcemeta::core::Decimal dividend{0};
+  const auto divisor = sourcemeta::core::Decimal::negative_infinity();
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
+TEST(Numeric_decimal, divisible_by_zero_dividend_quiet_nan_divisor) {
+  const sourcemeta::core::Decimal dividend{0};
+  const auto divisor = sourcemeta::core::Decimal::nan();
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};

@@ -736,6 +736,26 @@ TEST(JSON_decimal, divisible_by_decimal_real_real_false) {
   EXPECT_FALSE(dividend.divisible_by(divisor));
 }
 
+TEST(JSON_decimal, divisible_by_subnormal_real_real_integer_quotient) {
+  const sourcemeta::core::JSON dividend{1e-320};
+  const sourcemeta::core::JSON divisor{1e-321};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal,
+     divisible_by_subnormal_real_real_integer_quotient_negative_dividend) {
+  const sourcemeta::core::JSON dividend{-1e-320};
+  const sourcemeta::core::JSON divisor{1e-321};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal,
+     divisible_by_subnormal_real_real_reversed_operands_non_integer_quotient) {
+  const sourcemeta::core::JSON dividend{1e-321};
+  const sourcemeta::core::JSON divisor{1e-320};
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
 TEST(JSON_decimal, divisible_by_integer_decimal_integer_true) {
   const sourcemeta::core::JSON dividend{10};
   const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{5}};
