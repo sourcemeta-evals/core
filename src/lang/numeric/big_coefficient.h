@@ -406,18 +406,19 @@ public:
             remainder_top * BASE + static_cast<sourcemeta::core::uint128_t>(
                                        remainder.words[remainder.length - 2]);
         auto divisor_top = divisor.words[divisor.length - 1];
-        auto estimate = static_cast<std::uint64_t>(
+        auto estimate =
             numerator /
-            (static_cast<sourcemeta::core::uint128_t>(divisor_top) + 1U));
-        if (estimate == 0) {
-          estimate = 1;
+            (static_cast<sourcemeta::core::uint128_t>(divisor_top) + 1U);
+        if (estimate == 0U) {
+          estimate = 1U;
         }
 
         auto shift = remainder.length - divisor.length - 1U;
 
-        BigCoefficient estimate_big{1};
-        estimate_big.words[0] = estimate;
-        estimate_big.length = 1;
+        BigCoefficient estimate_big{2};
+        estimate_big.words[0] = static_cast<std::uint64_t>(estimate % BASE);
+        estimate_big.words[1] = static_cast<std::uint64_t>(estimate / BASE);
+        estimate_big.length = (estimate_big.words[1] > 0U) ? 2U : 1U;
 
         BigCoefficient scaled =
             shift == 0U ? estimate_big.clone()
@@ -426,7 +427,9 @@ public:
 
         while (product.compare(remainder) > 0 && estimate > 1U) {
           estimate--;
-          estimate_big.words[0] = estimate;
+          estimate_big.words[0] = static_cast<std::uint64_t>(estimate % BASE);
+          estimate_big.words[1] = static_cast<std::uint64_t>(estimate / BASE);
+          estimate_big.length = (estimate_big.words[1] > 0U) ? 2U : 1U;
           scaled = shift == 0U
                        ? estimate_big.clone()
                        : estimate_big.multiply_pow10(shift * BASE_DIGITS);
@@ -438,11 +441,16 @@ public:
           quotient.words[0]++;
         } else {
           remainder = remainder.subtract(product);
-          BigCoefficient estimated_quotient{shift + 1};
-          std::fill(estimated_quotient.words, estimated_quotient.words + shift,
-                    0ULL);
-          estimated_quotient.words[shift] = estimate;
-          estimated_quotient.length = shift + 1;
+          auto result_width = shift + estimate_big.length;
+          BigCoefficient estimated_quotient{result_width};
+          std::fill(estimated_quotient.words,
+                    estimated_quotient.words + result_width, 0ULL);
+          for (std::uint32_t limb_index = 0; limb_index < estimate_big.length;
+               limb_index++) {
+            estimated_quotient.words[shift + limb_index] =
+                estimate_big.words[limb_index];
+          }
+          estimated_quotient.length = result_width;
           quotient = quotient.add(estimated_quotient);
         }
 

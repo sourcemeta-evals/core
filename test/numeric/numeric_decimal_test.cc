@@ -5591,6 +5591,22 @@ TEST(Numeric_decimal, add_with_huge_exponent_gap_at_boundaries_same_sign) {
   EXPECT_EQ(result, sourcemeta::core::Decimal{"1e2147483647"});
 }
 
+TEST(Numeric_decimal,
+     divide_integer_wide_dividend_narrow_divisor_terminates_quickly) {
+  const sourcemeta::core::Decimal dividend{"1e53"};
+  const sourcemeta::core::Decimal divisor{"1000000000000000001"};
+  const auto result{dividend.divide_integer(divisor)};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"999999999999999999e17"});
+}
+
+TEST(Numeric_decimal,
+     divide_integer_all_nines_dividend_by_power_of_ten_terminates_quickly) {
+  const sourcemeta::core::Decimal dividend{std::string(54, '9')};
+  const sourcemeta::core::Decimal divisor{"1000000000000000000"};
+  const auto result{dividend.divide_integer(divisor)};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{std::string(36, '9')});
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};
