@@ -145,20 +145,32 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         }
         throw JSONLDError("Context overflow", location);
       }
-      if (state.resolver == nullptr || !*state.resolver) {
-        throw JSONLDError("Loading remote context failed", location);
-      }
-      const auto document{
-          resolve_remote_document(state, reference, location, {})};
-      if (!document.has_value()) {
-        throw JSONLDError("Loading remote context failed", location);
-      }
-      const auto *context_entry{
-          document->is_object()
-              ? document->try_at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)
-              : nullptr};
-      if (context_entry == nullptr) {
-        throw JSONLDError("Invalid remote context", location);
+      // A previously dereferenced context is never dereferenced again within
+      // one expansion, and only its @context entry is retained (JSON-LD 1.1
+      // API Section 5.1 step 5.2.4)
+      const auto cached{state.remote_documents.find(reference)};
+      const JSON *loaded_context{nullptr};
+      if (cached != state.remote_documents.cend()) {
+        loaded_context = &cached->second;
+      } else {
+        if (state.resolver == nullptr || !*state.resolver) {
+          throw JSONLDError("Loading remote context failed", location);
+        }
+        const auto document{
+            resolve_remote_document(state, reference, location, {})};
+        if (!document.has_value()) {
+          throw JSONLDError("Loading remote context failed", location);
+        }
+        const auto *context_entry{
+            document->is_object()
+                ? document->try_at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)
+                : nullptr};
+        if (context_entry == nullptr) {
+          throw JSONLDError("Invalid remote context", location);
+        }
+        loaded_context =
+            &state.remote_documents.emplace(reference, *context_entry)
+                 .first->second;
       }
       if (state.remote_context_chain.size() >= REMOTE_CONTEXT_LIMIT) {
         throw JSONLDError("Context overflow", location);
@@ -166,7 +178,7 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
       state.remote_context_chain.push_back(reference);
       try {
         // A loaded remote context is processed with the default propagation.
-        process_context(state, active_context, *context_entry, location);
+        process_context(state, active_context, *loaded_context, location);
       } catch (const JSONLDError &error) {
         state.remote_context_chain.pop_back();
         // The offending entries live in the remote document, so the error is

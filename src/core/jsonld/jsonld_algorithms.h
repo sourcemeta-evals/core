@@ -64,6 +64,14 @@ struct ExpansionState {
   // @import document rather than from the input, so their definitions carry
   // remote origin and report errors at the @import entry
   std::set<JSON::String, std::less<>> imported_keys;
+  // The @context entries of remote contexts already dereferenced during this
+  // expansion, keyed by absolute IRI. A previously dereferenced context MUST
+  // NOT be dereferenced again (JSON-LD 1.1 API Section 5.1 step 5.2.4)
+  std::map<JSON::String, JSON, std::less<>> remote_documents;
+  // Whether the context currently being processed is the external expansion
+  // context, whose entries are not in the input document, so deferred errors
+  // from its scoped contexts report at the document root
+  bool external_context{false};
   // Protected-term state for the context currently being processed.
   bool context_protected{false};
   bool protected_override{false};

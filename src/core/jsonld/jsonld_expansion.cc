@@ -342,6 +342,12 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
 
     if (expanded_property.has_value() &&
         expanded_property.value() == KEYWORD_NEST) {
+      // A keyword inside a reverse property map is invalid before any
+      // deferral (JSON-LD 1.1 API Section 5.1.2 step 13.4.1)
+      if (active_property.has_value() &&
+          active_property.value() == KEYWORD_REVERSE) {
+        throw JSONLDError("Invalid reverse property map", entry_pointer);
+      }
       if (entry.second.is_array()) {
         std::size_t nest_index{0};
         for (const auto &nest_value : entry.second.as_array()) {
@@ -560,7 +566,9 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         continue;
       }
       // Included content is expanded under the @included active property so
-      // identifier-only node references survive free-floating cleanup
+      // identifier-only node references survive free-floating cleanup, while
+      // invalid members still fail the node-object validation required by the
+      // official suite
       auto included{into_array(expand(state, active_context,
                                       JSON::String{KEYWORD_INCLUDED},
                                       entry.second, entry_pointer))};
@@ -814,6 +822,14 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       for (const auto &[index_key, index_value] :
            sorted_entries(entry.second)) {
         const JSON::String &index{*index_key};
+        // The key may be an alias of @none, which suppresses index metadata
+        // like the literal keyword (JSON-LD 1.1 API Section 5.1.2)
+        const auto expanded_index{expand_iri(state, active_context, index,
+                                             false, true, nullptr, nullptr,
+                                             empty_weak_pointer)};
+        const bool index_is_none{index == KEYWORD_NONE ||
+                                 (expanded_index.has_value() &&
+                                  expanded_index.value() == KEYWORD_NONE)};
         auto index_items{
             into_array(expand(state, active_context, property, *index_value,
                               entry_pointer.concat(index)))};
@@ -822,7 +838,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
           if (item.is_null()) {
             continue;
           }
-          if (index != KEYWORD_NONE) {
+          if (!index_is_none) {
             if (property_valued) {
               if (item.is_object() &&
                   item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {

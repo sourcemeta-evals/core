@@ -92,6 +92,7 @@ auto create_term_definition(ExpansionState &state,
     if (term == KEYWORD_TYPE && value.is_object() && !state.processing_1_0) {
       TermDefinition type_definition;
       bool has_container{false};
+      bool has_protected{false};
       bool invalid_entry{false};
       for (const auto &entry : value.as_object()) {
         const auto &name{entry.first};
@@ -101,6 +102,7 @@ auto create_term_definition(ExpansionState &state,
                               {KEYWORD_PROTECTED});
           }
           type_definition.is_protected = entry.second.to_boolean();
+          has_protected = true;
         } else if (name == KEYWORD_CONTAINER && entry.second.is_string()) {
           const auto &container{entry.second.to_string()};
           if (container == KEYWORD_SET) {
@@ -122,7 +124,9 @@ auto create_term_definition(ExpansionState &state,
           throw JSONLDError("Protected term redefinition", term_pointer);
         }
         type_definition.is_protected = true;
-      } else if (invalid_entry || !has_container) {
+      } else if (invalid_entry || (!has_container && !has_protected)) {
+        // Either or both of a set container and a protected flag are valid
+        // (JSON-LD 1.1 API Section 5.1.1 step 4)
         throw JSONLDError("Keyword redefinition", term_pointer);
       } else if (!type_definition.is_protected) {
         type_definition.is_protected = state.context_protected;
@@ -244,6 +248,13 @@ auto create_term_definition(ExpansionState &state,
       if (!reverse.is_string()) {
         throw JSONLDError("Invalid IRI mapping", term_pointer,
                           {KEYWORD_REVERSE});
+      }
+      // A keyword-shaped reverse value is ignored, including a defined
+      // keyword: unlike the @id entry, the @reverse rule carries no keyword
+      // exclusion (JSON-LD 1.1 API Section 5.1.1 step 13.3)
+      if (has_keyword_form(reverse.to_string())) {
+        defined[term] = true;
+        return;
       }
       definition.reverse = true;
       definition.iri =
@@ -450,11 +461,16 @@ auto create_term_definition(ExpansionState &state,
                             {KEYWORD_CONTAINER});
         }
       }
-      // A type-map container may only coerce its keys to identifiers.
-      if (container_type && definition.type_mapping.has_value() &&
-          definition.type_mapping.value() != KEYWORD_ID &&
-          definition.type_mapping.value() != KEYWORD_VOCAB) {
-        throw JSONLDError("Invalid type mapping", term_pointer, {KEYWORD_TYPE});
+      // A type-map container defaults to identifier coercion, and may only
+      // coerce its keys to identifiers (JSON-LD 1.1 API Section 5.1.1)
+      if (container_type) {
+        if (!definition.type_mapping.has_value()) {
+          definition.type_mapping = JSON::String{KEYWORD_ID};
+        } else if (definition.type_mapping.value() != KEYWORD_ID &&
+                   definition.type_mapping.value() != KEYWORD_VOCAB) {
+          throw JSONLDError("Invalid type mapping", term_pointer,
+                            {KEYWORD_TYPE});
+        }
       }
     }
 
@@ -531,9 +547,11 @@ auto create_term_definition(ExpansionState &state,
       definition.context_base = state.context_resolution_base();
       definition.context_remote = context_remote;
       // Remote definitions report at the input reference that loaded the
-      // defining context, as the scoped entry itself is not in the input
+      // defining context, and external expansion-context definitions report
+      // at the document root, as the scoped entry itself is not in the input
       definition.context_location =
-          imported         ? to_pointer(context_pointer.concat(TOKEN_IMPORT))
+          state.external_context ? to_pointer(empty_weak_pointer)
+          : imported       ? to_pointer(context_pointer.concat(TOKEN_IMPORT))
           : context_remote ? to_pointer(context_pointer)
                            : to_pointer(term_pointer.concat(TOKEN_CONTEXT));
     }
