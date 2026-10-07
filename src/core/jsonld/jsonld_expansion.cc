@@ -92,15 +92,21 @@ auto process_deferred_scoped_context(ExpansionState &state,
                                      const bool propagate) -> void {
   const auto saved_base{state.context_base_override};
   const auto saved_remote{state.remote_base_override};
+  const auto saved_external{state.external_context};
   state.context_base_override = definition.context_base;
   state.remote_base_override = definition.context_remote;
   const bool local{!definition.context_remote &&
                    !definition.context_location.empty()};
+  // A deferred external definition restores its origin, so nested scoped
+  // terms created during the replay keep root provenance
+  state.external_context =
+      saved_external || definition.context_location.empty();
   const auto location{to_weak_pointer(definition.context_location)};
   try {
     process_context(state, context, definition.context.value(), location,
                     propagate);
   } catch (const JSONLDError &error) {
+    state.external_context = saved_external;
     state.remote_base_override = saved_remote;
     state.context_base_override = saved_base;
     if (local) {
@@ -108,6 +114,7 @@ auto process_deferred_scoped_context(ExpansionState &state,
     }
     throw JSONLDError(error.what(), definition.context_location);
   }
+  state.external_context = saved_external;
   state.remote_base_override = saved_remote;
   state.context_base_override = saved_base;
 }
@@ -377,7 +384,8 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         for (const auto &nest_value : entry.second.as_array()) {
           if (!nest_value.is_object() ||
               nest_defines_value(state, active_context, nest_value)) {
-            throw JSONLDError("Invalid @nest value", entry_pointer);
+            throw JSONLDError("Invalid @nest value",
+                              entry_pointer.concat(nest_index));
           }
           nests.emplace_back(&property, &nest_value, nest_index);
           nest_index += 1;
@@ -560,22 +568,19 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                                            : entry_pointer};
         auto expanded_item{
             expand(state, active_context, active_property, item, item_pointer)};
-        if (expanded_item.is_array()) {
-          for (auto &nested : expanded_item.as_array()) {
-            elements.push_back(nested);
+        auto item_elements{expanded_item.is_null()
+                               ? JSON::make_array()
+                               : into_array(std::move(expanded_item))};
+        for (auto &nested : item_elements.as_array()) {
+          // A nested list reports at the member that produced it
+          if (name == KEYWORD_LIST && state.processing_1_0 &&
+              nested.is_object() &&
+              nested.defines(KEYWORD_LIST, KEYWORD_LIST_HASH)) {
+            throw JSONLDError("List of lists", item_pointer);
           }
-        } else if (!expanded_item.is_null()) {
-          elements.push_back(std::move(expanded_item));
+          elements.push_back(std::move(nested));
         }
         value_index += 1;
-      }
-      if (name == KEYWORD_LIST && state.processing_1_0) {
-        for (const auto &item : elements.as_array()) {
-          if (item.is_object() &&
-              item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH)) {
-            throw JSONLDError("List of lists", entry_pointer);
-          }
-        }
       }
       result.assign(name, std::move(elements));
       continue;
@@ -599,17 +604,32 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       // Included content is expanded under the @included active property so
       // identifier-only node references survive free-floating cleanup, while
       // invalid members still fail the node-object validation required by the
-      // official suite
-      auto included{into_array(expand(state, active_context,
-                                      JSON::String{KEYWORD_INCLUDED},
-                                      entry.second, entry_pointer))};
-      for (const auto &item : included.as_array()) {
-        if (!item.is_object() ||
-            item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH) ||
-            item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH) ||
-            item.defines(KEYWORD_SET, KEYWORD_SET_HASH)) {
-          throw JSONLDError("Invalid @included value", entry_pointer);
+      // official suite. Members expand individually so errors keep their
+      // original input index
+      auto included{JSON::make_array()};
+      const bool included_array{entry.second.is_array()};
+      const auto members{into_array(JSON{entry.second})};
+      std::size_t member_index{0};
+      for (const auto &member : members.as_array()) {
+        const WeakPointer member_pointer{
+            included_array ? entry_pointer.concat(member_index)
+                           : entry_pointer};
+        auto expanded_member{expand(state, active_context,
+                                    JSON::String{KEYWORD_INCLUDED}, member,
+                                    member_pointer)};
+        auto member_items{expanded_member.is_null()
+                              ? JSON::make_array()
+                              : into_array(std::move(expanded_member))};
+        for (auto &item : member_items.as_array()) {
+          if (!item.is_object() ||
+              item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH) ||
+              item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH) ||
+              item.defines(KEYWORD_SET, KEYWORD_SET_HASH)) {
+            throw JSONLDError("Invalid @included value", member_pointer);
+          }
+          included.push_back(std::move(item));
         }
+        member_index += 1;
       }
       merge(result, KEYWORD_INCLUDED, std::move(included));
       continue;
@@ -813,14 +833,20 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         const bool is_none{language == KEYWORD_NONE ||
                            (expanded_language.has_value() &&
                             expanded_language.value() == KEYWORD_NONE)};
+        const bool language_array{language_value->is_array()};
         auto language_items{into_array(JSON{*language_value})};
+        std::size_t language_index{0};
         for (auto &item : language_items.as_array()) {
           if (item.is_null()) {
+            language_index += 1;
             continue;
           }
           if (!item.is_string()) {
+            const WeakPointer language_pointer{entry_pointer.concat(language)};
             throw JSONLDError("Invalid language map value",
-                              entry_pointer.concat(language));
+                              language_array
+                                  ? language_pointer.concat(language_index)
+                                  : language_pointer);
           }
           auto value{JSON::make_object()};
           value.assign_assume_new(JSON::String{KEYWORD_VALUE}, JSON{item},
@@ -837,6 +863,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                                     KEYWORD_DIRECTION_HASH);
           }
           expanded_value.push_back(std::move(value));
+          language_index += 1;
         }
       }
     } else if (entry.second.is_object() &&
@@ -861,20 +888,46 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         const bool index_is_none{index == KEYWORD_NONE ||
                                  (expanded_index.has_value() &&
                                   expanded_index.value() == KEYWORD_NONE)};
-        auto index_items{
-            into_array(expand(state, active_context, property, *index_value,
-                              entry_pointer.concat(index)))};
-        for (auto &item : index_items.as_array()) {
-          // A null map value expands to nothing
-          if (item.is_null()) {
-            continue;
+        // Each member expands individually so delayed shape errors keep
+        // their original input index even after null removal or flattening
+        const bool index_value_array{index_value->is_array()};
+        const auto raw_values{into_array(JSON{*index_value})};
+        auto index_items{JSON::make_array()};
+        std::vector<std::size_t> item_origins;
+        std::size_t raw_index{0};
+        for (const auto &raw : raw_values.as_array()) {
+          const WeakPointer index_pointer{entry_pointer.concat(index)};
+          const WeakPointer raw_pointer{index_value_array
+                                            ? index_pointer.concat(raw_index)
+                                            : index_pointer};
+          auto expanded_raw{
+              expand(state, active_context, property, raw, raw_pointer)};
+          auto raw_items{expanded_raw.is_null()
+                             ? JSON::make_array()
+                             : into_array(std::move(expanded_raw))};
+          for (auto &raw_item : raw_items.as_array()) {
+            // A null map value expands to nothing
+            if (raw_item.is_null()) {
+              continue;
+            }
+            index_items.push_back(std::move(raw_item));
+            item_origins.push_back(raw_index);
           }
+          raw_index += 1;
+        }
+        std::size_t item_position{0};
+        for (auto &item : index_items.as_array()) {
+          const std::size_t item_origin{item_origins[item_position]};
+          item_position += 1;
           if (!index_is_none) {
             if (property_valued) {
               if (item.is_object() &&
                   item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
+                const WeakPointer index_pointer{entry_pointer.concat(index)};
                 throw JSONLDError("Invalid value object",
-                                  entry_pointer.concat(index));
+                                  index_value_array
+                                      ? index_pointer.concat(item_origin)
+                                      : index_pointer);
               }
               // The index value is prepended to any existing values.
               auto combined{into_array(expand_value(

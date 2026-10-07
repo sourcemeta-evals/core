@@ -1958,3 +1958,38 @@ TEST(JSONLD_expand, error_message_survives_buffer_destruction_and_copy) {
                "A custom error code longer than small string optimization");
   EXPECT_EQ(sourcemeta::core::to_string(copy->pointer()), "/where");
 }
+
+TEST(JSONLD_expand, free_floating_json_literal_is_dropped) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@type": "@json",
+    "@value": 42
+  })");
+
+  const auto expected = sourcemeta::core::parse_json("[]");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, free_floating_json_literal_in_graph_is_dropped) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@graph": [ { "@type": "@json", "@value": 42 } ]
+  })");
+
+  const auto expected = sourcemeta::core::parse_json("[]");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, json_literal_under_property_is_preserved) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@type": "@json", "@value": [ 2, 1 ] }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [ { "@type": "@json", "@value": [ 2, 1 ] } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
