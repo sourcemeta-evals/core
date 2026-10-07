@@ -3,6 +3,7 @@
 
 #include <sourcemeta/core/uri.h>
 
+#include <algorithm>        // std::ranges::sort
 #include <cstddef>          // std::size_t
 #include <initializer_list> // std::initializer_list
 #include <memory>           // std::make_shared
@@ -272,21 +273,36 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
         throw JSONLDError("Loading remote context failed", location,
                           {KEYWORD_IMPORT});
       }
-      if (state.resolver == nullptr || !*state.resolver) {
-        throw JSONLDError("Loading remote context failed", location,
-                          {KEYWORD_IMPORT});
+      // An import shares the per-expansion remote-document cache with direct
+      // context references, so one absolute IRI is dereferenced at most once
+      const auto cached{state.remote_documents.find(reference)};
+      const JSON *imported_context{nullptr};
+      if (cached != state.remote_documents.cend()) {
+        imported_context = &cached->second;
+      } else {
+        if (state.resolver == nullptr || !*state.resolver) {
+          throw JSONLDError("Loading remote context failed", location,
+                            {KEYWORD_IMPORT});
+        }
+        const auto document{resolve_remote_document(state, reference, location,
+                                                    {KEYWORD_IMPORT})};
+        if (!document.has_value()) {
+          throw JSONLDError("Loading remote context failed", location,
+                            {KEYWORD_IMPORT});
+        }
+        const auto *context_entry{
+            document->is_object()
+                ? document->try_at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)
+                : nullptr};
+        if (context_entry == nullptr) {
+          throw JSONLDError("Invalid remote context", location,
+                            {KEYWORD_IMPORT});
+        }
+        imported_context =
+            &state.remote_documents.emplace(reference, *context_entry)
+                 .first->second;
       }
-      const auto document{resolve_remote_document(state, reference, location,
-                                                  {KEYWORD_IMPORT})};
-      if (!document.has_value()) {
-        throw JSONLDError("Loading remote context failed", location,
-                          {KEYWORD_IMPORT});
-      }
-      const auto *imported_context{
-          document->is_object()
-              ? document->try_at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)
-              : nullptr};
-      if (imported_context == nullptr || !imported_context->is_object()) {
+      if (!imported_context->is_object()) {
         throw JSONLDError("Invalid remote context", location, {KEYWORD_IMPORT});
       }
       if (imported_context->defines(KEYWORD_IMPORT, KEYWORD_IMPORT_HASH)) {
@@ -410,6 +426,9 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
     }
 
     DefinedTerms defined;
+    // Term definitions are created in lexicographical key order, so the first
+    // error among several independently invalid terms is deterministic
+    std::vector<const JSON::String *> term_names;
     for (const auto &entry : context.as_object()) {
       const auto &name{entry.first};
       if (name == KEYWORD_BASE || name == KEYWORD_VOCAB ||
@@ -418,6 +437,14 @@ auto process_context(ExpansionState &state, ActiveContext &active_context,
           name == KEYWORD_PROPAGATE || name == KEYWORD_PROTECTED) {
         continue;
       }
+      term_names.push_back(&name);
+    }
+    std::ranges::sort(term_names,
+                      [](const auto *left, const auto *right) -> bool {
+                        return *left < *right;
+                      });
+    for (const auto *name_pointer : term_names) {
+      const auto &name{*name_pointer};
       if (state.imported_keys.contains(name)) {
         static const JSON::String TOKEN_IMPORT{KEYWORD_IMPORT};
         try {

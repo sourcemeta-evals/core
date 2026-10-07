@@ -141,26 +141,42 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
   // are applied.
   const ActiveContext type_context{active_context};
 
-  // Type-scoped contexts (JSON-LD 1.1 API Section 5.1.2 step 11). The values
-  // are referenced from the input element, never copied.
-  std::vector<JSON::StringView> type_values;
+  // Type-scoped contexts (JSON-LD 1.1 API Section 5.1.2 step 11): the
+  // type-bearing entries are visited in lexicographical key order and the
+  // values are sorted within each entry, so scoped-context precedence follows
+  // the input keys. The values are referenced from the input element, never
+  // copied.
+  std::vector<std::pair<const JSON::String *, std::vector<JSON::StringView>>>
+      type_entries;
   for (const auto &entry : element.as_object()) {
     const auto expanded{expand_iri(state, active_context, entry.first, false,
                                    true, nullptr, nullptr, empty_weak_pointer)};
     if (!expanded.has_value() || expanded.value() != KEYWORD_TYPE) {
       continue;
     }
+    std::vector<JSON::StringView> values;
     if (entry.second.is_array()) {
       for (const auto &item : entry.second.as_array()) {
         if (item.is_string()) {
-          type_values.push_back(item.to_string());
+          values.push_back(item.to_string());
         }
       }
     } else if (entry.second.is_string()) {
-      type_values.push_back(entry.second.to_string());
+      values.push_back(entry.second.to_string());
+    }
+    type_entries.emplace_back(&entry.first, std::move(values));
+  }
+  std::ranges::sort(type_entries,
+                    [](const auto &left, const auto &right) -> bool {
+                      return *left.first < *right.first;
+                    });
+  std::vector<JSON::StringView> type_values;
+  for (auto &type_entry : type_entries) {
+    std::ranges::sort(type_entry.second);
+    for (const auto &value : type_entry.second) {
+      type_values.push_back(value);
     }
   }
-  std::ranges::sort(type_values);
   for (const auto &type : type_values) {
     // Each type-scoped context is resolved against the context that preceded
     // type-scoped processing, so one type's context cannot hide another's.

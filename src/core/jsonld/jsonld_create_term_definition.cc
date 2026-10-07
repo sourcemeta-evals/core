@@ -207,17 +207,20 @@ auto create_term_definition(ExpansionState &state,
       definition.iri =
           expand_iri(state, active_context, string_value, false, true,
                      &local_context, &defined, context_pointer, term_pointer);
-      // In 1.1, an IRI-like term must expand to its IRI mapping.
+      // In 1.1, an IRI-like term must expand to its IRI mapping. The check
+      // passes the local context so that prefix terms it depends on are
+      // created on demand regardless of creation order, and the term itself is
+      // marked as defined first so the probe cannot re-enter it
       if (!state.processing_1_0 && definition.iri.has_value()) {
         const auto colon_position{term.find(':')};
         const bool iri_like_colon{colon_position != JSON::String::npos &&
                                   colon_position != 0 &&
                                   colon_position + 1 != term.size()};
         if (iri_like_colon || term.find('/') != JSON::String::npos) {
-          auto probe{active_context};
-          const auto expanded_term{expand_iri(state, probe, term, false, true,
-                                              nullptr, nullptr,
-                                              empty_weak_pointer)};
+          defined[term] = true;
+          const auto expanded_term{expand_iri(
+              state, active_context, term, false, true, &local_context,
+              &defined, context_pointer, term_pointer)};
           if (expanded_term.has_value() && expanded_term != definition.iri) {
             throw JSONLDError("Invalid IRI mapping", term_pointer);
           }
@@ -294,17 +297,20 @@ auto create_term_definition(ExpansionState &state,
         throw JSONLDError("Invalid keyword alias", term_pointer, {KEYWORD_ID});
       }
       // In 1.1, a term that itself has the form of an IRI (a colon other than
-      // at the edges, or a slash) must expand to its IRI mapping.
+      // at the edges, or a slash) must expand to its IRI mapping. The check
+      // passes the local context so that prefix terms it depends on are
+      // created on demand regardless of creation order, and the term itself is
+      // marked as defined first so the probe cannot re-enter it
       if (!state.processing_1_0 && mapping.has_value()) {
         const auto colon_position{term.find(':')};
         const bool iri_like_colon{colon_position != JSON::String::npos &&
                                   colon_position != 0 &&
                                   colon_position + 1 != term.size()};
         if (iri_like_colon || term.find('/') != JSON::String::npos) {
-          auto probe{active_context};
-          const auto expanded_term{expand_iri(state, probe, term, false, true,
-                                              nullptr, nullptr,
-                                              empty_weak_pointer)};
+          defined[term] = true;
+          const auto expanded_term{expand_iri(
+              state, active_context, term, false, true, &local_context,
+              &defined, context_pointer, term_pointer)};
           if (expanded_term.has_value() && expanded_term != mapping) {
             throw JSONLDError("Invalid IRI mapping", term_pointer,
                               {KEYWORD_ID});

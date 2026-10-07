@@ -1609,3 +1609,75 @@ TEST(JSONLD_expand_error, null_aliased_nest_value) {
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid @nest value", "/n");
 }
+
+TEST(JSONLD_expand_error, first_invalid_term_is_lexicographic) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "z": false, "a": false }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid term definition", "/@context/a");
+
+  const auto reversed = sourcemeta::core::parse_json(R"({
+    "@context": { "a": false, "z": false }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(reversed),
+                             "Invalid term definition", "/@context/a");
+}
+
+TEST(JSONLD_expand_error, first_invalid_mapping_is_lexicographic) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "z": { "@id": false }, "a": { "@id": false } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/a/@id");
+
+  const auto reversed = sourcemeta::core::parse_json(R"({
+    "@context": { "a": { "@id": false }, "z": { "@id": false } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(reversed),
+                             "Invalid IRI mapping", "/@context/a/@id");
+}
+
+TEST(JSONLD_expand_error, graph_container_with_both_map_kinds) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": {
+        "@id": "https://example.com/p",
+        "@container": [ "@graph", "@id", "@index" ]
+      }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid container mapping",
+                             "/@context/p/@container");
+}
+
+TEST(JSONLD_expand_error, graph_container_with_both_map_kinds_and_set) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": {
+        "@id": "https://example.com/p",
+        "@container": [ "@graph", "@id", "@index", "@set" ]
+      }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid container mapping",
+                             "/@context/p/@container");
+}
+
+TEST(JSONLD_expand_error, protected_context_nullification_mid_array) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [ { "@protected": true, "a": "urn:a" }, null ],
+    "urn:p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid context nullification", "/@context/1");
+}

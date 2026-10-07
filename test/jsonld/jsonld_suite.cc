@@ -95,6 +95,48 @@ struct JSONLDExpandCase {
   std::optional<std::filesystem::path> expand_context;
 };
 
+// The resolver maps suite IRIs onto the vendored files, dereferencing a
+// context IRI while ignoring any fragment or query component.
+auto make_suite_resolver(sourcemeta::core::JSON::String base_prefix,
+                         std::filesystem::path suite_root)
+    -> sourcemeta::core::JSONLDResolver {
+  return [base_prefix = std::move(base_prefix),
+          suite_root = std::move(suite_root)](
+             const sourcemeta::core::JSON::StringView identifier)
+             -> std::optional<sourcemeta::core::JSON> {
+    if (!identifier.starts_with(base_prefix)) {
+      return std::nullopt;
+    }
+    const auto suffix{identifier.substr(base_prefix.size())};
+    const auto path{suite_root / suffix.substr(0, suffix.find_first_of("#?"))};
+    if (!std::filesystem::exists(path)) {
+      return std::nullopt;
+    }
+    return sourcemeta::core::read_json(path);
+  };
+}
+
+// URLs that differ only in query or fragment components dereference the same
+// vendored context resource
+TEST(JSONLDSuiteResolver, query_and_fragment_equivalence) {
+  const std::filesystem::path suite_root{JSONLD_SUITE_PATH};
+  const auto manifest{
+      sourcemeta::core::read_json(suite_root / "expand-manifest.jsonld")};
+  const auto &base_prefix{manifest.at("baseIri").to_string()};
+  const auto resolver{make_suite_resolver(base_prefix, suite_root)};
+  const auto plain{resolver(base_prefix + "expand-manifest.jsonld")};
+  const auto with_query{
+      resolver(base_prefix + "expand-manifest.jsonld?version=1.1")};
+  const auto with_fragment{
+      resolver(base_prefix + "expand-manifest.jsonld#section")};
+  const auto with_both{
+      resolver(base_prefix + "expand-manifest.jsonld?version=1.1#section")};
+  ASSERT_TRUE(plain.has_value());
+  EXPECT_EQ(plain, with_query);
+  EXPECT_EQ(plain, with_fragment);
+  EXPECT_EQ(plain, with_both);
+}
+
 class JSONLDExpandTest : public testing::Test {
 public:
   explicit JSONLDExpandTest(JSONLDExpandCase test_case)
@@ -102,21 +144,8 @@ public:
 
   auto TestBody() -> void override {
     const auto &test_case{this->test_case_};
-    const sourcemeta::core::JSONLDResolver resolver =
-        [&test_case](const sourcemeta::core::JSON::StringView identifier)
-        -> std::optional<sourcemeta::core::JSON> {
-      if (!identifier.starts_with(test_case.base_prefix)) {
-        return std::nullopt;
-      }
-      // Dereferencing a context IRI ignores any fragment or query component.
-      const auto suffix{identifier.substr(test_case.base_prefix.size())};
-      const auto path{test_case.suite_root /
-                      suffix.substr(0, suffix.find_first_of("#?"))};
-      if (!std::filesystem::exists(path)) {
-        return std::nullopt;
-      }
-      return sourcemeta::core::read_json(path);
-    };
+    const auto resolver{
+        make_suite_resolver(test_case.base_prefix, test_case.suite_root)};
 
     const auto input{sourcemeta::core::read_json(test_case.input)};
 
@@ -156,7 +185,8 @@ public:
                                                 resolver, test_case.version)};
       EXPECT_TRUE(jsonld_deep_equal(actual, expected, false))
           << "Expanded output did not match expected under JSON-LD 1.1 "
-             "unordered semantics";
+             "unordered semantics\nExpected: "
+          << expected << "\nActual: " << actual;
     }
   }
 
