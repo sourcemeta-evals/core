@@ -5978,6 +5978,24 @@ TEST(Numeric_decimal, unary_plus_negative_nonzero_preserves_sign) {
   EXPECT_EQ(result, sourcemeta::core::Decimal{-5});
 }
 
+TEST(Numeric_decimal, to_string_zero_at_maximum_exponent_round_trips) {
+  const sourcemeta::core::Decimal value{"0e2147483647"};
+  const auto serialized = value.to_string();
+  const sourcemeta::core::Decimal reparsed{serialized};
+  EXPECT_TRUE(reparsed.is_zero());
+  EXPECT_FALSE(reparsed.is_signed());
+  EXPECT_TRUE(reparsed.same_quantum(value));
+}
+
+TEST(Numeric_decimal, to_string_negative_zero_at_maximum_exponent_round_trips) {
+  const sourcemeta::core::Decimal value{"-0e2147483647"};
+  const auto serialized = value.to_string();
+  const sourcemeta::core::Decimal reparsed{serialized};
+  EXPECT_TRUE(reparsed.is_zero());
+  EXPECT_TRUE(reparsed.is_signed());
+  EXPECT_TRUE(reparsed.same_quantum(value));
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};
