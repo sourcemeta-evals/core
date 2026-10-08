@@ -6055,6 +6055,64 @@ TEST(Numeric_decimal,
   EXPECT_EQ(result, sourcemeta::core::Decimal{"19999999999999999999"});
 }
 
+TEST(Numeric_decimal,
+     add_overlapping_discarded_coefficient_digits_rounds_above_midpoint) {
+  // Large coefficient whose dropped tail is `4999` just below the half-even
+  // midpoint, combined with a smaller operand whose adjusted exponent sits
+  // AT the larger operand's bottom coefficient digit. The sticky-sentinel
+  // substitution must not fire for this case: it would discard the carry
+  // chain that propagates `9+2=11` across the dropped tail and flips the
+  // 16-digit rounded result from 1.000000000000000 to the correct
+  // 1.000000000000001.
+  const sourcemeta::core::Decimal left{"1.0000000000000004999"};
+  const sourcemeta::core::Decimal right{"2e-19"};
+  EXPECT_EQ(left + right, sourcemeta::core::Decimal{"1.000000000000001"});
+}
+
+TEST(Numeric_decimal,
+     add_overlapping_coefficient_with_trailing_zero_encoding_rounds_above) {
+  // Equivalent encoding of 2e-19 with twenty trailing coefficient zeros and
+  // stored exponent -38. The adjusted-gap gate alone would miss this case
+  // because the stored_gap is 19 (greater than WORKING_PRECISION + 2); the
+  // digit-count gate catches it via adj_gap >= larger_digits.
+  const sourcemeta::core::Decimal left{"1.0000000000000004999"};
+  const sourcemeta::core::Decimal right{"20000000000000000000e-38"};
+  EXPECT_EQ(left + right, sourcemeta::core::Decimal{"1.000000000000001"});
+}
+
+TEST(Numeric_decimal,
+     add_overlapping_coefficient_with_trailing_zero_encoding_reversed) {
+  const sourcemeta::core::Decimal left{"20000000000000000000e-38"};
+  const sourcemeta::core::Decimal right{"1.0000000000000004999"};
+  EXPECT_EQ(left + right, sourcemeta::core::Decimal{"1.000000000000001"});
+}
+
+TEST(Numeric_decimal,
+     scale_by_zero_preserves_coefficient_beyond_working_precision) {
+  const sourcemeta::core::Decimal value{"12345678901234567"};
+  const auto result{value.scale_by(sourcemeta::core::Decimal{0})};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"12345678901234567"});
+  EXPECT_TRUE(result.same_quantum(value));
+}
+
+TEST(Numeric_decimal,
+     scale_by_positive_preserves_coefficient_beyond_working_precision) {
+  const sourcemeta::core::Decimal value{"12345678901234567"};
+  const auto result{value.scale_by(sourcemeta::core::Decimal{2})};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"12345678901234567e2"});
+  EXPECT_TRUE(
+      result.same_quantum(sourcemeta::core::Decimal{"12345678901234567e2"}));
+}
+
+TEST(Numeric_decimal,
+     scale_by_negative_preserves_coefficient_beyond_working_precision) {
+  const sourcemeta::core::Decimal value{"12345678901234567"};
+  const auto result{value.scale_by(sourcemeta::core::Decimal{-2})};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"12345678901234567e-2"});
+  EXPECT_TRUE(
+      result.same_quantum(sourcemeta::core::Decimal{"12345678901234567e-2"}));
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};
