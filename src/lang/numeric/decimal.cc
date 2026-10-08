@@ -1783,18 +1783,22 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
         result_exp = preferred_quantum;
       }
 
+      std::int64_t new_coefficient{0};
+      std::uint64_t new_coefficient_high{0};
+      std::uint8_t new_flags{0};
+      store_big_result(new_coefficient, new_coefficient_high, new_flags,
+                       std::move(non_zero_big), non_zero_negative);
       free_big_coefficient(this->coefficient_, this->flags_);
-      store_big_result(this->coefficient_, this->coefficient_high_,
-                       this->flags_, std::move(non_zero_big),
-                       non_zero_negative);
+      this->coefficient_ = new_coefficient;
+      this->coefficient_high_ = new_coefficient_high;
+      this->flags_ = new_flags;
       this->exponent_ = result_exp;
       round_to_precision(this->coefficient_, this->coefficient_high_,
                          this->exponent_, this->flags_);
       return *this;
     }
 
-    if (!left_big.is_zero() && !right_big.is_zero() &&
-        left_digits <= WORKING_PRECISION && right_digits <= WORKING_PRECISION) {
+    if (!left_big.is_zero() && !right_big.is_zero()) {
       const auto left_adj_64 =
           static_cast<std::int64_t>(this->exponent_) + left_digits - 1;
       const auto right_adj_64 =
@@ -1832,9 +1836,15 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
       result_negative = false;
     }
 
-    free_big_coefficient(this->coefficient_, this->flags_);
-    store_big_result(this->coefficient_, this->coefficient_high_, this->flags_,
+    std::int64_t new_coefficient{0};
+    std::uint64_t new_coefficient_high{0};
+    std::uint8_t new_flags{0};
+    store_big_result(new_coefficient, new_coefficient_high, new_flags,
                      std::move(result_big), result_negative);
+    free_big_coefficient(this->coefficient_, this->flags_);
+    this->coefficient_ = new_coefficient;
+    this->coefficient_high_ = new_coefficient_high;
+    this->flags_ = new_flags;
     this->exponent_ = result_exponent;
     round_to_precision(this->coefficient_, this->coefficient_high_,
                        this->exponent_, this->flags_);
@@ -1928,9 +1938,15 @@ auto Decimal::operator*=(const Decimal &other) -> Decimal & {
     auto right_big = coefficient_as_big(other.coefficient_,
                                         other.coefficient_high_, other.flags_);
     auto product = left_big.multiply(right_big);
-    free_big_coefficient(this->coefficient_, this->flags_);
-    store_big_result(this->coefficient_, this->coefficient_high_, this->flags_,
+    std::int64_t new_coefficient{0};
+    std::uint64_t new_coefficient_high{0};
+    std::uint8_t new_flags{0};
+    store_big_result(new_coefficient, new_coefficient_high, new_flags,
                      std::move(product), result_negative);
+    free_big_coefficient(this->coefficient_, this->flags_);
+    this->coefficient_ = new_coefficient;
+    this->coefficient_high_ = new_coefficient_high;
+    this->flags_ = new_flags;
     this->exponent_ = result_exponent;
     round_to_precision(this->coefficient_, this->coefficient_high_,
                        this->exponent_, this->flags_);
@@ -2110,9 +2126,15 @@ auto Decimal::operator/=(const Decimal &other) -> Decimal & {
     throw NumericOverflowError{};
   }
 
-  free_big_coefficient(this->coefficient_, this->flags_);
-  store_big_result(this->coefficient_, this->coefficient_high_, this->flags_,
+  std::int64_t new_coefficient{0};
+  std::uint64_t new_coefficient_high{0};
+  std::uint8_t new_flags{0};
+  store_big_result(new_coefficient, new_coefficient_high, new_flags,
                    std::move(quotient), result_negative);
+  free_big_coefficient(this->coefficient_, this->flags_);
+  this->coefficient_ = new_coefficient;
+  this->coefficient_high_ = new_coefficient_high;
+  this->flags_ = new_flags;
 
   this->exponent_ = static_cast<std::int32_t>(final_exponent_64);
 
@@ -2230,6 +2252,9 @@ auto Decimal::operator+() const -> Decimal {
   if (result.is_finite()) {
     round_to_precision(result.coefficient_, result.coefficient_high_,
                        result.exponent_, result.flags_);
+    if (result.is_zero()) {
+      result.flags_ = static_cast<std::uint8_t>(result.flags_ & ~FLAG_SIGN);
+    }
   }
   return result;
 }

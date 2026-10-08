@@ -5921,6 +5921,63 @@ TEST(Numeric_decimal, divide_pushes_result_past_minimum_exponent_overflows) {
       sourcemeta::core::NumericOverflowError);
 }
 
+TEST(Numeric_decimal,
+     add_seventeen_digit_coefficient_distant_zero_rounds_half_even_up) {
+  const sourcemeta::core::Decimal left{"12345678901234567e1000000000"};
+  const sourcemeta::core::Decimal right{"1e-1000000000"};
+  EXPECT_EQ(left + right,
+            sourcemeta::core::Decimal{"1234567890123457e1000000001"});
+}
+
+TEST(
+    Numeric_decimal,
+    add_seventeen_digit_coefficient_distant_zero_rounds_half_even_up_reversed) {
+  const sourcemeta::core::Decimal left{"1e-1000000000"};
+  const sourcemeta::core::Decimal right{"12345678901234567e1000000000"};
+  EXPECT_EQ(left + right,
+            sourcemeta::core::Decimal{"1234567890123457e1000000001"});
+}
+
+TEST(Numeric_decimal,
+     add_seventeen_digit_coefficient_distant_zero_sticky_rounds_down) {
+  const sourcemeta::core::Decimal left{"12345678901234561e1000000000"};
+  const sourcemeta::core::Decimal right{"1e-1000000000"};
+  EXPECT_EQ(left + right,
+            sourcemeta::core::Decimal{"1234567890123456e1000000001"});
+}
+
+TEST(Numeric_decimal, unary_plus_negative_zero_yields_positive_zero) {
+  const sourcemeta::core::Decimal value{"-0"};
+  const auto result = +value;
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+}
+
+TEST(Numeric_decimal,
+     unary_plus_negative_zero_with_negative_exponent_preserves_quantum) {
+  const sourcemeta::core::Decimal value{"-0.00"};
+  const auto result = +value;
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{"0.00"}));
+}
+
+TEST(Numeric_decimal,
+     unary_plus_negative_zero_with_positive_exponent_preserves_quantum) {
+  const sourcemeta::core::Decimal value{"-0e3"};
+  const auto result = +value;
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{"0e3"}));
+}
+
+TEST(Numeric_decimal, unary_plus_negative_nonzero_preserves_sign) {
+  const sourcemeta::core::Decimal value{"-5"};
+  const auto result = +value;
+  EXPECT_TRUE(result.is_signed());
+  EXPECT_EQ(result, sourcemeta::core::Decimal{-5});
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};
