@@ -188,6 +188,149 @@ auto includes_invalid_member(const JSON &expanded) -> bool {
   throw JSONLDError("Invalid @included value", pointer);
 }
 
+// Whether an expanded property-valued index-map result contains a value
+// object, which that container forbids
+auto contains_value_object(const JSON &expanded) -> bool {
+  if (expanded.is_array()) {
+    for (const auto &item : expanded.as_array()) {
+      if (item.is_object() && item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return expanded.is_object() &&
+         expanded.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH);
+}
+
+// Throw the invalid value object error at the innermost offending member of a
+// property-valued index-map value, drilling through nested arrays and set
+// objects to its original location
+[[noreturn]] auto
+throw_invalid_index_value(ExpansionState &state, ActiveContext &context,
+                          const std::optional<JSON::String> &property,
+                          const JSON &member, const WeakPointer &pointer)
+    -> void {
+  if (member.is_array()) {
+    std::size_t index{0};
+    for (const auto &sub : member.as_array()) {
+      const WeakPointer sub_pointer{pointer.concat(index)};
+      const auto expanded{expand(state, context, property, sub, sub_pointer)};
+      if (contains_value_object(expanded)) {
+        throw_invalid_index_value(state, context, property, sub, sub_pointer);
+      }
+      index += 1;
+    }
+  } else if (member.is_object()) {
+    for (const auto &entry : member.as_object()) {
+      const auto expanded_key{expand_iri(state, context, entry.first, false,
+                                         true, nullptr, nullptr,
+                                         empty_weak_pointer)};
+      if (expanded_key.has_value() && expanded_key.value() == KEYWORD_SET) {
+        throw_invalid_index_value(state, context, property, entry.second,
+                                  pointer.concat(entry.first));
+      }
+    }
+  }
+  throw JSONLDError("Invalid value object", pointer);
+}
+
+// Whether an expanded reverse property value contains a value or list object,
+// which reverse properties forbid
+auto contains_reverse_invalid(const JSON &expanded) -> bool {
+  if (expanded.is_array()) {
+    for (const auto &item : expanded.as_array()) {
+      if (item.is_object() &&
+          (item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH) ||
+           item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH))) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return expanded.is_object() &&
+         (expanded.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH) ||
+          expanded.defines(KEYWORD_LIST, KEYWORD_LIST_HASH));
+}
+
+// Throw the invalid reverse property value error at the innermost offending
+// member, drilling through nested arrays and set objects to its original
+// location
+[[noreturn]] auto
+throw_invalid_reverse_value(ExpansionState &state, ActiveContext &context,
+                            const std::optional<JSON::String> &property,
+                            const JSON &member, const WeakPointer &pointer)
+    -> void {
+  if (member.is_array()) {
+    std::size_t index{0};
+    for (const auto &sub : member.as_array()) {
+      const WeakPointer sub_pointer{pointer.concat(index)};
+      const auto expanded{expand(state, context, property, sub, sub_pointer)};
+      if (contains_reverse_invalid(expanded)) {
+        throw_invalid_reverse_value(state, context, property, sub, sub_pointer);
+      }
+      index += 1;
+    }
+  } else if (member.is_object()) {
+    for (const auto &entry : member.as_object()) {
+      const auto expanded_key{expand_iri(state, context, entry.first, false,
+                                         true, nullptr, nullptr,
+                                         empty_weak_pointer)};
+      if (expanded_key.has_value() && expanded_key.value() == KEYWORD_SET) {
+        throw_invalid_reverse_value(state, context, property, entry.second,
+                                    pointer.concat(entry.first));
+      }
+    }
+  }
+  throw JSONLDError("Invalid reverse property value", pointer);
+}
+
+// Whether an expanded result contains a list object, which a list container
+// forbids in JSON-LD 1.0
+auto contains_list_object(const JSON &expanded) -> bool {
+  if (expanded.is_array()) {
+    for (const auto &item : expanded.as_array()) {
+      if (item.is_object() && item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return expanded.is_object() &&
+         expanded.defines(KEYWORD_LIST, KEYWORD_LIST_HASH);
+}
+
+// Throw the list of lists error at the innermost offending member of a list
+// container value, drilling through nested arrays and set objects to its
+// original location
+[[noreturn]] auto
+throw_list_of_lists(ExpansionState &state, ActiveContext &context,
+                    const std::optional<JSON::String> &property,
+                    const JSON &member, const WeakPointer &pointer) -> void {
+  if (member.is_array()) {
+    std::size_t index{0};
+    for (const auto &sub : member.as_array()) {
+      const WeakPointer sub_pointer{pointer.concat(index)};
+      const auto expanded{expand(state, context, property, sub, sub_pointer)};
+      if (contains_list_object(expanded)) {
+        throw_list_of_lists(state, context, property, sub, sub_pointer);
+      }
+      index += 1;
+    }
+  } else if (member.is_object()) {
+    for (const auto &entry : member.as_object()) {
+      const auto expanded_key{expand_iri(state, context, entry.first, false,
+                                         true, nullptr, nullptr,
+                                         empty_weak_pointer)};
+      if (expanded_key.has_value() && expanded_key.value() == KEYWORD_SET) {
+        throw_list_of_lists(state, context, property, entry.second,
+                            pointer.concat(entry.first));
+      }
+    }
+  }
+  throw JSONLDError("List of lists", pointer);
+}
+
 // Whether any key of the given nested object expands to @value, which the
 // @nest validation forbids, including through keyword aliases
 auto nest_defines_value(ExpansionState &state, ActiveContext &active_context,
@@ -752,30 +895,13 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                   }
                   const WeakPointer input_pointer{
                       entry_pointer.concat(input_entry.first)};
-                  // Array values are probed per member so the error keeps the
-                  // offending member's original input index
-                  const auto input_members{
-                      into_array(JSON{input_entry.second})};
-                  const bool input_array{input_entry.second.is_array()};
-                  std::size_t input_index{0};
-                  for (const auto &input_member : input_members.as_array()) {
-                    const WeakPointer member_pointer{
-                        input_array ? input_pointer.concat(input_index)
-                                    : input_pointer};
-                    const auto probe{into_array(
-                        expand(state, reverse_context, input_entry.first,
-                               input_member, member_pointer))};
-                    for (const auto &probe_item : probe.as_array()) {
-                      if (probe_item.is_object() &&
-                          (probe_item.defines(KEYWORD_VALUE,
-                                              KEYWORD_VALUE_HASH) ||
-                           probe_item.defines(KEYWORD_LIST,
-                                              KEYWORD_LIST_HASH))) {
-                        throw JSONLDError("Invalid reverse property value",
-                                          member_pointer);
-                      }
-                    }
-                    input_index += 1;
+                  const auto probe{expand(state, reverse_context,
+                                          input_entry.first, input_entry.second,
+                                          input_pointer)};
+                  if (contains_reverse_invalid(probe)) {
+                    throw_invalid_reverse_value(
+                        state, reverse_context, input_entry.first,
+                        input_entry.second, input_pointer);
                   }
                 }
                 throw JSONLDError("Invalid reverse property value",
@@ -995,9 +1121,9 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
               if (item.is_object() &&
                   item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
                 const WeakPointer index_pointer{entry_pointer.concat(index)};
-                throw JSONLDError("Invalid value object",
-                                  index_value_array
-                                      ? index_pointer.concat(item_origin)
+                throw_invalid_index_value(
+                    state, active_context, property, raw_values.at(item_origin),
+                    index_value_array ? index_pointer.concat(item_origin)
                                       : index_pointer);
               }
               // The index value is prepended to any existing values.
@@ -1148,7 +1274,10 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         for (const auto &item : expanded_value.as_array()) {
           if (item.is_object() &&
               item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH)) {
-            throw JSONLDError("List of lists", entry_pointer);
+            // The value is re-probed on the error path so the error keeps the
+            // offending member's original input location
+            throw_list_of_lists(state, active_context, property, entry.second,
+                                entry_pointer);
           }
         }
       }
@@ -1168,27 +1297,10 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         if (item.is_object() &&
             (item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH) ||
              item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH))) {
-          // An array value is re-probed per member so the error keeps the
-          // offending member's original input index
-          if (entry.second.is_array()) {
-            std::size_t member_index{0};
-            for (const auto &member : entry.second.as_array()) {
-              const WeakPointer member_pointer{
-                  entry_pointer.concat(member_index)};
-              const auto probe{into_array(expand(
-                  state, active_context, property, member, member_pointer))};
-              for (const auto &probe_item : probe.as_array()) {
-                if (probe_item.is_object() &&
-                    (probe_item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH) ||
-                     probe_item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH))) {
-                  throw JSONLDError("Invalid reverse property value",
-                                    member_pointer);
-                }
-              }
-              member_index += 1;
-            }
-          }
-          throw JSONLDError("Invalid reverse property value", entry_pointer);
+          // The value is re-probed on the error path so the error keeps the
+          // offending member's original input location
+          throw_invalid_reverse_value(state, active_context, property,
+                                      entry.second, entry_pointer);
         }
       }
       const auto *existing_reverse{
@@ -1293,7 +1405,10 @@ auto expand(ExpansionState &state, ActiveContext &active_context,
         for (const auto &item : result.as_array()) {
           if (item.is_object() &&
               item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH)) {
-            throw JSONLDError("List of lists", pointer);
+            // The value is re-probed on the error path so the error keeps the
+            // offending member's original input location
+            throw_list_of_lists(state, active_context, active_property, element,
+                                pointer);
           }
         }
       }

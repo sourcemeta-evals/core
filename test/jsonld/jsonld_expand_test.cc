@@ -2094,3 +2094,22 @@ TEST(JSONLD_expand, top_level_array_preserves_graph_object) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
+
+TEST(JSONLD_expand, included_named_graph_member_expands) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@included": { "@id": "urn:g", "@graph": [ { "urn:p": "v" } ] }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@included": [
+        {
+          "@id": "urn:g",
+          "@graph": [ { "urn:p": [ { "@value": "v" } ] } ]
+        }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}

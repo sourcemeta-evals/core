@@ -1972,3 +1972,152 @@ TEST(JSONLD_expand_error, reverse_definition_rejects_unknown_entries) {
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid term definition", "/@context/p/@bogus");
 }
+
+TEST(JSONLD_expand_error, index_map_nested_array_member_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": { "@id": "urn:p", "@container": "@index", "@index": "urn:i" }
+    },
+    "p": { "x": [ null, [ null, { "@value": "bad" } ] ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid value object", "/p/x/1/1");
+}
+
+TEST(JSONLD_expand_error, index_map_set_member_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": { "@id": "urn:p", "@container": "@index", "@index": "urn:i" }
+    },
+    "p": { "x": [ null, { "@set": [ null, { "@value": "bad" } ] } ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid value object", "/p/x/1/@set/1");
+}
+
+TEST(JSONLD_expand_error, index_map_direct_set_value_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": { "@id": "urn:p", "@container": "@index", "@index": "urn:i" }
+    },
+    "p": { "x": { "@set": [ null, { "@value": "bad" } ] } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid value object", "/p/x/@set/1");
+}
+
+TEST(JSONLD_expand_error, reverse_nested_array_member_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "r": { "@reverse": "urn:p" } },
+    "r": [ null, [ { "@value": 1 } ] ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value", "/r/1/0");
+}
+
+TEST(JSONLD_expand_error, reverse_set_value_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "r": { "@reverse": "urn:p" } },
+    "r": { "@set": [ null, { "@value": "x" } ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value", "/r/@set/1");
+}
+
+TEST(JSONLD_expand_error, reverse_map_nested_member_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@reverse": { "urn:p": [ null, [ { "@value": 1 } ] ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value",
+                             "/@reverse/urn:p/1/0");
+}
+
+TEST(JSONLD_expand_error, legacy_list_container_member_keeps_index) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@container": "@list" } },
+    "p": [ null, { "@list": [ "x" ] } ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "List of lists", "/p/1");
+}
+
+TEST(JSONLD_expand_error, protected_type_empty_redefinition) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [ { "@type": { "@protected": true } }, { "@type": {} } ],
+    "@type": "urn:T"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Keyword redefinition", "/@context/1/@type");
+}
+
+TEST(JSONLD_expand_error, imported_term_local_dependency_keeps_location) {
+  const sourcemeta::core::JSONLDResolver resolver =
+      [](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    if (identifier == "https://example.com/import-local-dependency") {
+      return sourcemeta::core::parse_json(R"({ "@context": { "a": "z" } })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@import": "https://example.com/import-local-dependency",
+      "z": { "@id": 42 }
+    },
+    "a": "x"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver),
+      "Invalid IRI mapping", "/@context/z/@id");
+}
+
+TEST(JSONLD_expand_error, blank_node_remote_context_rejected) {
+  std::size_t invocations{0};
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&invocations](const sourcemeta::core::JSON::StringView)
+      -> std::optional<sourcemeta::core::JSON> {
+    invocations += 1;
+    return sourcemeta::core::parse_json(R"({ "@context": {} })");
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": "_:ctx"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver),
+      "Loading document failed", "/@context");
+  EXPECT_EQ(invocations, 0);
+}
+
+TEST(JSONLD_expand_error, blank_node_import_rejected) {
+  std::size_t invocations{0};
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&invocations](const sourcemeta::core::JSON::StringView)
+      -> std::optional<sourcemeta::core::JSON> {
+    invocations += 1;
+    return sourcemeta::core::parse_json(R"({ "@context": {} })");
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@import": "_:ctx" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver),
+      "Loading remote context failed", "/@context/@import");
+  EXPECT_EQ(invocations, 0);
+}

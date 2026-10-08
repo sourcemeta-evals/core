@@ -120,8 +120,12 @@ auto create_term_definition_internal(
           invalid_entry = true;
         }
       }
-      // A redefinition of a protected @type is rejected before the shape of
-      // the new definition is validated.
+      // Either or both of a set container and a protected flag are valid,
+      // and the shape is validated before the protected redefinition
+      // comparison (JSON-LD 1.1 API Section 5.1.1 step 4)
+      if (invalid_entry || (!has_container && !has_protected)) {
+        throw JSONLDError("Keyword redefinition", term_pointer);
+      }
       const auto existing_type{active_context.terms.find(KEYWORD_TYPE)};
       if (existing_type != active_context.terms.cend() &&
           existing_type->second.is_protected && !state.protected_override) {
@@ -129,10 +133,6 @@ auto create_term_definition_internal(
           throw JSONLDError("Protected term redefinition", term_pointer);
         }
         type_definition.is_protected = true;
-      } else if (invalid_entry || (!has_container && !has_protected)) {
-        // Either or both of a set container and a protected flag are valid
-        // (JSON-LD 1.1 API Section 5.1.1 step 4)
-        throw JSONLDError("Keyword redefinition", term_pointer);
       } else if (!has_protected) {
         // An explicit @protected flag, including false, wins over the
         // context-wide default
@@ -695,6 +695,17 @@ auto create_term_definition(ExpansionState &state,
                                       term, defined, context_pointer,
                                       reference_pointer);
     } catch (const JSONLDError &error) {
+      // An error raised by a local dependency of the imported term keeps its
+      // own location
+      const auto prefix{to_pointer(context_pointer)};
+      const auto &location{error.pointer()};
+      if (location.size() > prefix.size() && location.starts_with(prefix)) {
+        const auto &token{location.at(prefix.size())};
+        if (token.is_property() && local_context.defines(token.to_property()) &&
+            !state.imported_keys.contains(token.to_property())) {
+          throw;
+        }
+      }
       throw JSONLDError(error.what(),
                         context_pointer.concat(TOKEN_IMPORT_ENTRY));
     }
