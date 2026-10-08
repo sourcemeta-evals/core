@@ -6024,6 +6024,37 @@ TEST(Numeric_decimal,
   EXPECT_EQ(left - right, sourcemeta::core::Decimal{"1.000000000000002"});
 }
 
+TEST(Numeric_decimal,
+     subtract_long_coefficient_very_distant_operand_rounds_above_midpoint) {
+  const sourcemeta::core::Decimal left{"1.23456789012345650001"};
+  const sourcemeta::core::Decimal right{"1e-100"};
+  EXPECT_EQ(left - right, sourcemeta::core::Decimal{"1.234567890123457"});
+}
+
+TEST(Numeric_decimal,
+     add_long_coefficient_very_distant_operand_rounds_above_midpoint) {
+  const sourcemeta::core::Decimal left{"1.23456789012345749999"};
+  const sourcemeta::core::Decimal right{"1e-100"};
+  EXPECT_EQ(left + right, sourcemeta::core::Decimal{"1.234567890123457"});
+}
+
+TEST(Numeric_decimal,
+     divide_integer_long_division_correction_preserves_carries_between_limbs) {
+  // D = (2V-1) * 10^19 where V = (10^19/2 + 1) * 10^38 - 1 = 5*10^56 + 10^38 -
+  // 1 and B = 10^19. Expected integer quotient D / V = 2*B - 1 =
+  // 19999999999999999999. This exercises the limb-wise carry correction in
+  // long division: a quotient-digit estimate near the base boundary must
+  // propagate its carry into the next limb before subtracting the scaled
+  // divisor from the running remainder.
+  const sourcemeta::core::Decimal dividend{
+      "100000000000000000019999999999999999999999999999999999999700000000000000"
+      "00000"};
+  const sourcemeta::core::Decimal divisor{
+      "500000000000000000099999999999999999999999999999999999999"};
+  const auto result{dividend.divide_integer(divisor)};
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"19999999999999999999"});
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};
