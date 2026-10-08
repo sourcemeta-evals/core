@@ -77,9 +77,15 @@ auto expand_iri(ExpansionState &state, ActiveContext &active_context,
   }
 
   if (document_relative && active_context.base.has_value()) {
-    return URI::from_iri(value)
-        .resolve_from(URI::from_iri(active_context.base.value()))
-        .recompose();
+    // A malformed identifier is preserved rather than corrected or rejected
+    // through a dependency exception (JSON-LD 1.1 API Section 2 conformance)
+    try {
+      return URI::from_iri(value)
+          .resolve_from(URI::from_iri(active_context.base.value()))
+          .recompose();
+    } catch (const URIParseError &) {
+      return value;
+    }
   }
 
   return value;

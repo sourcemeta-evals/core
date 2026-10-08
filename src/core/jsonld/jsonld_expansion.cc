@@ -795,6 +795,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       // A null @set value keeps its null expansion, so the bare-set collapse
       // turns the whole element into null and the property disappears
       if (name == KEYWORD_SET && entry.second.is_null()) {
+        value_members.collection = source_pointer;
         result.assign(name, JSON{nullptr});
         continue;
       }
@@ -928,23 +929,24 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                       entry.second.at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH),
                       entry_pointer.concat(keyword_context()));
                 }
-                for (const auto &input_entry : entry.second.as_object()) {
-                  const auto input_property{expand_iri(
-                      state, reverse_context, input_entry.first, false, true,
-                      nullptr, nullptr, empty_weak_pointer)};
+                for (const auto &[input_key, input_value] :
+                     sorted_entries(entry.second)) {
+                  const JSON::String &input_name{*input_key};
+                  const auto input_property{
+                      expand_iri(state, reverse_context, input_name, false,
+                                 true, nullptr, nullptr, empty_weak_pointer)};
                   if (!input_property.has_value() ||
                       input_property.value() != reverse_property) {
                     continue;
                   }
                   const WeakPointer input_pointer{
-                      entry_pointer.concat(input_entry.first)};
-                  const auto probe{expand(state, reverse_context,
-                                          input_entry.first, input_entry.second,
-                                          input_pointer)};
+                      entry_pointer.concat(input_name)};
+                  const auto probe{expand(state, reverse_context, input_name,
+                                          *input_value, input_pointer)};
                   if (contains_reverse_invalid(probe)) {
-                    throw_invalid_reverse_value(
-                        state, reverse_context, input_entry.first,
-                        input_entry.second, input_pointer);
+                    throw_invalid_reverse_value(state, reverse_context,
+                                                input_name, *input_value,
+                                                input_pointer);
                   }
                 }
                 throw JSONLDError("Invalid reverse property value",
@@ -1034,15 +1036,19 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                                         KEYWORD_ID_HASH);
               }
             } else if (property_valued) {
-              auto combined{into_array(expand_value(
-                  state, active_context, definition->index, JSON{index}))};
-              if (graph.defines(index_property.value())) {
-                for (auto &existing :
-                     graph.at(index_property.value()).as_array()) {
-                  combined.push_back(existing);
+              // A null-redefined index term expands to nothing, so no
+              // metadata is added
+              if (index_property.has_value()) {
+                auto combined{into_array(expand_value(
+                    state, active_context, definition->index, JSON{index}))};
+                if (graph.defines(index_property.value())) {
+                  for (auto &existing :
+                       graph.at(index_property.value()).as_array()) {
+                    combined.push_back(existing);
+                  }
                 }
+                graph.assign(index_property.value(), std::move(combined));
               }
-              graph.assign(index_property.value(), std::move(combined));
             } else if (!graph.defines(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
               graph.assign_assume_new(JSON::String{KEYWORD_INDEX}, JSON{index},
                                       KEYWORD_INDEX_HASH);
@@ -1169,16 +1175,20 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                     index_value_array ? index_pointer.concat(item_origin)
                                       : index_pointer);
               }
-              // The index value is prepended to any existing values.
-              auto combined{into_array(expand_value(
-                  state, active_context, definition->index, JSON{index}))};
-              if (item.defines(index_property.value())) {
-                for (auto &existing :
-                     item.at(index_property.value()).as_array()) {
-                  combined.push_back(existing);
+              // The index value is prepended to any existing values. A
+              // null-redefined index term expands to nothing, so no metadata
+              // is added
+              if (index_property.has_value()) {
+                auto combined{into_array(expand_value(
+                    state, active_context, definition->index, JSON{index}))};
+                if (item.defines(index_property.value())) {
+                  for (auto &existing :
+                       item.at(index_property.value()).as_array()) {
+                    combined.push_back(existing);
+                  }
                 }
+                item.assign(index_property.value(), std::move(combined));
               }
-              item.assign(index_property.value(), std::move(combined));
             } else if (!item.defines(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
               item.assign_assume_new(JSON::String{KEYWORD_INDEX}, JSON{index},
                                      KEYWORD_INDEX_HASH);

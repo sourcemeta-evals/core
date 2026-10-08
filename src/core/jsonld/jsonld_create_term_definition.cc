@@ -248,6 +248,30 @@ auto create_term_definition_internal(
   } else if (value.is_object()) {
     const bool has_id{id_entry != nullptr};
     const JSON *const id{id_entry};
+    // The type mapping is processed before the reverse and identifier
+    // mappings, so an invalid type is rejected even when a keyword-form
+    // mapping would otherwise ignore the term (JSON-LD 1.1 API Section 5.2
+    // step 12)
+    if (const auto *type_entry{value.try_at(KEYWORD_TYPE, KEYWORD_TYPE_HASH)}) {
+      const auto &type_value{*type_entry};
+      if (!type_value.is_string()) {
+        throw JSONLDError("Invalid type mapping", term_pointer, {KEYWORD_TYPE});
+      }
+      const auto type{expand_iri(state, active_context, type_value.to_string(),
+                                 false, true, &local_context, &defined,
+                                 context_pointer,
+                                 term_pointer.concat(TOKEN_TYPE))};
+      if (!type.has_value() || type.value().starts_with("_:") ||
+          (type.value() != KEYWORD_ID && type.value() != KEYWORD_VOCAB &&
+           type.value() != KEYWORD_JSON && type.value() != KEYWORD_NONE &&
+           type.value().find(':') == JSON::String::npos) ||
+          (state.processing_1_0 &&
+           (type.value() == KEYWORD_JSON || type.value() == KEYWORD_NONE))) {
+        throw JSONLDError("Invalid type mapping", term_pointer, {KEYWORD_TYPE});
+      }
+      definition.type_mapping = type;
+    }
+
     if (const auto *reverse_entry{
             value.try_at(KEYWORD_REVERSE, KEYWORD_REVERSE_HASH)}) {
       if (has_id || value.defines(KEYWORD_NEST, KEYWORD_NEST_HASH)) {
@@ -351,26 +375,6 @@ auto create_term_definition_internal(
                                   nullptr, nullptr, empty_weak_pointer);
     } else if (active_context.vocabulary.has_value()) {
       definition.iri = active_context.vocabulary.value() + term;
-    }
-
-    if (const auto *type_entry{value.try_at(KEYWORD_TYPE, KEYWORD_TYPE_HASH)}) {
-      const auto &type_value{*type_entry};
-      if (!type_value.is_string()) {
-        throw JSONLDError("Invalid type mapping", term_pointer, {KEYWORD_TYPE});
-      }
-      const auto type{expand_iri(state, active_context, type_value.to_string(),
-                                 false, true, &local_context, &defined,
-                                 context_pointer,
-                                 term_pointer.concat(TOKEN_TYPE))};
-      if (!type.has_value() || type.value().starts_with("_:") ||
-          (type.value() != KEYWORD_ID && type.value() != KEYWORD_VOCAB &&
-           type.value() != KEYWORD_JSON && type.value() != KEYWORD_NONE &&
-           type.value().find(':') == JSON::String::npos) ||
-          (state.processing_1_0 &&
-           (type.value() == KEYWORD_JSON || type.value() == KEYWORD_NONE))) {
-        throw JSONLDError("Invalid type mapping", term_pointer, {KEYWORD_TYPE});
-      }
-      definition.type_mapping = type;
     }
 
     if (const auto *container_entry{

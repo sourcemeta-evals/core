@@ -2342,3 +2342,61 @@ TEST(JSONLD_expand_error, empty_container_array) {
                              "Invalid container mapping",
                              "/@context/p/@container");
 }
+
+TEST(JSONLD_expand_error, invalid_type_with_keyword_form_id) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "@foo", "@type": false } },
+    "urn:q": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid type mapping", "/@context/p/@type");
+}
+
+TEST(JSONLD_expand_error, invalid_type_with_keyword_form_reverse) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@reverse": "@future", "@type": false } },
+    "urn:q": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid type mapping", "/@context/p/@type");
+}
+
+TEST(JSONLD_expand_error, null_set_inside_nest_keeps_location) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@nest": { "@set": null, "@type": "urn:T" } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid set or list object", "/urn:p/@nest");
+}
+
+TEST(JSONLD_expand_error, null_set_inside_nest_array_keeps_location) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@nest": [ { "@set": null, "@type": "urn:T" } ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid set or list object", "/urn:p/@nest/0");
+}
+
+TEST(JSONLD_expand_error, reverse_alias_errors_report_lexicographically) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "a": "urn:p", "z": "urn:p" },
+    "@reverse": { "z": 1, "a": 2 }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value", "/@reverse/a");
+}
+
+TEST(JSONLD_expand_error, reverse_alias_lexicographic_reversed) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "a": "urn:p", "z": "urn:p" },
+    "@reverse": { "a": 2, "z": 1 }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value", "/@reverse/a");
+}

@@ -16,6 +16,4 @@ target_link_libraries(sourcemeta_core_jsonld
 target_link_libraries(sourcemeta_core_jsonld
   PRIVATE sourcemeta::core::uri)
 target_link_libraries(sourcemeta_core_jsonld
-  PRIVATE sourcemeta::core::langtag)
-target_link_libraries(sourcemeta_core_jsonld
   PRIVATE sourcemeta::core::text)

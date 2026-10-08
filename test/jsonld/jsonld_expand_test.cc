@@ -2312,3 +2312,152 @@ TEST(JSONLD_expand, set_container_control) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
+
+TEST(JSONLD_expand, keyword_form_id_with_valid_type_ignored) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "@foo", "@type": "@id" } },
+    "urn:q": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:q": [ { "@value": "v" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, null_redefined_index_term_drops_metadata) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "i": "urn:i",
+        "p": { "@id": "urn:p", "@container": "@index", "@index": "i" }
+      },
+      { "i": null }
+    ],
+    "p": { "x": { "@id": "urn:n" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@id": "urn:n" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, custom_index_term_control) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "i": "urn:i",
+      "p": { "@id": "urn:p", "@container": "@index", "@index": "i" }
+    },
+    "p": { "x": { "@id": "urn:n" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@id": "urn:n", "urn:i": [ { "@value": "x" } ] }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, null_redefined_index_term_graph_container) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "i": "urn:i",
+        "p": {
+          "@id": "urn:p",
+          "@container": [ "@graph", "@index" ],
+          "@index": "i"
+        }
+      },
+      { "i": null }
+    ],
+    "p": { "x": { "@id": "urn:n" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@graph": [ { "@id": "urn:n" } ] }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, malformed_identifier_preserved_with_base) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@id": "bad%zz",
+    "urn:p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "bad%zz",
+      "urn:p": [ { "@value": "v" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input, "https://example.com/", {}),
+            expected);
+}
+
+TEST(JSONLD_expand, malformed_coerced_identifier_preserved_with_base) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@type": "@id" } },
+    "p": "bad%zz"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@id": "bad%zz" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input, "https://example.com/", {}),
+            expected);
+}
+
+TEST(JSONLD_expand, indexed_set_accepts_index_metadata) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@set": [ "x" ], "@index": "i" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, indexed_set_accepts_index_metadata_in_1_0) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@set": [ "x" ], "@index": "i" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(
+                input, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(JSONLD_expand, aliased_indexed_set_accepts_index_metadata) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "s": "@set", "i": "@index" },
+    "urn:p": { "s": [ "x" ], "i": "i" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
