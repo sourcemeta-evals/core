@@ -49,8 +49,12 @@ auto finalize_definition(ExpansionState &state, ActiveContext &active_context,
     if (!same_definition(previous.value(), candidate)) {
       throw JSONLDError("Protected term redefinition", term_pointer);
     }
-    // A redefinition with the same definition retains the protected flag.
-    candidate.is_protected = true;
+    // An equivalent redefinition keeps the previous definition, including its
+    // origin metadata, so deferred errors keep their original defining
+    // location
+    active_context.terms[term] = previous.value();
+    defined[term] = true;
+    return;
   }
   active_context.terms[term] = std::move(candidate);
   defined[term] = true;

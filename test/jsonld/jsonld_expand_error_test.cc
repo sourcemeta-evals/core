@@ -1864,3 +1864,111 @@ TEST(JSONLD_expand_error, nested_external_protected_scope_error_at_root) {
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input, context),
                              "Protected term redefinition", "");
 }
+
+TEST(JSONLD_expand_error, invalid_type_member_keeps_index) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@type": [ "urn:ok", 5 ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid type value", "/@type/1");
+}
+
+TEST(JSONLD_expand_error, invalid_aliased_type_member_keeps_index) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "t": "@type" },
+    "t": [ "urn:ok", 5 ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid type value", "/t/1");
+}
+
+TEST(JSONLD_expand_error, invalid_type_member_keeps_index_in_1_0) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@type": [ "urn:ok", 5 ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Invalid type value", "/@type/1");
+}
+
+TEST(JSONLD_expand_error, invalid_reverse_term_member_keeps_index) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "r": { "@reverse": "urn:p" } },
+    "r": [ { "@id": "urn:a" }, { "@value": 1 } ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value", "/r/1");
+}
+
+TEST(JSONLD_expand_error, invalid_reverse_map_member_keeps_index) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@reverse": { "urn:p": [ { "@id": "urn:a" }, { "@value": 1 } ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value",
+                             "/@reverse/urn:p/1");
+}
+
+TEST(JSONLD_expand_error, included_nested_array_member_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "https://example.com/p": "v",
+    "@included": [ { "@id": "urn:ok" }, [ { "@id": "urn:n" }, { "@value": "x" } ] ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @included value", "/@included/1/1");
+}
+
+TEST(JSONLD_expand_error, included_set_member_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "https://example.com/p": "v",
+    "@included": [
+      { "@id": "urn:ok" },
+      { "@set": [ { "@id": "urn:n" }, { "@value": "x" } ] }
+    ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @included value", "/@included/1/@set/1");
+}
+
+TEST(JSONLD_expand_error, equivalent_protected_redefinition_retains_origin) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": { "@id": "urn:a", "@protected": true },
+      "T": {
+        "@id": "urn:T",
+        "@protected": true,
+        "@context": { "a": "urn:other" }
+      }
+    },
+    "@type": "T",
+    "a": "x"
+  })");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "a": { "@id": "urn:a", "@protected": true },
+    "T": {
+      "@id": "urn:T",
+      "@protected": true,
+      "@context": { "a": "urn:other" }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input, context),
+                             "Protected term redefinition", "");
+}
+
+TEST(JSONLD_expand_error, reverse_definition_rejects_unknown_entries) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@reverse": "urn:p", "@bogus": true } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid term definition", "/@context/p/@bogus");
+}

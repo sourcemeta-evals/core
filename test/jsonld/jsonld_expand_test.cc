@@ -1993,3 +1993,104 @@ TEST(JSONLD_expand, json_literal_under_property_is_preserved) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
+
+TEST(JSONLD_expand, null_mapped_type_map_key_preserves_node) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": { "@id": "urn:p", "@container": "@type" },
+      "NoType": null
+    },
+    "p": { "NoType": { "@id": "urn:n" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@id": "urn:n" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, included_nested_array_member_expands) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@included": [ [ { "urn:p": "v" } ] ]
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@included": [ { "urn:p": [ { "@value": "v" } ] } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, included_set_member_expands) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@included": { "@set": [ { "urn:p": "v" } ] }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@included": [ { "urn:p": [ { "@value": "v" } ] } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, query_distinct_contexts_resolve_separately) {
+  std::size_t invocations{0};
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&invocations](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    invocations += 1;
+    if (identifier == "https://example.com/ctx?v=1") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "p": "urn:first" } })");
+    }
+    if (identifier == "https://example.com/ctx?v=2") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "p": "urn:second" } })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      "https://example.com/ctx?v=1",
+      "https://example.com/ctx?v=2"
+    ],
+    "p": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:second": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input, "", resolver), expected);
+  EXPECT_EQ(invocations, 2);
+}
+
+TEST(JSONLD_expand, top_level_graph_object_unwraps) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@graph": [ { "urn:p": "x" } ]
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, top_level_array_preserves_graph_object) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "@graph": [ { "urn:p": "x" } ] }
+  ])");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "@graph": [ { "urn:p": [ { "@value": "x" } ] } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
