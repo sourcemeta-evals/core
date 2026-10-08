@@ -2210,3 +2210,135 @@ TEST(JSONLD_expand_error, relative_base_in_expand_context) {
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input, context),
                              "Invalid base IRI", "");
 }
+
+TEST(JSONLD_expand_error, explicit_list_set_member_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@list": [ { "@set": [ null, { "@list": [ "x" ] } ] } ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "List of lists", "/urn:p/@list/0/@set/1");
+}
+
+TEST(JSONLD_expand_error, unknown_term_entries_report_lexicographically) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "z": false, "a": false } },
+    "urn:q": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid term definition", "/@context/p/a");
+}
+
+TEST(JSONLD_expand_error, unknown_term_entries_lexicographic_reversed) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "a": false, "z": false } },
+    "urn:q": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid term definition", "/@context/p/a");
+}
+
+TEST(JSONLD_expand_error, imported_name_keeps_nested_scope_validation) {
+  const sourcemeta::core::JSONLDResolver resolver =
+      [](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    if (identifier == "https://example.com/import-collision") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "p": "urn:imported" } })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@import": "https://example.com/import-collision",
+      "T": {
+        "@id": "urn:T",
+        "@context": {
+          "p": { "@id": "urn:local", "@context": { "@base": 42 } }
+        }
+      }
+    },
+    "urn:q": "x"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver),
+      "Invalid scoped context", "/@context/T/@context");
+}
+
+TEST(JSONLD_expand_error, nested_scope_validation_without_import) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "T": {
+        "@id": "urn:T",
+        "@context": {
+          "p": { "@id": "urn:local", "@context": { "@base": 42 } }
+        }
+      }
+    },
+    "urn:q": "x"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid scoped context", "/@context/T/@context");
+}
+
+TEST(JSONLD_expand_error, nested_shape_pointer) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "n": "@nest" },
+    "urn:p": { "n": { "@list": [ "x" ], "@set": [ "y" ] } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid set or list object", "/urn:p/n");
+}
+
+TEST(JSONLD_expand_error, nested_shape_pointer_array_member) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "n": "@nest" },
+    "urn:p": {
+      "n": [
+        { "urn:q": "v" },
+        { "@list": [ "x" ], "@set": [ "y" ] }
+      ]
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid set or list object", "/urn:p/n/1");
+}
+
+TEST(JSONLD_expand_error, invalid_array_datatype_on_value_object) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@value": "x", "@type": [ "@foo" ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid typed value", "/urn:p/@type");
+}
+
+TEST(JSONLD_expand_error, invalid_array_datatype_on_aliased_type) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "t": "@type" },
+    "urn:p": { "@value": "x", "t": [ "@foo" ] }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid typed value", "/urn:p/t");
+}
+
+TEST(JSONLD_expand_error, empty_container_array) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@container": [] } },
+    "p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid container mapping",
+                             "/@context/p/@container");
+}

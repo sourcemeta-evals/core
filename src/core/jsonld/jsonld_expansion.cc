@@ -79,6 +79,10 @@ auto expand_type(ExpansionState &state, const ActiveContext &type_context,
 struct ValueMemberPointers {
   std::optional<WeakPointer> value;
   std::optional<WeakPointer> type;
+  // The location of the input object that contributed @list or @set entries,
+  // which differs from the expanded object's own location when the entries
+  // arrive through @nest merging
+  std::optional<WeakPointer> collection;
 };
 
 // Process a deferred scoped context, carrying the definition's remote origin.
@@ -521,15 +525,18 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
   // at once is equally invalid.
   if (result.defines(KEYWORD_LIST, KEYWORD_LIST_HASH) ||
       result.defines(KEYWORD_SET, KEYWORD_SET_HASH)) {
+    const WeakPointer &collection_pointer{value_members.collection.has_value()
+                                              ? value_members.collection.value()
+                                              : pointer};
     if (result.defines(KEYWORD_LIST, KEYWORD_LIST_HASH) &&
         result.defines(KEYWORD_SET, KEYWORD_SET_HASH)) {
-      throw JSONLDError("Invalid set or list object", pointer);
+      throw JSONLDError("Invalid set or list object", collection_pointer);
     }
     for (const auto &entry : result.as_object()) {
       const auto &name{entry.first};
       if (name != KEYWORD_LIST && name != KEYWORD_SET &&
           name != KEYWORD_INDEX) {
-        throw JSONLDError("Invalid set or list object", pointer);
+        throw JSONLDError("Invalid set or list object", collection_pointer);
       }
     }
   }
@@ -792,6 +799,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         continue;
       }
 
+      value_members.collection = source_pointer;
       auto elements{JSON::make_array()};
       const auto values{into_array(JSON{entry.second})};
       std::size_t value_index{0};
@@ -805,11 +813,13 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                                ? JSON::make_array()
                                : into_array(std::move(expanded_item))};
         for (auto &nested : item_elements.as_array()) {
-          // A nested list reports at the member that produced it
+          // A nested list reports at the member that produced it, drilling
+          // through nested arrays and set objects to its original location
           if (name == KEYWORD_LIST && state.processing_1_0 &&
               nested.is_object() &&
               nested.defines(KEYWORD_LIST, KEYWORD_LIST_HASH)) {
-            throw JSONLDError("List of lists", item_pointer);
+            throw_list_of_lists(state, active_context, active_property, item,
+                                item_pointer);
           }
           elements.push_back(std::move(nested));
         }

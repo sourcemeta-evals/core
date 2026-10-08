@@ -541,6 +541,11 @@ auto create_term_definition_internal(
       const bool saved_context_protected{state.context_protected};
       const bool saved_remote_base{state.remote_base_override};
       const bool saved_validate{state.validate_scoped_context};
+      // The import set describes the enclosing context's entries, not the
+      // scoped context's, so a nested local term that shares an imported name
+      // must not inherit its remote origin
+      auto saved_imported{std::move(state.imported_keys)};
+      state.imported_keys.clear();
       try {
         // The error raised here is always discarded below, so its location does
         // not matter.
@@ -549,11 +554,13 @@ auto create_term_definition_internal(
         state.remote_base_override = context_remote;
         state.validate_scoped_context = false;
         process_context(state, probe, *context_entry, empty_weak_pointer);
+        state.imported_keys = std::move(saved_imported);
         state.validate_scoped_context = saved_validate;
         state.remote_base_override = saved_remote_base;
         state.protected_override = saved_override;
         state.context_protected = saved_context_protected;
       } catch (const JSONLDError &) {
+        state.imported_keys = std::move(saved_imported);
         state.validate_scoped_context = saved_validate;
         state.remote_base_override = saved_remote_base;
         state.protected_override = saved_override;
@@ -652,7 +659,9 @@ auto create_term_definition_internal(
     }
 
     // A term definition may not contain any entry other than the keywords
-    // recognised above.
+    // recognised above. The lexicographically first offender is reported so
+    // the location does not depend on insertion order
+    const JSON::String *unknown_entry{nullptr};
     for (const auto &entry : value.as_object()) {
       const JSON::StringView key{entry.first};
       if (key != KEYWORD_ID && key != KEYWORD_REVERSE &&
@@ -661,8 +670,14 @@ auto create_term_definition_internal(
           key != KEYWORD_LANGUAGE && key != KEYWORD_NEST &&
           key != KEYWORD_PREFIX && key != KEYWORD_PROTECTED &&
           key != KEYWORD_TYPE) {
-        throw JSONLDError("Invalid term definition", term_pointer, {key});
+        if (unknown_entry == nullptr || entry.first < *unknown_entry) {
+          unknown_entry = &entry.first;
+        }
       }
+    }
+    if (unknown_entry != nullptr) {
+      throw JSONLDError("Invalid term definition", term_pointer,
+                        {*unknown_entry});
     }
   } else {
     throw JSONLDError("Invalid term definition", term_pointer);

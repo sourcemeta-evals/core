@@ -2217,3 +2217,98 @@ TEST(JSONLD_expand, inputs_are_unchanged) {
   EXPECT_EQ(input, input_copy);
   EXPECT_EQ(context, context_copy);
 }
+
+TEST(JSONLD_expand, explicit_nested_list_accepted_in_1_1) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@list": [ { "@set": [ { "@list": [ "x" ] } ] } ] }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@list": [ { "@list": [ { "@value": "x" } ] } ] }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, external_base_keeps_document_context_resolution) {
+  std::vector<sourcemeta::core::JSON::String> requests;
+  const sourcemeta::core::JSONLDResolver resolver =
+      [&requests](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    requests.emplace_back(identifier);
+    if (identifier == "https://document.example/dir/ctx.jsonld") {
+      return sourcemeta::core::parse_json(
+          R"({ "@context": { "name": "urn:name" } })");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": "ctx.jsonld",
+    "@id": "node",
+    "name": "Alice"
+  })");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "@base": "https://ids.example/"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "https://ids.example/node",
+      "urn:name": [ { "@value": "Alice" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(
+                input, context, "https://document.example/dir/input.jsonld",
+                resolver),
+            expected);
+  ASSERT_EQ(requests.size(), 1);
+  EXPECT_EQ(requests.front(), "https://document.example/dir/ctx.jsonld");
+}
+
+TEST(JSONLD_expand, unknown_only_type_array_retained) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@type": [ "@foo" ],
+    "urn:p": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@type": [],
+      "urn:p": [ { "@value": "x" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, unknown_scalar_type_omitted) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@type": "@foo",
+    "urn:p": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, set_container_control) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@container": [ "@set" ] } },
+    "p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "v" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
