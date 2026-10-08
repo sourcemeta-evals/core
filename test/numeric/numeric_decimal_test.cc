@@ -6188,3 +6188,38 @@ TEST(Numeric_decimal, reduce_heap_backed_multiple_trailing_zeros_throws) {
       { [[maybe_unused]] const auto result = value.reduce(); },
       sourcemeta::core::NumericOverflowError);
 }
+
+TEST(Numeric_decimal,
+     to_integral_exact_halfway_across_complete_discarded_limb_rounds_even) {
+  const std::string zeros(17, '0');
+  const sourcemeta::core::Decimal positive{"2." + std::string("5") + zeros};
+  EXPECT_EQ(positive.to_integral(), sourcemeta::core::Decimal{2});
+  const sourcemeta::core::Decimal negative{"-2." + std::string("5") + zeros};
+  EXPECT_EQ(negative.to_integral(), sourcemeta::core::Decimal{-2});
+  const sourcemeta::core::Decimal odd_positive{"3." + std::string("5") + zeros};
+  EXPECT_EQ(odd_positive.to_integral(), sourcemeta::core::Decimal{4});
+  const sourcemeta::core::Decimal odd_negative{"-3." + std::string("5") +
+                                               zeros};
+  EXPECT_EQ(odd_negative.to_integral(), sourcemeta::core::Decimal{-4});
+}
+
+TEST(Numeric_decimal,
+     to_integral_exact_halfway_with_trailing_nonzero_rounds_away_from_zero) {
+  const std::string zeros(16, '0');
+  const sourcemeta::core::Decimal positive{"2." + std::string("5") + zeros +
+                                           "1"};
+  EXPECT_EQ(positive.to_integral(), sourcemeta::core::Decimal{3});
+  const sourcemeta::core::Decimal negative{"-2." + std::string("5") + zeros +
+                                           "1"};
+  EXPECT_EQ(negative.to_integral(), sourcemeta::core::Decimal{-3});
+}
+
+TEST(
+    Numeric_decimal,
+    unary_plus_exact_halfway_across_complete_discarded_limb_preserves_evenness) {
+  const std::string zeros(17, '0');
+  const sourcemeta::core::Decimal value{"1.2345678901234565" + zeros};
+  EXPECT_EQ(+value, sourcemeta::core::Decimal{"1.234567890123456"});
+  const sourcemeta::core::Decimal odd_value{"1.2345678901234575" + zeros};
+  EXPECT_EQ(+odd_value, sourcemeta::core::Decimal{"1.234567890123458"});
+}

@@ -451,3 +451,27 @@ TEST(Numeric_uint128,
             static_cast<std::uint64_t>(dividend >> 64));
   EXPECT_TRUE(remainder < sourcemeta::core::uint128_t{divisor});
 }
+
+TEST(Numeric_uint128, shift_counts_from_narrow_integral_types_preserve_width) {
+  const sourcemeta::core::uint128_t one{std::uint64_t{1}};
+  EXPECT_EQ(static_cast<std::uint64_t>(one << std::int8_t{1}), 2ULL);
+  EXPECT_EQ(static_cast<std::uint64_t>(one << std::uint8_t{1}), 2ULL);
+  EXPECT_EQ(static_cast<std::uint64_t>(one << true), 2ULL);
+  EXPECT_EQ(static_cast<std::uint64_t>(one << false), 1ULL);
+  const auto across_boundary = one << std::int8_t{64};
+  EXPECT_EQ(static_cast<std::uint64_t>(across_boundary), 0ULL);
+  EXPECT_EQ(static_cast<std::uint64_t>(across_boundary >> 64), 1ULL);
+  const auto full_width = one << std::uint8_t{127};
+  EXPECT_EQ(static_cast<std::uint64_t>(full_width), 0ULL);
+  EXPECT_EQ(static_cast<std::uint64_t>(full_width >> 64),
+            std::uint64_t{1} << 63);
+  const auto high_bit = one << 127;
+  const auto right_by_sixty_four = high_bit >> std::int8_t{64};
+  EXPECT_EQ(static_cast<std::uint64_t>(right_by_sixty_four),
+            std::uint64_t{1} << 63);
+  const auto right_by_one_twenty_seven = high_bit >> std::uint8_t{127};
+  EXPECT_EQ(static_cast<std::uint64_t>(right_by_one_twenty_seven), 1ULL);
+  const auto right_by_one = high_bit >> true;
+  EXPECT_EQ(static_cast<std::uint64_t>(right_by_one >> 64),
+            std::uint64_t{1} << 62);
+}
