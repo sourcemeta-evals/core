@@ -394,24 +394,29 @@ auto create_term_definition_internal(
           throw JSONLDError("Invalid container mapping", term_pointer,
                             {KEYWORD_CONTAINER});
         }
+        static const JSON::String TOKEN_CONTAINER_ENTRY{KEYWORD_CONTAINER};
+        const WeakPointer container_pointer{
+            term_pointer.concat(TOKEN_CONTAINER_ENTRY)};
+        std::size_t container_index{0};
         for (const auto &item : container.as_array()) {
           if (!item.is_string()) {
-            throw JSONLDError("Invalid container mapping", term_pointer,
-                              {KEYWORD_CONTAINER});
+            throw JSONLDError("Invalid container mapping",
+                              container_pointer.concat(container_index));
           }
           const auto &item_string{item.to_string()};
           if (!is_valid_container(item_string)) {
-            throw JSONLDError("Invalid container mapping", term_pointer,
-                              {KEYWORD_CONTAINER});
+            throw JSONLDError("Invalid container mapping",
+                              container_pointer.concat(container_index));
           }
           // A keyword may not appear more than once in the container array.
           for (const auto &seen : definition.container) {
             if (seen == item_string) {
-              throw JSONLDError("Invalid container mapping", term_pointer,
-                                {KEYWORD_CONTAINER});
+              throw JSONLDError("Invalid container mapping",
+                                container_pointer.concat(container_index));
             }
           }
           definition.container.push_back(item_string);
+          container_index += 1;
         }
       } else if (container.is_string()) {
         const auto &container_string{container.to_string()};
@@ -625,7 +630,8 @@ auto create_term_definition_internal(
       const auto index_iri{expand_iri(
           state, active_context, index_string, false, true, &local_context,
           &defined, context_pointer, term_pointer.concat(TOKEN_INDEX))};
-      if (!index_iri.has_value() || is_keyword(index_iri.value())) {
+      if (!index_iri.has_value() || is_keyword(index_iri.value()) ||
+          index_iri.value().find(':') == JSON::String::npos) {
         throw JSONLDError("Invalid term definition", term_pointer,
                           {KEYWORD_INDEX});
       }

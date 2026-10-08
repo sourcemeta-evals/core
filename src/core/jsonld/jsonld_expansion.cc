@@ -175,12 +175,20 @@ auto includes_invalid_member(const JSON &expanded) -> bool {
       index += 1;
     }
   } else if (member.is_object()) {
+    // The member's own local context may alias @set, so it applies before
+    // the keys are probed
+    ActiveContext effective{context};
+    if (member.defines(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)) {
+      process_context(state, effective,
+                      member.at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH),
+                      pointer.concat(keyword_context()));
+    }
     for (const auto &entry : member.as_object()) {
-      const auto expanded_key{expand_iri(state, context, entry.first, false,
+      const auto expanded_key{expand_iri(state, effective, entry.first, false,
                                          true, nullptr, nullptr,
                                          empty_weak_pointer)};
       if (expanded_key.has_value() && expanded_key.value() == KEYWORD_SET) {
-        throw_invalid_included(state, context, entry.second,
+        throw_invalid_included(state, effective, entry.second,
                                pointer.concat(entry.first));
       }
     }
@@ -222,12 +230,20 @@ throw_invalid_index_value(ExpansionState &state, ActiveContext &context,
       index += 1;
     }
   } else if (member.is_object()) {
+    // The member's own local context may alias @set, so it applies before
+    // the keys are probed
+    ActiveContext effective{context};
+    if (member.defines(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)) {
+      process_context(state, effective,
+                      member.at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH),
+                      pointer.concat(keyword_context()));
+    }
     for (const auto &entry : member.as_object()) {
-      const auto expanded_key{expand_iri(state, context, entry.first, false,
+      const auto expanded_key{expand_iri(state, effective, entry.first, false,
                                          true, nullptr, nullptr,
                                          empty_weak_pointer)};
       if (expanded_key.has_value() && expanded_key.value() == KEYWORD_SET) {
-        throw_invalid_index_value(state, context, property, entry.second,
+        throw_invalid_index_value(state, effective, property, entry.second,
                                   pointer.concat(entry.first));
       }
     }
@@ -272,12 +288,20 @@ throw_invalid_reverse_value(ExpansionState &state, ActiveContext &context,
       index += 1;
     }
   } else if (member.is_object()) {
+    // The member's own local context may alias @set, so it applies before
+    // the keys are probed
+    ActiveContext effective{context};
+    if (member.defines(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)) {
+      process_context(state, effective,
+                      member.at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH),
+                      pointer.concat(keyword_context()));
+    }
     for (const auto &entry : member.as_object()) {
-      const auto expanded_key{expand_iri(state, context, entry.first, false,
+      const auto expanded_key{expand_iri(state, effective, entry.first, false,
                                          true, nullptr, nullptr,
                                          empty_weak_pointer)};
       if (expanded_key.has_value() && expanded_key.value() == KEYWORD_SET) {
-        throw_invalid_reverse_value(state, context, property, entry.second,
+        throw_invalid_reverse_value(state, effective, property, entry.second,
                                     pointer.concat(entry.first));
       }
     }
@@ -318,12 +342,20 @@ throw_list_of_lists(ExpansionState &state, ActiveContext &context,
       index += 1;
     }
   } else if (member.is_object()) {
+    // The member's own local context may alias @set, so it applies before
+    // the keys are probed
+    ActiveContext effective{context};
+    if (member.defines(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH)) {
+      process_context(state, effective,
+                      member.at(KEYWORD_CONTEXT, KEYWORD_CONTEXT_HASH),
+                      pointer.concat(keyword_context()));
+    }
     for (const auto &entry : member.as_object()) {
-      const auto expanded_key{expand_iri(state, context, entry.first, false,
+      const auto expanded_key{expand_iri(state, effective, entry.first, false,
                                          true, nullptr, nullptr,
                                          empty_weak_pointer)};
       if (expanded_key.has_value() && expanded_key.value() == KEYWORD_SET) {
-        throw_list_of_lists(state, context, property, entry.second,
+        throw_list_of_lists(state, effective, property, entry.second,
                             pointer.concat(entry.first));
       }
     }
@@ -569,7 +601,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                                             empty_weak_pointer)};
 
     if (expanded_property.has_value() &&
-        expanded_property.value() == KEYWORD_NEST) {
+        expanded_property.value() == KEYWORD_NEST && !state.processing_1_0) {
       // A keyword inside a reverse property map is invalid before any
       // deferral (JSON-LD 1.1 API Section 5.1.2 step 13.4.1)
       if (active_property.has_value() &&
@@ -635,7 +667,6 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
     }
 
     if (name == KEYWORD_TYPE) {
-      value_members.type = entry_pointer;
       if (entry.second.is_array()) {
         std::size_t type_index{0};
         for (const auto &item : entry.second.as_array()) {
@@ -665,10 +696,12 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       } else {
         expanded_type = expand_type(state, type_context, entry.second);
       }
-      // A lone @type value that does not expand to an IRI carries nothing.
+      // A lone @type value that does not expand to an IRI carries nothing,
+      // including for error provenance
       if (expanded_type.is_null()) {
         continue;
       }
+      value_members.type = entry_pointer;
       if (result.defines(KEYWORD_TYPE, KEYWORD_TYPE_HASH)) {
         auto merged{
             into_array(std::move(result.at(KEYWORD_TYPE, KEYWORD_TYPE_HASH)))};

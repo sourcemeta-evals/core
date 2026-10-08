@@ -1173,7 +1173,7 @@ TEST(JSONLD_expand_error, duplicate_container_keyword) {
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid container mapping",
-                             "/@context/a/@container");
+                             "/@context/a/@container/1");
 }
 
 TEST(JSONLD_expand_error, error_code_value_is_owned) {
@@ -2120,4 +2120,93 @@ TEST(JSONLD_expand_error, blank_node_import_rejected) {
       sourcemeta::core::jsonld_expand(input, "", resolver),
       "Loading remote context failed", "/@context/@import");
   EXPECT_EQ(invocations, 0);
+}
+
+TEST(JSONLD_expand_error, included_set_alias_member_keeps_indices) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@included": {
+      "@context": { "s": "@set" },
+      "s": [ null, { "@value": "x" } ]
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @included value", "/@included/s/1");
+}
+
+TEST(JSONLD_expand_error, included_set_alias_member_after_valid_node) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@included": {
+      "@context": { "s": "@set" },
+      "s": [ { "@id": "urn:n" }, { "@value": "x" } ]
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @included value", "/@included/s/1");
+}
+
+TEST(JSONLD_expand_error, invalid_container_member_keeps_index) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@container": [ "@set", false ] } },
+    "urn:q": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid container mapping",
+                             "/@context/p/@container/1");
+}
+
+TEST(JSONLD_expand_error, unresolved_property_valued_index) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": { "@id": "urn:p", "@container": "@index", "@index": "relative" }
+    },
+    "p": { "x": {} }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid term definition", "/@context/p/@index");
+}
+
+TEST(JSONLD_expand_error, ignored_type_alias_preserves_provenance) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "urn:", "a": "@type", "z": "@type" },
+    "urn:p": { "@value": 1, "a": "_:blank", "z": "@ignore" }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid typed value", "/urn:p/a");
+}
+
+TEST(JSONLD_expand_error, relative_base_without_caller_base) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@base": "relative/path" },
+    "urn:p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid base IRI", "/@context/@base");
+}
+
+TEST(JSONLD_expand_error, relative_base_in_second_context_entry) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [ null, { "@base": "relative/path" } ],
+    "urn:p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid base IRI", "/@context/1/@base");
+}
+
+TEST(JSONLD_expand_error, relative_base_in_expand_context) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:p": "v"
+  })");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "@base": "relative/path"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input, context),
+                             "Invalid base IRI", "");
 }

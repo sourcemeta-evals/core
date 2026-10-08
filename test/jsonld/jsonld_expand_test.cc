@@ -2113,3 +2113,107 @@ TEST(JSONLD_expand, included_named_graph_member_expands) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
+
+TEST(JSONLD_expand, resolved_property_valued_index_control) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@vocab": "urn:",
+      "p": { "@id": "urn:p", "@container": "@index", "@index": "relative" }
+    },
+    "p": { "x": { "@id": "urn:n" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@id": "urn:n", "urn:relative": [ { "@value": "x" } ] }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, nest_ignored_in_1_0) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:q": "y",
+    "@nest": { "urn:p": "x" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "urn:q": [ { "@value": "y" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(
+                input, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(JSONLD_expand, nest_expands_in_1_1) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "urn:q": "y",
+    "@nest": { "urn:p": "x" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:q": [ { "@value": "y" } ],
+      "urn:p": [ { "@value": "x" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, included_empty_set_member) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@included": { "@set": [] },
+    "urn:p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@included": [],
+      "urn:p": [ { "@value": "v" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, included_set_alias_valid_members) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@included": {
+      "@context": { "s": "@set" },
+      "s": [ { "@id": "urn:n" } ]
+    },
+    "urn:p": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@included": [ { "@id": "urn:n" } ],
+      "urn:p": [ { "@value": "v" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(JSONLD_expand, inputs_are_unchanged) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@container": "@list" } },
+    "p": [ "a", [ "b" ] ],
+    "urn:q": { "@value": 1 }
+  })");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "@vocab": "urn:"
+  })");
+  const auto input_copy{input};
+  const auto context_copy{context};
+
+  sourcemeta::core::jsonld_expand(input, context);
+
+  EXPECT_EQ(input, input_copy);
+  EXPECT_EQ(context, context_copy);
+}
