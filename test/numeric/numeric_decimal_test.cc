@@ -5843,6 +5843,84 @@ TEST(Numeric_decimal, strict_from_negative_zero_clears_integer_origin) {
   EXPECT_TRUE(result.is_signed());
 }
 
+TEST(Numeric_decimal,
+     scale_by_long_coefficient_minimum_exponent_scaled_down_overflows) {
+  const sourcemeta::core::Decimal value{"10000000000000000e-2147483648"};
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{-1});
+      },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(
+    Numeric_decimal,
+    scale_by_negative_long_coefficient_minimum_exponent_scaled_down_overflows) {
+  const sourcemeta::core::Decimal value{"-10000000000000000e-2147483648"};
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{-1});
+      },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     scale_by_positive_zero_at_maximum_exponent_scaled_up_overflows) {
+  const sourcemeta::core::Decimal value{"0e2147483647"};
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{1});
+      },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     scale_by_negative_zero_at_minimum_exponent_scaled_down_overflows) {
+  const sourcemeta::core::Decimal value{"-0e-2147483648"};
+  EXPECT_THROW(
+      {
+        [[maybe_unused]] const auto result =
+            value.scale_by(sourcemeta::core::Decimal{-1});
+      },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal,
+     scale_by_long_coefficient_minimum_exponent_scaled_up_succeeds) {
+  const sourcemeta::core::Decimal value{"10000000000000000e-2147483648"};
+  const auto result{value.scale_by(sourcemeta::core::Decimal{1})};
+  EXPECT_TRUE(result.is_finite());
+  EXPECT_EQ(result, sourcemeta::core::Decimal{"10000000000000000e-2147483647"});
+}
+
+TEST(Numeric_decimal,
+     scale_by_negative_zero_at_minimum_exponent_identity_preserves_sign) {
+  const sourcemeta::core::Decimal value{"-0e-2147483648"};
+  const auto result{value.scale_by(sourcemeta::core::Decimal{0})};
+  EXPECT_TRUE(result.is_finite());
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(Numeric_decimal, multiply_pushes_result_past_maximum_exponent_overflows) {
+  const sourcemeta::core::Decimal left{"1e2147483647"};
+  const sourcemeta::core::Decimal right{"1e1"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = left * right; },
+      sourcemeta::core::NumericOverflowError);
+}
+
+TEST(Numeric_decimal, divide_pushes_result_past_minimum_exponent_overflows) {
+  const sourcemeta::core::Decimal left{"1e-2147483648"};
+  const sourcemeta::core::Decimal right{"1e1"};
+  EXPECT_THROW(
+      { [[maybe_unused]] const auto result = left / right; },
+      sourcemeta::core::NumericOverflowError);
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};
