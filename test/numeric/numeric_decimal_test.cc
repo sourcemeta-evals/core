@@ -5996,6 +5996,34 @@ TEST(Numeric_decimal, to_string_negative_zero_at_maximum_exponent_round_trips) {
   EXPECT_TRUE(reparsed.same_quantum(value));
 }
 
+TEST(Numeric_decimal,
+     subtract_long_coefficient_at_same_stored_exponent_rounds_across_midpoint) {
+  const sourcemeta::core::Decimal left{"1.00000000000000150001"};
+  const sourcemeta::core::Decimal right{"2e-20"};
+  EXPECT_EQ(left - right, sourcemeta::core::Decimal{"1.000000000000001"});
+}
+
+TEST(Numeric_decimal,
+     add_long_coefficient_at_same_stored_exponent_rounds_across_midpoint) {
+  const sourcemeta::core::Decimal left{"1.00000000000000149999"};
+  const sourcemeta::core::Decimal right{"2e-20"};
+  EXPECT_EQ(left + right, sourcemeta::core::Decimal{"1.000000000000002"});
+}
+
+TEST(Numeric_decimal,
+     add_long_coefficient_rounds_across_midpoint_with_distant_operand) {
+  const sourcemeta::core::Decimal left{"1.00000000000000049999"};
+  const sourcemeta::core::Decimal right{"2e-20"};
+  EXPECT_EQ(left + right, sourcemeta::core::Decimal{"1.000000000000001"});
+}
+
+TEST(Numeric_decimal,
+     subtract_long_coefficient_rounds_across_midpoint_with_distant_operand) {
+  const sourcemeta::core::Decimal left{"1.00000000000000250001"};
+  const sourcemeta::core::Decimal right{"2e-20"};
+  EXPECT_EQ(left - right, sourcemeta::core::Decimal{"1.000000000000002"});
+}
+
 TEST(Numeric_decimal, scale_by_int32_min_scale_value_accepts) {
   const sourcemeta::core::Decimal value{1};
   const auto result{value.scale_by(sourcemeta::core::Decimal{"-2147483648"})};

@@ -1806,7 +1806,13 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
       const auto adjusted_gap_64 = left_adj_64 > right_adj_64
                                        ? left_adj_64 - right_adj_64
                                        : right_adj_64 - left_adj_64;
-      if (adjusted_gap_64 > MAX_STORED_GAP) {
+      // Both the adjusted-exponent gap and the stored-exponent gap must
+      // exceed the precision window + guard. Adjusted-gap alone is not
+      // sufficient when the smaller operand's stored exponent coincides
+      // with digits inside the larger operand's dropped tail (its sticky
+      // substitution would discard information that affects rounding
+      // across the half-even midpoint).
+      if (adjusted_gap_64 > MAX_STORED_GAP && stored_gap_64 > MAX_STORED_GAP) {
         const bool left_is_larger_adj = left_adj_64 > right_adj_64;
         const std::int32_t larger_exp =
             left_is_larger_adj ? this->exponent_ : other.exponent_;
