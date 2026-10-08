@@ -1776,16 +1776,18 @@ auto Decimal::operator+=(const Decimal &other) -> Decimal & {
 
       const auto pad_64 =
           static_cast<std::int64_t>(non_zero_exp) - preferred_quantum;
+      std::int32_t result_exp{non_zero_exp};
       if (pad_64 > 0) {
         non_zero_big =
             non_zero_big.multiply_pow10(static_cast<std::uint32_t>(pad_64));
+        result_exp = preferred_quantum;
       }
 
       free_big_coefficient(this->coefficient_, this->flags_);
       store_big_result(this->coefficient_, this->coefficient_high_,
                        this->flags_, std::move(non_zero_big),
                        non_zero_negative);
-      this->exponent_ = preferred_quantum;
+      this->exponent_ = result_exp;
       round_to_precision(this->coefficient_, this->coefficient_high_,
                          this->exponent_, this->flags_);
       return *this;
