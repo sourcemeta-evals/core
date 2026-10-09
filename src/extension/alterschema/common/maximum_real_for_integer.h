@@ -39,12 +39,14 @@ public:
   auto transform(JSON &schema, const Result &) const -> void override {
     if (schema.at("maximum").is_decimal()) {
       auto current{schema.at("maximum").to_decimal()};
+      if (current.is_integral() && !current.is_integer()) {
+        return;
+      }
       auto new_value{current.to_integral()};
       if (new_value > current) {
         new_value -= sourcemeta::core::Decimal{1};
       }
-
-      if (new_value.is_int64()) {
+      if (current.is_integer() && new_value.is_int64()) {
         schema.assign("maximum", sourcemeta::core::JSON{new_value.to_int64()});
       } else {
         schema.assign("maximum", sourcemeta::core::JSON{std::move(new_value)});

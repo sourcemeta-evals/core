@@ -4831,6 +4831,60 @@ TEST(Numeric_decimal, divide_integer_large_exponent_multi_digit_dividend) {
   EXPECT_EQ(quotient, sourcemeta::core::Decimal{"61725e2147483639"});
 }
 
+TEST(Numeric_decimal, divide_integer_large_gap_with_positive_divisor_exponent) {
+  const auto dividend{sourcemeta::core::Decimal{"1e100"}};
+  const auto divisor{sourcemeta::core::Decimal{"2e10"}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"5e89"});
+}
+
+TEST(Numeric_decimal, divide_integer_large_gap_with_negative_divisor_exponent) {
+  const auto dividend{sourcemeta::core::Decimal{"1e100"}};
+  const auto divisor{sourcemeta::core::Decimal{"2e-10"}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"5e109"});
+}
+
+TEST(Numeric_decimal,
+     divide_integer_small_dividend_large_negative_divisor_exp) {
+  const auto dividend{sourcemeta::core::Decimal{1}};
+  const auto divisor{sourcemeta::core::Decimal{"2e-100"}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"5e99"});
+}
+
+TEST(Numeric_decimal, divide_integer_small_dividend_negative_dividend_exp) {
+  const auto dividend{sourcemeta::core::Decimal{"1e-10"}};
+  const auto divisor{sourcemeta::core::Decimal{"2e-100"}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"5e89"});
+}
+
+TEST(Numeric_decimal, divide_integer_large_gap_equivalent_divisor_encodings) {
+  const auto dividend{sourcemeta::core::Decimal{"1e100"}};
+  const auto quotient_a{
+      dividend.divide_integer(sourcemeta::core::Decimal{"2e10"})};
+  const auto quotient_b{
+      dividend.divide_integer(sourcemeta::core::Decimal{"20e9"})};
+  EXPECT_EQ(quotient_a, sourcemeta::core::Decimal{"5e89"});
+  EXPECT_EQ(quotient_b, sourcemeta::core::Decimal{"5e89"});
+}
+
+TEST(Numeric_decimal, divide_integer_large_gap_negative_operands_xor_sign) {
+  const auto quotient_neg_dividend{
+      sourcemeta::core::Decimal{"-1e100"}.divide_integer(
+          sourcemeta::core::Decimal{"2e10"})};
+  const auto quotient_neg_divisor{
+      sourcemeta::core::Decimal{"1e100"}.divide_integer(
+          sourcemeta::core::Decimal{"-2e10"})};
+  const auto quotient_both_neg{
+      sourcemeta::core::Decimal{"-1e100"}.divide_integer(
+          sourcemeta::core::Decimal{"-2e10"})};
+  EXPECT_EQ(quotient_neg_dividend, sourcemeta::core::Decimal{"-5e89"});
+  EXPECT_EQ(quotient_neg_divisor, sourcemeta::core::Decimal{"-5e89"});
+  EXPECT_EQ(quotient_both_neg, sourcemeta::core::Decimal{"5e89"});
+}
+
 TEST(Numeric_decimal,
      divide_integer_hundred_thousand_digit_by_three_yields_exact_quotient) {
   const std::string dividend_digits(100001, '9');

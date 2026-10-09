@@ -1569,14 +1569,13 @@ TEST(AlterSchema_canonicalize_2020_12,
 
   EXPECT_TRUE(result.first);
 
-  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "integer",
-    "multipleOf": 1,
-    "maximum": 99
-  })JSON");
-
-  EXPECT_EQ(document, expected);
+  EXPECT_TRUE(document.defines("maximum"));
+  EXPECT_FALSE(document.defines("exclusiveMaximum"));
+  EXPECT_EQ(document.at("maximum"),
+            sourcemeta::core::JSON{sourcemeta::core::Decimal{"99"}});
+  ASSERT_TRUE(document.at("maximum").is_decimal());
+  EXPECT_TRUE(document.at("maximum").to_decimal().same_quantum(
+      sourcemeta::core::Decimal{"99.0"}));
 }
 
 TEST(AlterSchema_canonicalize_2020_12,
@@ -1592,14 +1591,13 @@ TEST(AlterSchema_canonicalize_2020_12,
 
   EXPECT_TRUE(result.first);
 
-  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "integer",
-    "multipleOf": 1,
-    "minimum": 101
-  })JSON");
-
-  EXPECT_EQ(document, expected);
+  EXPECT_TRUE(document.defines("minimum"));
+  EXPECT_FALSE(document.defines("exclusiveMinimum"));
+  EXPECT_EQ(document.at("minimum"),
+            sourcemeta::core::JSON{sourcemeta::core::Decimal{"101"}});
+  ASSERT_TRUE(document.at("minimum").is_decimal());
+  EXPECT_TRUE(document.at("minimum").to_decimal().same_quantum(
+      sourcemeta::core::Decimal{"101.0"}));
 }
 
 TEST(AlterSchema_canonicalize_2020_12,

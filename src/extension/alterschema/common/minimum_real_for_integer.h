@@ -39,15 +39,17 @@ public:
   auto transform(JSON &schema, const Result &) const -> void override {
     if (schema.at("minimum").is_decimal()) {
       const auto current{schema.at("minimum").to_decimal()};
+      if (current.is_integral() && !current.is_integer()) {
+        return;
+      }
       auto new_value{current.to_integral()};
       if (new_value < current) {
         new_value += sourcemeta::core::Decimal{1};
       }
-
-      if (new_value.is_int64()) {
+      if (current.is_integer() && new_value.is_int64()) {
         schema.assign("minimum", sourcemeta::core::JSON{new_value.to_int64()});
       } else {
-        schema.assign("minimum", sourcemeta::core::JSON{new_value});
+        schema.assign("minimum", sourcemeta::core::JSON{std::move(new_value)});
       }
     } else {
       const auto current{schema.at("minimum").to_real()};

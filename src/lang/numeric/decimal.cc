@@ -1450,8 +1450,7 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
       auto final_quotient =
           initial_quotient.multiply_pow10(static_cast<std::uint32_t>(steps))
               .add(tail);
-      const auto final_exponent_64 =
-          static_cast<std::int64_t>(this->exponent_) - steps;
+      const auto final_exponent_64 = gap_64 - steps;
       if (final_exponent_64 > std::numeric_limits<std::int32_t>::max() ||
           final_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
         throw NumericOverflowError{};
