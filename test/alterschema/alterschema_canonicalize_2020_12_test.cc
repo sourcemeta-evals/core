@@ -1641,3 +1641,105 @@ TEST(AlterSchema_canonicalize_2020_12,
   EXPECT_TRUE(document.at("minimum").to_decimal().same_quantum(
       sourcemeta::core::Decimal{"100.0"}));
 }
+
+TEST(AlterSchema_canonicalize_2020_12,
+     maximum_real_for_integer_fractional_decimal_retains_decimal_storage) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("maximum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"3.5"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+  ASSERT_TRUE(document.at("maximum").is_decimal());
+  EXPECT_EQ(document.at("maximum").to_decimal(), sourcemeta::core::Decimal{3});
+}
+
+TEST(AlterSchema_canonicalize_2020_12,
+     minimum_real_for_integer_fractional_decimal_retains_decimal_storage) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("minimum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"3.5"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+  ASSERT_TRUE(document.at("minimum").is_decimal());
+  EXPECT_EQ(document.at("minimum").to_decimal(), sourcemeta::core::Decimal{4});
+}
+
+TEST(AlterSchema_canonicalize_2020_12,
+     exclusive_maximum_fractional_decimal_retains_decimal_storage) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("exclusiveMaximum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"3.5"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+  EXPECT_TRUE(document.defines("maximum"));
+  ASSERT_TRUE(document.at("maximum").is_decimal());
+  EXPECT_EQ(document.at("maximum").to_decimal(), sourcemeta::core::Decimal{3});
+}
+
+TEST(AlterSchema_canonicalize_2020_12,
+     exclusive_minimum_fractional_decimal_retains_decimal_storage) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("exclusiveMinimum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"3.5"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+  EXPECT_TRUE(document.defines("minimum"));
+  ASSERT_TRUE(document.at("minimum").is_decimal());
+  EXPECT_EQ(document.at("minimum").to_decimal(), sourcemeta::core::Decimal{4});
+}
+
+TEST(AlterSchema_canonicalize_2020_12,
+     exclusive_maximum_large_integral_decimal_preserves_quantum) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("exclusiveMaximum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"1.00e20"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+  EXPECT_TRUE(document.defines("maximum"));
+  ASSERT_TRUE(document.at("maximum").is_decimal());
+  EXPECT_TRUE(document.at("maximum").to_decimal().same_quantum(
+      sourcemeta::core::Decimal{"1.00e20"}));
+}
+
+TEST(AlterSchema_canonicalize_2020_12,
+     exclusive_minimum_large_integral_decimal_preserves_quantum) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("exclusiveMinimum",
+                  sourcemeta::core::JSON{sourcemeta::core::Decimal{"1.00e20"}});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+  EXPECT_TRUE(document.defines("minimum"));
+  ASSERT_TRUE(document.at("minimum").is_decimal());
+  EXPECT_TRUE(document.at("minimum").to_decimal().same_quantum(
+      sourcemeta::core::Decimal{"1.00e20"}));
+}

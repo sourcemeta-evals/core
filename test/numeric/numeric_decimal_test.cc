@@ -6312,3 +6312,36 @@ TEST(
   const sourcemeta::core::Decimal odd_value{"1.2345678901234575" + zeros};
   EXPECT_EQ(+odd_value, sourcemeta::core::Decimal{"1.234567890123458"});
 }
+
+TEST(Numeric_decimal, subtract_tiny_from_one_rounds_down_through_precision) {
+  const sourcemeta::core::Decimal one{1};
+  const sourcemeta::core::Decimal tiny{"6e-17"};
+  EXPECT_EQ(one - tiny, sourcemeta::core::Decimal{"0.9999999999999999"});
+}
+
+TEST(Numeric_decimal,
+     subtract_tiny_from_one_below_halfway_rounds_to_one_exact) {
+  const sourcemeta::core::Decimal one{1};
+  const sourcemeta::core::Decimal four_tiny{"4e-17"};
+  const sourcemeta::core::Decimal five_tiny{"5e-17"};
+  EXPECT_EQ(one - four_tiny, sourcemeta::core::Decimal{1});
+  EXPECT_EQ(one - five_tiny, sourcemeta::core::Decimal{1});
+}
+
+TEST(Numeric_decimal, subtract_small_fraction_from_power_of_ten_rounds_down) {
+  const sourcemeta::core::Decimal power{"1e16"};
+  const sourcemeta::core::Decimal small{"0.6"};
+  EXPECT_EQ(power - small, sourcemeta::core::Decimal{"9999999999999999"});
+}
+
+TEST(Numeric_decimal,
+     divide_integer_large_exponent_terminating_by_two_pow_129) {
+  const sourcemeta::core::Decimal dividend{"1e2147483647"};
+  const sourcemeta::core::Decimal divisor{
+      "680564733841876926926749214863536422912"};
+  const sourcemeta::core::Decimal expected{
+      "1469367938527859384960920671527807097273331945965109401885939632"
+      "848021574318408966064453125e2147483518"};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, expected);
+}

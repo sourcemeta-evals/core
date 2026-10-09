@@ -1436,7 +1436,7 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
         dividend_big.divide_modulo(divisor_big);
     auto tail = BigCoefficient::from_uint64(0);
     std::int64_t steps = 0;
-    constexpr std::int64_t MAX_TRIAL_STEPS = 128;
+    constexpr std::int64_t MAX_TRIAL_STEPS = 2048;
     const auto trial_cap = std::min(gap_64, MAX_TRIAL_STEPS);
     while (!remainder.is_zero() && steps < trial_cap) {
       remainder = remainder.multiply_pow10(1);

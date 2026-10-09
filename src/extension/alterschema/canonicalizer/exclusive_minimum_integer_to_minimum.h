@@ -42,6 +42,9 @@ public:
       sourcemeta::core::Decimal new_value;
       if (current.is_integral()) {
         new_value = current + sourcemeta::core::Decimal{1};
+        if (new_value == current) {
+          new_value = current;
+        }
       } else {
         new_value = current.to_integral();
         if (new_value < current) {
