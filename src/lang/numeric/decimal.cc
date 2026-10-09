@@ -2296,10 +2296,6 @@ auto Decimal::operator-() const -> Decimal {
   result.flags_ ^= FLAG_SIGN;
   result.flags_ =
       static_cast<std::uint8_t>(result.flags_ & ~FLAG_INTEGER_LITERAL);
-  if (result.is_finite()) {
-    round_to_precision(result.coefficient_, result.coefficient_high_,
-                       result.exponent_, result.flags_);
-  }
   return result;
 }
 

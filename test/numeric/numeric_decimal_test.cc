@@ -6346,13 +6346,10 @@ TEST(Numeric_decimal,
   EXPECT_EQ(quotient, expected);
 }
 
-TEST(Numeric_decimal,
-     unary_minus_exact_halfway_across_complete_discarded_limb_rounds_even) {
+TEST(Numeric_decimal, unary_minus_preserves_long_coefficient) {
   const std::string zeros(17, '0');
   const sourcemeta::core::Decimal value{"1.2345678901234565" + zeros};
-  EXPECT_EQ(-value, sourcemeta::core::Decimal{"-1.234567890123456"});
-  const sourcemeta::core::Decimal odd_value{"1.2345678901234575" + zeros};
-  EXPECT_EQ(-odd_value, sourcemeta::core::Decimal{"-1.234567890123458"});
+  EXPECT_EQ(-value, sourcemeta::core::Decimal{"-1.2345678901234565" + zeros});
 }
 
 TEST(Numeric_decimal, unary_minus_short_coefficient_preserves_value) {
@@ -6360,4 +6357,22 @@ TEST(Numeric_decimal, unary_minus_short_coefficient_preserves_value) {
   EXPECT_EQ(-small, sourcemeta::core::Decimal{"-1.5"});
   const sourcemeta::core::Decimal integer{3};
   EXPECT_EQ(-integer, sourcemeta::core::Decimal{-3});
+}
+
+TEST(Numeric_decimal, subtract_long_coefficient_cancellation_exact) {
+  const sourcemeta::core::Decimal a{"10000000000000002"};
+  const sourcemeta::core::Decimal b{"10000000000000001"};
+  EXPECT_EQ(a - b, sourcemeta::core::Decimal{1});
+  EXPECT_EQ(b - a, sourcemeta::core::Decimal{-1});
+  const sourcemeta::core::Decimal c{"10000000000000001"};
+  EXPECT_EQ(c - c, sourcemeta::core::Decimal{0});
+  sourcemeta::core::Decimal mutable_c{"10000000000000001"};
+  mutable_c -= sourcemeta::core::Decimal{"10000000000000001"};
+  EXPECT_EQ(mutable_c, sourcemeta::core::Decimal{0});
+}
+
+TEST(Numeric_decimal, subtract_fractional_cancellation_preserves_difference) {
+  const sourcemeta::core::Decimal one{1};
+  const sourcemeta::core::Decimal almost_one{"0.99999999999999995"};
+  EXPECT_EQ(one - almost_one, sourcemeta::core::Decimal{"5e-17"});
 }
