@@ -676,3 +676,21 @@ TEST(JSON_number, is_integer_real_storage_fractional) {
   const sourcemeta::core::JSON document{3.14};
   EXPECT_FALSE(document.is_integer());
 }
+
+TEST(JSON_number, divisible_by_real_real_precision_sensitive_integer) {
+  const sourcemeta::core::JSON dividend{1e23};
+  const sourcemeta::core::JSON divisor{10.0};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_number, divisible_by_negative_real_real_precision_sensitive_integer) {
+  const sourcemeta::core::JSON dividend{-1e23};
+  const sourcemeta::core::JSON divisor{10.0};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_number, divisible_by_real_real_precision_sensitive_non_divisor) {
+  const sourcemeta::core::JSON dividend{1e23};
+  const sourcemeta::core::JSON divisor{3.0};
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}

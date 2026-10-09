@@ -6345,3 +6345,19 @@ TEST(Numeric_decimal,
   const auto quotient{dividend.divide_integer(divisor)};
   EXPECT_EQ(quotient, expected);
 }
+
+TEST(Numeric_decimal,
+     unary_minus_exact_halfway_across_complete_discarded_limb_rounds_even) {
+  const std::string zeros(17, '0');
+  const sourcemeta::core::Decimal value{"1.2345678901234565" + zeros};
+  EXPECT_EQ(-value, sourcemeta::core::Decimal{"-1.234567890123456"});
+  const sourcemeta::core::Decimal odd_value{"1.2345678901234575" + zeros};
+  EXPECT_EQ(-odd_value, sourcemeta::core::Decimal{"-1.234567890123458"});
+}
+
+TEST(Numeric_decimal, unary_minus_short_coefficient_preserves_value) {
+  const sourcemeta::core::Decimal small{"1.5"};
+  EXPECT_EQ(-small, sourcemeta::core::Decimal{"-1.5"});
+  const sourcemeta::core::Decimal integer{3};
+  EXPECT_EQ(-integer, sourcemeta::core::Decimal{-3});
+}
