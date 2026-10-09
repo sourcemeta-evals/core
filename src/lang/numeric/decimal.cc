@@ -1421,6 +1421,53 @@ auto Decimal::divide_integer(const Decimal &other) const -> Decimal {
   auto divisor_big = coefficient_as_big(other.coefficient_,
                                         other.coefficient_high_, other.flags_);
 
+  // When the dividend's stored exponent sits far above the divisor's, the
+  // naive alignment path would materialize dividend * 10^gap, which can
+  // allocate billions of coefficient digits for operands near the maximum
+  // stored exponent. For divisors whose only prime factors are 2 and 5 the
+  // quotient terminates in a bounded number of long-division steps, so we
+  // perform the division step by step on the compact coefficients and keep
+  // the remaining power of ten in the stored exponent of the result.
+  const auto gap_64 = static_cast<std::int64_t>(this->exponent_) -
+                      static_cast<std::int64_t>(other.exponent_);
+  constexpr std::int64_t LONG_DIVISION_GAP_THRESHOLD = 64;
+  if (gap_64 > LONG_DIVISION_GAP_THRESHOLD) {
+    auto [initial_quotient, remainder] =
+        dividend_big.divide_modulo(divisor_big);
+    auto tail = BigCoefficient::from_uint64(0);
+    std::int64_t steps = 0;
+    constexpr std::int64_t MAX_TRIAL_STEPS = 128;
+    const auto trial_cap = std::min(gap_64, MAX_TRIAL_STEPS);
+    while (!remainder.is_zero() && steps < trial_cap) {
+      remainder = remainder.multiply_pow10(1);
+      auto [digit_quotient, next_remainder] =
+          remainder.divide_modulo(divisor_big);
+      tail = tail.multiply_pow10(1).add(digit_quotient);
+      remainder = std::move(next_remainder);
+      steps++;
+    }
+    if (remainder.is_zero()) {
+      auto final_quotient =
+          initial_quotient.multiply_pow10(static_cast<std::uint32_t>(steps))
+              .add(tail);
+      const auto final_exponent_64 =
+          static_cast<std::int64_t>(this->exponent_) - steps;
+      if (final_exponent_64 > std::numeric_limits<std::int32_t>::max() ||
+          final_exponent_64 < std::numeric_limits<std::int32_t>::min()) {
+        throw NumericOverflowError{};
+      }
+      Decimal result;
+      store_big_result(result.coefficient_, result.coefficient_high_,
+                       result.flags_, std::move(final_quotient),
+                       result_negative);
+      if (result.is_zero()) {
+        result.flags_ = result_negative ? FLAG_SIGN : 0;
+      }
+      result.exponent_ = static_cast<std::int32_t>(final_exponent_64);
+      return result;
+    }
+  }
+
   BigCoefficient::align_exponents(dividend_big, divisor_big, this->exponent_,
                                   other.exponent_);
 

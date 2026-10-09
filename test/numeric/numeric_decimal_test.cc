@@ -4796,6 +4796,41 @@ TEST(Numeric_decimal, divide_integer_two_million_exponent_returns_unchanged) {
   EXPECT_FALSE(quotient.is_nan());
 }
 
+TEST(Numeric_decimal, divide_integer_max_exponent_terminating_by_two) {
+  const auto dividend{sourcemeta::core::Decimal{"1e2147483647"}};
+  const auto divisor{sourcemeta::core::Decimal{2}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"5e2147483646"});
+}
+
+TEST(Numeric_decimal, divide_integer_max_exponent_terminating_by_eight) {
+  const auto dividend{sourcemeta::core::Decimal{"1e2147483647"}};
+  const auto divisor{sourcemeta::core::Decimal{8}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"125e2147483644"});
+}
+
+TEST(Numeric_decimal, divide_integer_max_exponent_terminating_by_five) {
+  const auto dividend{sourcemeta::core::Decimal{"1e2147483647"}};
+  const auto divisor{sourcemeta::core::Decimal{5}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"2e2147483646"});
+}
+
+TEST(Numeric_decimal, divide_integer_max_exponent_terminating_negative_sign) {
+  const auto dividend{sourcemeta::core::Decimal{"-1e2147483647"}};
+  const auto divisor{sourcemeta::core::Decimal{2}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"-5e2147483646"});
+}
+
+TEST(Numeric_decimal, divide_integer_large_exponent_multi_digit_dividend) {
+  const auto dividend{sourcemeta::core::Decimal{"12345e2147483640"}};
+  const auto divisor{sourcemeta::core::Decimal{2}};
+  const auto quotient{dividend.divide_integer(divisor)};
+  EXPECT_EQ(quotient, sourcemeta::core::Decimal{"61725e2147483639"});
+}
+
 TEST(Numeric_decimal,
      divide_integer_hundred_thousand_digit_by_three_yields_exact_quotient) {
   const std::string dividend_digits(100001, '9');
