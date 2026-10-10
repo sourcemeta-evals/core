@@ -6376,3 +6376,75 @@ TEST(Numeric_decimal, subtract_fractional_cancellation_preserves_difference) {
   const sourcemeta::core::Decimal almost_one{"0.99999999999999995"};
   EXPECT_EQ(one - almost_one, sourcemeta::core::Decimal{"5e-17"});
 }
+
+TEST(Numeric_decimal, modulo_applies_arithmetic_precision_cap) {
+  const sourcemeta::core::Decimal dividend{"1234567890123456789"};
+  const sourcemeta::core::Decimal divisor{"2000000000000000000"};
+  const sourcemeta::core::Decimal expected{"1234567890123457e3"};
+  EXPECT_EQ(dividend % divisor, expected);
+  sourcemeta::core::Decimal accumulator{dividend};
+  accumulator %= divisor;
+  EXPECT_EQ(accumulator, expected);
+  const sourcemeta::core::Decimal negative_dividend{"-1234567890123456789"};
+  const sourcemeta::core::Decimal negative_expected{"-1234567890123457e3"};
+  EXPECT_EQ(negative_dividend % divisor, negative_expected);
+}
+
+TEST(Numeric_decimal, modulo_small_remainder_exact_small_result) {
+  const sourcemeta::core::Decimal dividend{"1000000000000005"};
+  const sourcemeta::core::Decimal divisor{10};
+  EXPECT_EQ(dividend % divisor, sourcemeta::core::Decimal{5});
+}
+
+TEST(Numeric_decimal, addition_propagates_rounding_carry_across_long_tails) {
+  const std::string zeros(14, '0');
+  const std::string nines(9, '9');
+  const sourcemeta::core::Decimal x{"1." + zeros + "04" + nines};
+  const sourcemeta::core::Decimal y{"2e-25"};
+  const sourcemeta::core::Decimal expected{"1.000000000000001"};
+  EXPECT_EQ(x + y, expected);
+  EXPECT_EQ(y + x, expected);
+  sourcemeta::core::Decimal accumulator{x};
+  accumulator += y;
+  EXPECT_EQ(accumulator, expected);
+}
+
+TEST(Numeric_decimal, divide_integer_accepts_equivalent_divisor_encodings) {
+  const sourcemeta::core::Decimal dividend{"1e2147483647"};
+  const sourcemeta::core::Decimal expected{"5e2147483646"};
+  EXPECT_EQ(dividend.divide_integer(sourcemeta::core::Decimal{"20e-1"}),
+            expected);
+  EXPECT_EQ(dividend.divide_integer(sourcemeta::core::Decimal{2}), expected);
+  const sourcemeta::core::Decimal negative_dividend{"-1e2147483647"};
+  const sourcemeta::core::Decimal negative_expected{"-5e2147483646"};
+  EXPECT_EQ(
+      negative_dividend.divide_integer(sourcemeta::core::Decimal{"20e-1"}),
+      negative_expected);
+  EXPECT_EQ(dividend.divide_integer(sourcemeta::core::Decimal{"-20e-1"}),
+            negative_expected);
+}
+
+TEST(Numeric_parse, zero_coefficient_rejects_positive_out_of_range_exponent) {
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"0e2147483648"},
+               sourcemeta::core::DecimalParseError);
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"+0e2147483648"},
+               sourcemeta::core::DecimalParseError);
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"-0e2147483648"},
+               sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_parse, zero_coefficient_rejects_negative_out_of_range_exponent) {
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"-0e-2147483649"},
+               sourcemeta::core::DecimalParseError);
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"0.0e-2147483648"},
+               sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_parse, zero_coefficient_accepts_boundary_exponents) {
+  const sourcemeta::core::Decimal positive{"0e2147483647"};
+  EXPECT_TRUE(positive.is_zero());
+  EXPECT_FALSE(positive.is_signed());
+  const sourcemeta::core::Decimal negative{"-0e-2147483648"};
+  EXPECT_TRUE(negative.is_zero());
+  EXPECT_TRUE(negative.is_signed());
+}
