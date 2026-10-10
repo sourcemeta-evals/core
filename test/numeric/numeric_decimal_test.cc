@@ -6423,28 +6423,3 @@ TEST(Numeric_decimal, divide_integer_accepts_equivalent_divisor_encodings) {
   EXPECT_EQ(dividend.divide_integer(sourcemeta::core::Decimal{"-20e-1"}),
             negative_expected);
 }
-
-TEST(Numeric_parse, zero_coefficient_rejects_positive_out_of_range_exponent) {
-  EXPECT_THROW((void)sourcemeta::core::Decimal{"0e2147483648"},
-               sourcemeta::core::DecimalParseError);
-  EXPECT_THROW((void)sourcemeta::core::Decimal{"+0e2147483648"},
-               sourcemeta::core::DecimalParseError);
-  EXPECT_THROW((void)sourcemeta::core::Decimal{"-0e2147483648"},
-               sourcemeta::core::DecimalParseError);
-}
-
-TEST(Numeric_parse, zero_coefficient_rejects_negative_out_of_range_exponent) {
-  EXPECT_THROW((void)sourcemeta::core::Decimal{"-0e-2147483649"},
-               sourcemeta::core::DecimalParseError);
-  EXPECT_THROW((void)sourcemeta::core::Decimal{"0.0e-2147483648"},
-               sourcemeta::core::DecimalParseError);
-}
-
-TEST(Numeric_parse, zero_coefficient_accepts_boundary_exponents) {
-  const sourcemeta::core::Decimal positive{"0e2147483647"};
-  EXPECT_TRUE(positive.is_zero());
-  EXPECT_FALSE(positive.is_signed());
-  const sourcemeta::core::Decimal negative{"-0e-2147483648"};
-  EXPECT_TRUE(negative.is_zero());
-  EXPECT_TRUE(negative.is_signed());
-}

@@ -287,3 +287,28 @@ TEST(Numeric_parse, to_int64_t_base8_empty) {
   const auto result{sourcemeta::core::to_int64_t(input, 8)};
   EXPECT_FALSE(result.has_value());
 }
+
+TEST(Numeric_parse, zero_coefficient_rejects_positive_out_of_range_exponent) {
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"0e2147483648"},
+               sourcemeta::core::DecimalParseError);
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"+0e2147483648"},
+               sourcemeta::core::DecimalParseError);
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"-0e2147483648"},
+               sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_parse, zero_coefficient_rejects_negative_out_of_range_exponent) {
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"-0e-2147483649"},
+               sourcemeta::core::DecimalParseError);
+  EXPECT_THROW((void)sourcemeta::core::Decimal{"0.0e-2147483648"},
+               sourcemeta::core::DecimalParseError);
+}
+
+TEST(Numeric_parse, zero_coefficient_accepts_boundary_exponents) {
+  const sourcemeta::core::Decimal positive{"0e2147483647"};
+  EXPECT_TRUE(positive.is_zero());
+  EXPECT_FALSE(positive.is_signed());
+  const sourcemeta::core::Decimal negative{"-0e-2147483648"};
+  EXPECT_TRUE(negative.is_zero());
+  EXPECT_TRUE(negative.is_signed());
+}
