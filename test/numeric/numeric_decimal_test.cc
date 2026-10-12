@@ -5967,6 +5967,78 @@ TEST(Numeric_decimal, add_zero_at_opposite_boundary_exponents_bounded_memory) {
   EXPECT_EQ(value, sourcemeta::core::Decimal{"1e2147483647"});
 }
 
+TEST(
+    Numeric_decimal,
+    add_opposite_sign_zeros_positive_lhs_negative_rhs_opposite_boundary_exponents_yields_positive_zero) {
+  const sourcemeta::core::Decimal left{"0e2147483647"};
+  const sourcemeta::core::Decimal right{"-0e-2147483648"};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{"0e-2147483648"}));
+}
+
+TEST(
+    Numeric_decimal,
+    add_opposite_sign_zeros_negative_lhs_positive_rhs_opposite_boundary_exponents_yields_positive_zero) {
+  const sourcemeta::core::Decimal left{"-0e-2147483648"};
+  const sourcemeta::core::Decimal right{"0e2147483647"};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{"0e-2147483648"}));
+}
+
+TEST(
+    Numeric_decimal,
+    add_opposite_sign_zeros_negative_large_exponent_positive_small_exponent_yields_positive_zero) {
+  const sourcemeta::core::Decimal left{"-0e2147483647"};
+  const sourcemeta::core::Decimal right{"0e-2147483648"};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{"0e-2147483648"}));
+}
+
+TEST(
+    Numeric_decimal,
+    add_opposite_sign_zeros_positive_small_exponent_negative_large_exponent_yields_positive_zero) {
+  const sourcemeta::core::Decimal left{"0e-2147483648"};
+  const sourcemeta::core::Decimal right{"-0e2147483647"};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{"0e-2147483648"}));
+}
+
+TEST(
+    Numeric_decimal,
+    add_two_negative_zeros_opposite_boundary_exponents_yields_negative_zero_at_finer_quantum) {
+  const sourcemeta::core::Decimal left{"-0e2147483647"};
+  const sourcemeta::core::Decimal right{"-0e-2147483648"};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{"0e-2147483648"}));
+}
+
+TEST(
+    Numeric_decimal,
+    add_two_negative_zeros_opposite_boundary_exponents_commuted_yields_negative_zero_at_finer_quantum) {
+  const sourcemeta::core::Decimal left{"-0e-2147483648"};
+  const sourcemeta::core::Decimal right{"-0e2147483647"};
+  const auto result{left + right};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+  EXPECT_FALSE(result.is_integer());
+  EXPECT_TRUE(result.same_quantum(sourcemeta::core::Decimal{"0e-2147483648"}));
+}
+
 TEST(Numeric_decimal,
      add_nonzero_compact_opposite_boundary_exponents_bounded_memory) {
   sourcemeta::core::Decimal value{"1e2147483647"};
