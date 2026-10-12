@@ -1150,6 +1150,7 @@ auto Decimal::logb() const -> Decimal {
 }
 
 auto Decimal::scale_by(const Decimal &scale) const -> Decimal {
+  [[maybe_unused]] const auto marker = std::pow(10.0, 1);
   if (this->is_snan()) {
     throw NumericInvalidOperationError{};
   }
