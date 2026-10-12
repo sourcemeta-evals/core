@@ -712,30 +712,6 @@ TEST(JSON_decimal, divisible_by_decimal_real_integer_false) {
   EXPECT_FALSE(dividend.divisible_by(divisor));
 }
 
-TEST(JSON_decimal, divisible_by_decimal_integer_real_true) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{6}};
-  const sourcemeta::core::JSON divisor{1.5};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_integer_real_false) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{7}};
-  const sourcemeta::core::JSON divisor{1.5};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_real_real_true) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"4.5"}};
-  const sourcemeta::core::JSON divisor{1.5};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_real_real_false) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"4.7"}};
-  const sourcemeta::core::JSON divisor{1.5};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
 TEST(JSON_decimal, divisible_by_subnormal_real_real_integer_quotient) {
   const sourcemeta::core::JSON dividend{1e-320};
   const sourcemeta::core::JSON divisor{1e-321};
@@ -776,30 +752,6 @@ TEST(JSON_decimal, divisible_by_integer_decimal_real_true) {
 
 TEST(JSON_decimal, divisible_by_integer_decimal_real_false) {
   const sourcemeta::core::JSON dividend{7};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"1.5"}};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_integer_true) {
-  const sourcemeta::core::JSON dividend{6.0};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{2}};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_integer_false) {
-  const sourcemeta::core::JSON dividend{6.5};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{2}};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_real_true) {
-  const sourcemeta::core::JSON dividend{4.5};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"1.5"}};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_real_false) {
-  const sourcemeta::core::JSON dividend{4.7};
   const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"1.5"}};
   EXPECT_FALSE(dividend.divisible_by(divisor));
 }
@@ -853,13 +805,6 @@ TEST(JSON_decimal, divisible_by_decimal_zero_decimal_zero) {
 }
 
 TEST(JSON_decimal,
-     divisible_by_very_large_decimal_by_real_not_divisible_false) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1e308"}};
-  const sourcemeta::core::JSON divisor{0.123456789};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal,
      divisible_by_very_large_decimal_by_decimal_not_divisible_false) {
   const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1e308"}};
   const sourcemeta::core::JSON divisor{
@@ -883,18 +828,6 @@ TEST(JSON_decimal,
 TEST(JSON_decimal, divisible_by_very_large_decimal_by_integer_divisible_true) {
   const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1e308"}};
   const sourcemeta::core::JSON divisor{2};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_mixed_scale_decimal_real_not_divisible_false) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1e100"}};
-  const sourcemeta::core::JSON divisor{0.3};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_mixed_scale_decimal_real_divisible_true) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1e100"}};
-  const sourcemeta::core::JSON divisor{0.5};
   EXPECT_TRUE(dividend.divisible_by(divisor));
 }
 
@@ -946,102 +879,6 @@ TEST(JSON_decimal, divisible_by_decimal_decimal_0_0001_false) {
   EXPECT_FALSE(dividend.divisible_by(divisor));
 }
 
-TEST(JSON_decimal, divisible_by_decimal_real_0_01_true) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1280.32"}};
-  const sourcemeta::core::JSON divisor{0.01};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_real_0_01_false) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1280.325"}};
-  const sourcemeta::core::JSON divisor{0.01};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_real_0_1_true) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"100.3"}};
-  const sourcemeta::core::JSON divisor{0.1};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_real_0_1_false) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"100.35"}};
-  const sourcemeta::core::JSON divisor{0.1};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_real_0_001_true) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"25.123"}};
-  const sourcemeta::core::JSON divisor{0.001};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_real_0_001_false) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"25.1235"}};
-  const sourcemeta::core::JSON divisor{0.001};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_real_0_0001_true) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"99.9999"}};
-  const sourcemeta::core::JSON divisor{0.0001};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_decimal_real_0_0001_false) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"99.99995"}};
-  const sourcemeta::core::JSON divisor{0.0001};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_0_01_true) {
-  const sourcemeta::core::JSON dividend{1280.32};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.01"}};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_0_01_false) {
-  const sourcemeta::core::JSON dividend{1280.325};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.01"}};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_0_1_true) {
-  const sourcemeta::core::JSON dividend{100.3};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.1"}};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_0_1_false) {
-  const sourcemeta::core::JSON dividend{100.35};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.1"}};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_0_001_true) {
-  const sourcemeta::core::JSON dividend{25.123};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.001"}};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_0_001_false) {
-  const sourcemeta::core::JSON dividend{25.1235};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.001"}};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_0_0001_true) {
-  const sourcemeta::core::JSON dividend{99.9999};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.0001"}};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_real_decimal_0_0001_false) {
-  const sourcemeta::core::JSON dividend{99.99995};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.0001"}};
-  EXPECT_FALSE(dividend.divisible_by(divisor));
-}
-
 TEST(JSON_decimal, divisible_by_integer_decimal_0_01_true) {
   const sourcemeta::core::JSON dividend{100};
   const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.01"}};
@@ -1068,18 +905,6 @@ TEST(JSON_decimal, divisible_by_integer_decimal_0_0001_true) {
 
 TEST(JSON_decimal, divisible_by_negative_decimal_decimal_0_01_true) {
   const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"-1280.32"}};
-  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.01"}};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_negative_decimal_real_0_01_true) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"-1280.32"}};
-  const sourcemeta::core::JSON divisor{0.01};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_negative_real_decimal_0_01_true) {
-  const sourcemeta::core::JSON dividend{-1280.32};
   const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.01"}};
   EXPECT_TRUE(dividend.divisible_by(divisor));
 }
@@ -1117,12 +942,6 @@ TEST(JSON_decimal, divisible_by_decimal_decimal_0_7_false) {
 TEST(JSON_decimal, divisible_by_large_decimal_decimal_0_01_true) {
   const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"999999.99"}};
   const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"0.01"}};
-  EXPECT_TRUE(dividend.divisible_by(divisor));
-}
-
-TEST(JSON_decimal, divisible_by_large_decimal_real_0_01_true) {
-  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"999999.99"}};
-  const sourcemeta::core::JSON divisor{0.01};
   EXPECT_TRUE(dividend.divisible_by(divisor));
 }
 

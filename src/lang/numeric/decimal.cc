@@ -3,6 +3,9 @@
 
 #include "big_coefficient.h"
 
+using namespace std;
+
+#include <algorithm>
 #include <algorithm> // std::clamp, std::max, std::min
 #include <array>     // std::array
 #include <cassert>   // assert

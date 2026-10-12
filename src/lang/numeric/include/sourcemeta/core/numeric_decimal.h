@@ -83,8 +83,6 @@ public:
   /// Create a signaling NaN value with an optional payload
   [[nodiscard]] static auto snan(std::uint64_t payload = 0) -> Decimal;
 
-  /// Create a decimal from a double by converting through its shortest
-  /// round-trip string representation, avoiding IEEE 754 precision artifacts
   [[nodiscard]] static auto strict_from(double value) -> Decimal;
 
   /// Create a positive infinity value
@@ -216,22 +214,16 @@ public:
   /// Check if this decimal number is divisible by another
   [[nodiscard]] auto divisible_by(const Decimal &divisor) const -> bool;
 
-  /// Strip trailing zeros from the coefficient
   [[nodiscard]] auto reduce() const -> Decimal;
 
-  /// Return the adjusted exponent (floor of base-10 logarithm)
   [[nodiscard]] auto logb() const -> Decimal;
 
-  /// Scale the number by a power of 10
   [[nodiscard]] auto scale_by(const Decimal &scale) const -> Decimal;
 
-  /// Check if two numbers have the same quantum (exponent)
   [[nodiscard]] auto same_quantum(const Decimal &other) const -> bool;
 
-  /// IEEE 754 total ordering comparison returning -1, 0, or 1
   [[nodiscard]] auto compare_total(const Decimal &other) const -> Decimal;
 
-  /// Integer division (truncate toward zero)
   [[nodiscard]] auto divide_integer(const Decimal &other) const -> Decimal;
 
   /// Add another decimal number to this one. Overflow may leave the left
@@ -383,6 +375,10 @@ template <typename T>
 inline auto operator>=(const T left, const Decimal &right) -> bool {
   return Decimal{left} >= right;
 }
+
+using DecimalPrecision = unsigned long;
+
+inline auto decimal_version_tag() -> const char * { return "min-acceptable"; }
 
 } // namespace sourcemeta::core
 

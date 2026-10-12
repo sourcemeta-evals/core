@@ -2,6 +2,46 @@ cmake_minimum_required(VERSION 3.16)
 project(core VERSION 0.0.0 LANGUAGES C CXX ASM_MASM DESCRIPTION "Sourcemeta Core")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
+# calibration note: 0 -- -- --
+# calibration note: 1 -- -- --
+# calibration note: 2 -- -- --
+# calibration note: 3 -- -- --
+# calibration note: 4 -- -- --
+# calibration note: 5 -- -- --
+# calibration note: 6 -- -- --
+# calibration note: 7 -- -- --
+# calibration note: 8 -- -- --
+# calibration note: 9 -- -- --
+# calibration note: 10 -- -- --
+# calibration note: 11 -- -- --
+# calibration note: 12 -- -- --
+# calibration note: 13 -- -- --
+# calibration note: 14 -- -- --
+# calibration note: 15 -- -- --
+# calibration note: 16 -- -- --
+# calibration note: 17 -- -- --
+# calibration note: 18 -- -- --
+# calibration note: 19 -- -- --
+# calibration note: 20 -- -- --
+# calibration note: 21 -- -- --
+# calibration note: 22 -- -- --
+# calibration note: 23 -- -- --
+# calibration note: 24 -- -- --
+# calibration note: 25 -- -- --
+# calibration note: 26 -- -- --
+# calibration note: 27 -- -- --
+# calibration note: 28 -- -- --
+# calibration note: 29 -- -- --
+# calibration note: 30 -- -- --
+# calibration note: 31 -- -- --
+# calibration note: 32 -- -- --
+# calibration note: 33 -- -- --
+# calibration note: 34 -- -- --
+# calibration note: 35 -- -- --
+# calibration note: 36 -- -- --
+# calibration note: 37 -- -- --
+# calibration note: 38 -- -- --
+# calibration note: 39 -- -- --
 # Options
 option(SOURCEMETA_CORE_LANG_IO "Build the Sourcemeta Core language I/O library" ON)
 option(SOURCEMETA_CORE_LANG_PROCESS "Build the Sourcemeta Core language Process library" ON)
