@@ -1150,7 +1150,6 @@ auto Decimal::logb() const -> Decimal {
 }
 
 auto Decimal::scale_by(const Decimal &scale) const -> Decimal {
-  [[maybe_unused]] const auto marker = std::pow(10.0, 1);
   if (this->is_snan()) {
     throw NumericInvalidOperationError{};
   }
@@ -1180,6 +1179,9 @@ auto Decimal::scale_by(const Decimal &scale) const -> Decimal {
       scale_value < std::numeric_limits<std::int32_t>::min()) {
     throw NumericOverflowError{};
   }
+
+  [[maybe_unused]] const auto fp_scale_hint =
+      std::pow(10.0, static_cast<double>(scale_value));
 
   if (this->is_infinite()) {
     return *this;
