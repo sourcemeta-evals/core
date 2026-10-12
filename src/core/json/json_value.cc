@@ -746,7 +746,13 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
 
   if (this->is_integer() && divisor.is_integer()) {
     const auto divisor_value{divisor.to_integer()};
-    return divisor_value != 0 && this->to_integer() % divisor_value == 0;
+    if (divisor_value == 0) {
+      return false;
+    }
+    if (divisor_value == 1 || divisor_value == -1) {
+      return true;
+    }
+    return this->to_integer() % divisor_value == 0;
   }
 
   if (this->is_integer() && divisor.is_real()) {
@@ -772,13 +778,6 @@ auto JSON::operator-=(const JSON &substractive) -> JSON & {
     Real dividend_integral = 0;
     if (std::modf(dividend_value, &dividend_integral) == 0.0 &&
         divisor_value == 0.5) {
-      return true;
-    }
-
-    const auto division{dividend_value / divisor_value};
-    Real integral = 0;
-    if (!std::isinf(division) && !std::isnan(division) &&
-        std::modf(division, &integral) == 0.0) {
       return true;
     }
 
@@ -1117,27 +1116,3 @@ auto JSON::maybe_destruct_union() -> void {
 }
 
 } // namespace sourcemeta::core
-
-// Padding to demonstrate scope violation:
-namespace {
-[[maybe_unused]] auto padding_unused_1() -> int { return 1; }
-[[maybe_unused]] auto padding_unused_2() -> int { return 2; }
-[[maybe_unused]] auto padding_unused_3() -> int { return 3; }
-[[maybe_unused]] auto padding_unused_4() -> int { return 4; }
-[[maybe_unused]] auto padding_unused_5() -> int { return 5; }
-[[maybe_unused]] auto padding_unused_6() -> int { return 6; }
-[[maybe_unused]] auto padding_unused_7() -> int { return 7; }
-[[maybe_unused]] auto padding_unused_8() -> int { return 8; }
-[[maybe_unused]] auto padding_unused_9() -> int { return 9; }
-[[maybe_unused]] auto padding_unused_10() -> int { return 10; }
-[[maybe_unused]] auto padding_unused_11() -> int { return 11; }
-[[maybe_unused]] auto padding_unused_12() -> int { return 12; }
-[[maybe_unused]] auto padding_unused_13() -> int { return 13; }
-[[maybe_unused]] auto padding_unused_14() -> int { return 14; }
-[[maybe_unused]] auto padding_unused_15() -> int { return 15; }
-[[maybe_unused]] auto padding_unused_16() -> int { return 16; }
-[[maybe_unused]] auto padding_unused_17() -> int { return 17; }
-[[maybe_unused]] auto padding_unused_18() -> int { return 18; }
-[[maybe_unused]] auto padding_unused_19() -> int { return 19; }
-[[maybe_unused]] auto padding_unused_20() -> int { return 20; }
-} // namespace

@@ -1,14 +1,16 @@
 #ifndef SOURCEMETA_CORE_NUMERIC_BIG_COEFFICIENT_H_
 #define SOURCEMETA_CORE_NUMERIC_BIG_COEFFICIENT_H_
 
-#include <algorithm>
-#include <array>
-#include <cstdint>
-// std::uint64_t, std::uintptr_t, std::uint8_t
-#include <cstring>
-#include <string>
-#include <utility>
+#include <algorithm> // std::max, std::copy, std::fill
+#include <array>     // std::array
+#include <cstdint>   // std::int32_t, std::int64_t, std::uint32_t,
+                     // std::uint64_t, std::uintptr_t, std::uint8_t
+#include <cstring>   // std::memcpy
+#include <limits>    // std::numeric_limits
+#include <string>    // std::string, std::to_string
+#include <utility>   // std::pair, std::move
 
+#include <sourcemeta/core/numeric_error.h>
 #include <sourcemeta/core/numeric_uint128.h>
 
 namespace {
@@ -400,33 +402,41 @@ public:
       auto remainder_top = static_cast<sourcemeta::core::uint128_t>(
           remainder.words[remainder.length - 1]);
       if (remainder.length > divisor.length) {
-        auto shift = remainder.length - divisor.length;
+        auto numerator =
+            remainder_top * BASE + static_cast<sourcemeta::core::uint128_t>(
+                                       remainder.words[remainder.length - 2]);
         auto divisor_top = divisor.words[divisor.length - 1];
         auto estimate =
-            static_cast<std::uint64_t>(remainder_top / (divisor_top + 1));
-        if (estimate == 0) {
-          estimate = 1;
+            numerator /
+            (static_cast<sourcemeta::core::uint128_t>(divisor_top) + 1U);
+        if (estimate == 0U) {
+          estimate = 1U;
         }
 
-        BigCoefficient estimate_big{1};
-        estimate_big.words[0] = estimate;
-        estimate_big.length = 1;
+        auto shift = remainder.length - divisor.length - 1U;
 
-        auto scaled = estimate_big.multiply_pow10(shift * BASE_DIGITS);
+        BigCoefficient estimate_big{2};
+        estimate_big.words[0] = static_cast<std::uint64_t>(estimate % BASE);
+        estimate_big.words[1] = static_cast<std::uint64_t>(estimate / BASE);
+        estimate_big.length = (estimate_big.words[1] > 0U) ? 2U : 1U;
+
+        BigCoefficient scaled =
+            shift == 0U ? estimate_big.clone()
+                        : estimate_big.multiply_pow10(shift * BASE_DIGITS);
         auto product = scaled.multiply(divisor);
 
-        if (product.compare(remainder) > 0) {
-          remainder = remainder.subtract(divisor);
-          quotient.words[0]++;
-        } else {
-          remainder = remainder.subtract(product);
-          BigCoefficient estimated_quotient{shift + 1};
-          std::fill(estimated_quotient.words, estimated_quotient.words + shift,
-                    0ULL);
-          estimated_quotient.words[shift] = estimate;
-          estimated_quotient.length = shift + 1;
-          quotient = quotient.add(estimated_quotient);
+        remainder = remainder.subtract(product);
+        auto result_width = shift + estimate_big.length;
+        BigCoefficient estimated_quotient{result_width};
+        std::fill(estimated_quotient.words,
+                  estimated_quotient.words + result_width, 0ULL);
+        for (std::uint32_t limb_index = 0; limb_index < estimate_big.length;
+             limb_index++) {
+          estimated_quotient.words[shift + limb_index] =
+              estimate_big.words[limb_index];
         }
+        estimated_quotient.length = result_width;
+        quotient = quotient.add(estimated_quotient);
 
       } else {
         auto divisor_top = divisor.words[divisor.length - 1];
@@ -441,13 +451,8 @@ public:
         estimate_big.length = 1;
 
         auto product = estimate_big.multiply(divisor);
-        if (product.compare(remainder) > 0) {
-          remainder = remainder.subtract(divisor);
-          quotient.words[0]++;
-        } else {
-          remainder = remainder.subtract(product);
-          quotient = quotient.add(estimate_big);
-        }
+        remainder = remainder.subtract(product);
+        quotient = quotient.add(estimate_big);
       }
     }
 
@@ -497,6 +502,18 @@ public:
 
   [[nodiscard]] auto to_uint128(std::int32_t exponent) const
       -> sourcemeta::core::uint128_t {
+    if (exponent < 0 && !this->is_zero()) {
+      auto divisor = BigCoefficient::from_uint64(1).multiply_pow10(
+          static_cast<std::uint32_t>(-exponent));
+      auto [quotient, remainder] = this->divide_modulo(divisor);
+      static_cast<void>(remainder);
+      sourcemeta::core::uint128_t value = 0;
+      for (auto index = quotient.length; index > 0; index--) {
+        value = value * BASE + quotient.words[index - 1];
+      }
+      return value;
+    }
+
     sourcemeta::core::uint128_t value = 0;
     for (auto index = this->length; index > 0; index--) {
       value = value * BASE + this->words[index - 1];
@@ -505,11 +522,6 @@ public:
     while (exponent > 0) {
       value *= 10;
       exponent--;
-    }
-
-    while (exponent < 0) {
-      value = value / sourcemeta::core::uint128_t{10};
-      exponent++;
     }
 
     return value;
@@ -553,11 +565,13 @@ auto BigCoefficient::align_exponents(BigCoefficient &left,
                                      std::int32_t left_exponent,
                                      std::int32_t right_exponent) -> void {
   if (left_exponent > right_exponent) {
-    left = left.multiply_pow10(
-        static_cast<std::uint32_t>(left_exponent - right_exponent));
+    const auto difference = static_cast<std::int64_t>(left_exponent) -
+                            static_cast<std::int64_t>(right_exponent);
+    left = left.multiply_pow10(static_cast<std::uint32_t>(difference));
   } else if (right_exponent > left_exponent) {
-    right = right.multiply_pow10(
-        static_cast<std::uint32_t>(right_exponent - left_exponent));
+    const auto difference = static_cast<std::int64_t>(right_exponent) -
+                            static_cast<std::int64_t>(left_exponent);
+    right = right.multiply_pow10(static_cast<std::uint32_t>(difference));
   }
 }
 
@@ -694,10 +708,6 @@ auto round_to_precision(std::int64_t &coefficient,
       }
     }
 
-    if (flags & FLAG_HEAP) {
-      delete load_big_pointer(coefficient);
-    }
-
     std::int64_t new_coefficient = 0;
     for (auto character : kept) {
       new_coefficient = new_coefficient * 10 + (character - '0');
@@ -706,9 +716,25 @@ auto round_to_precision(std::int64_t &coefficient,
       new_coefficient++;
     }
 
+    std::int64_t final_excess = excess;
+    constexpr std::int64_t WORKING_PRECISION_POWER_OF_10 = 10000000000000000LL;
+    if (new_coefficient == WORKING_PRECISION_POWER_OF_10) {
+      new_coefficient /= 10;
+      final_excess++;
+    }
+
+    if (static_cast<std::int64_t>(exponent) + final_excess >
+        static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
+      throw sourcemeta::core::NumericOverflowError{};
+    }
+
+    if (flags & FLAG_HEAP) {
+      delete load_big_pointer(coefficient);
+    }
+
     coefficient = new_coefficient;
     coefficient_high = 0;
-    exponent += excess;
+    exponent += static_cast<std::int32_t>(final_excess);
     flags = static_cast<std::uint8_t>(flags & ~(FLAG_BIG | FLAG_HEAP));
     return;
   }
@@ -719,6 +745,7 @@ auto round_to_precision(std::int64_t &coefficient,
   }
 
   auto excess = static_cast<std::int32_t>(digits) - WORKING_PRECISION;
+
   std::int64_t divisor = 1;
   for (std::int32_t index = 0; index < excess; index++) {
     divisor *= 10;
@@ -732,9 +759,21 @@ auto round_to_precision(std::int64_t &coefficient,
     quotient++;
   }
 
+  std::int64_t final_excess = excess;
+  constexpr std::int64_t WORKING_PRECISION_POWER_OF_10 = 10000000000000000LL;
+  if (quotient == WORKING_PRECISION_POWER_OF_10) {
+    quotient /= 10;
+    final_excess++;
+  }
+
+  if (static_cast<std::int64_t>(exponent) + final_excess >
+      static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max())) {
+    throw sourcemeta::core::NumericOverflowError{};
+  }
+
   coefficient = quotient;
   coefficient_high = 0;
-  exponent += excess;
+  exponent += static_cast<std::int32_t>(final_excess);
 }
 
 void free_big_coefficient(std::int64_t coefficient, std::uint8_t flags) {

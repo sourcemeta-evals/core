@@ -1,18 +1,16 @@
 #ifndef SOURCEMETA_CORE_NUMERIC_UINT128_H_
 #define SOURCEMETA_CORE_NUMERIC_UINT128_H_
 
-#pragma GCC diagnostic ignored "-Wpedantic"
-
 #ifndef SOURCEMETA_CORE_NUMERIC_EXPORT
 #include <sourcemeta/core/numeric_export.h>
 #endif
 
-#include <cassert>
-#include <climits>
-#include <cstdint>
+#include <cassert> // assert
+#include <climits> // UINT64_MAX
+#include <cstdint> // std::uint64_t, std::int64_t
 
 #if defined(_MSC_VER)
-#include <intrin.h>
+#include <intrin.h> // _umul128, _udiv128
 #endif
 
 namespace sourcemeta::core {

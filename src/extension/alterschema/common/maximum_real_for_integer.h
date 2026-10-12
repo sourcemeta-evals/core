@@ -33,6 +33,21 @@ public:
                      (schema.at("maximum").is_real() ||
                       (schema.at("maximum").is_decimal() &&
                        !schema.at("maximum").to_decimal().is_integral())));
+    if (schema.at("maximum").is_real()) {
+      const auto current{schema.at("maximum").to_real()};
+      if (!std::isfinite(current)) {
+        return false;
+      }
+      const auto flooring{std::floor(current)};
+      const auto int64_min_as_double{
+          static_cast<double>(std::numeric_limits<std::int64_t>::min())};
+      const auto int64_max_as_double{
+          static_cast<double>(std::numeric_limits<std::int64_t>::max())};
+      if (!(flooring >= int64_min_as_double &&
+            flooring < int64_max_as_double)) {
+        return false;
+      }
+    }
     return APPLIES_TO_KEYWORDS("maximum");
   }
 
@@ -43,12 +58,7 @@ public:
       if (new_value > current) {
         new_value -= sourcemeta::core::Decimal{1};
       }
-
-      if (new_value.is_int64()) {
-        schema.assign("maximum", sourcemeta::core::JSON{new_value.to_int64()});
-      } else {
-        schema.assign("maximum", sourcemeta::core::JSON{std::move(new_value)});
-      }
+      schema.assign("maximum", sourcemeta::core::JSON{std::move(new_value)});
     } else {
       const auto current{schema.at("maximum").to_real()};
       const auto new_value{static_cast<std::int64_t>(std::floor(current))};
