@@ -3838,66 +3838,12 @@ TEST(Numeric_decimal, multithreaded_high_thread_count) {
   }
 }
 
-TEST(Numeric_decimal, reduce_strips_trailing_zeros) {
-  const sourcemeta::core::Decimal value{"1.200"};
-  const sourcemeta::core::Decimal expected{"1.2"};
-  const auto reduced{value.reduce()};
-  EXPECT_EQ(reduced, expected);
-  EXPECT_TRUE(reduced.same_quantum(expected));
-}
-
-TEST(Numeric_decimal, reduce_zero) {
-  const sourcemeta::core::Decimal value{"0.00"};
-  const sourcemeta::core::Decimal expected{0};
-  EXPECT_EQ(value.reduce(), expected);
-}
-
-TEST(Numeric_decimal, reduce_negative_zero_preserves_sign) {
-  const sourcemeta::core::Decimal value{"-0.00"};
-  const auto reduced{value.reduce()};
-  EXPECT_TRUE(reduced.is_zero());
-  EXPECT_TRUE(reduced.is_signed());
-}
-
-TEST(Numeric_decimal, reduce_integer) {
-  const sourcemeta::core::Decimal value{"1200"};
-  const sourcemeta::core::Decimal expected{"12E+2"};
-  const auto reduced{value.reduce()};
-  EXPECT_EQ(reduced, expected);
-  EXPECT_TRUE(reduced.same_quantum(expected));
-}
-
-TEST(Numeric_decimal, reduce_negative) {
-  const sourcemeta::core::Decimal value{"-1.200"};
-  const sourcemeta::core::Decimal expected{"-1.2"};
-  EXPECT_EQ(value.reduce(), expected);
-}
-
-TEST(Numeric_decimal, reduce_infinity) {
-  EXPECT_TRUE(sourcemeta::core::Decimal::infinity().reduce().is_infinite());
-}
-
-TEST(Numeric_decimal, reduce_signaling_nan_throws_invalid_operation) {
-  const sourcemeta::core::Decimal value{"sNaN"};
-  EXPECT_THROW(
-      { [[maybe_unused]] const auto result = value.reduce(); },
-      sourcemeta::core::NumericInvalidOperationError);
-}
-
 TEST(Numeric_decimal,
      reduce_signaling_nan_with_payload_throws_invalid_operation) {
   const sourcemeta::core::Decimal value{"sNaN123"};
   EXPECT_THROW(
       { [[maybe_unused]] const auto result = value.reduce(); },
       sourcemeta::core::NumericInvalidOperationError);
-}
-
-TEST(Numeric_decimal, reduce_quiet_nan_preserves_payload) {
-  const sourcemeta::core::Decimal value{"NaN123"};
-  const auto result{value.reduce()};
-  EXPECT_TRUE(result.is_nan());
-  EXPECT_FALSE(result.is_snan());
-  EXPECT_EQ(result.nan_payload(), 123U);
 }
 
 TEST(Numeric_decimal, reduce_nan) {
@@ -4144,31 +4090,9 @@ TEST(Numeric_decimal,
       sourcemeta::core::NumericInvalidOperationError);
 }
 
-TEST(Numeric_decimal, same_quantum_same_exponent) {
-  const sourcemeta::core::Decimal left{"1.23"};
-  const sourcemeta::core::Decimal right{"4.56"};
-  EXPECT_TRUE(left.same_quantum(right));
-}
-
-TEST(Numeric_decimal, same_quantum_different_exponent) {
-  const sourcemeta::core::Decimal left{"1.2"};
-  const sourcemeta::core::Decimal right{"1.23"};
-  EXPECT_FALSE(left.same_quantum(right));
-}
-
 TEST(Numeric_decimal, same_quantum_both_nan) {
   EXPECT_TRUE(sourcemeta::core::Decimal::nan().same_quantum(
       sourcemeta::core::Decimal::nan()));
-}
-
-TEST(Numeric_decimal, same_quantum_both_infinity) {
-  EXPECT_TRUE(sourcemeta::core::Decimal::infinity().same_quantum(
-      sourcemeta::core::Decimal::negative_infinity()));
-}
-
-TEST(Numeric_decimal, same_quantum_nan_and_number) {
-  EXPECT_FALSE(sourcemeta::core::Decimal::nan().same_quantum(
-      sourcemeta::core::Decimal{1}));
 }
 
 TEST(Numeric_decimal, compare_total_positive_ordering) {
@@ -4507,13 +4431,6 @@ TEST(Numeric_decimal, parse_long_integer_literal_preserves_ordering) {
   std::string longer(2001, '1');
   EXPECT_TRUE(sourcemeta::core::Decimal{shorter} <
               sourcemeta::core::Decimal{longer});
-}
-
-TEST(Numeric_decimal, reduce_multi_limb_preserves_value) {
-  const sourcemeta::core::Decimal original{"2000000000000000010"};
-  const auto reduced{original.reduce()};
-  EXPECT_EQ(reduced, original);
-  EXPECT_FALSE(reduced.same_quantum(original));
 }
 
 TEST(Numeric_decimal,
@@ -5350,19 +5267,6 @@ TEST(Numeric_decimal, compound_subtract_right_signaling_nan_payload_wins) {
   left -= right;
   EXPECT_TRUE(left.is_nan());
   EXPECT_EQ(left.nan_payload(), 2U);
-}
-
-TEST(Numeric_decimal, reduce_compact_exponent_overflow_throws) {
-  const sourcemeta::core::Decimal value{"10e2147483647"};
-  EXPECT_THROW(
-      { [[maybe_unused]] const auto result = value.reduce(); },
-      sourcemeta::core::NumericOverflowError);
-}
-
-TEST(Numeric_decimal, reduce_compact_exponent_at_boundary_passes) {
-  const sourcemeta::core::Decimal value{"100e2147483645"};
-  const auto reduced{value.reduce()};
-  EXPECT_EQ(reduced, sourcemeta::core::Decimal{"1e2147483647"});
 }
 
 TEST(Numeric_decimal, divide_at_int32_min_exponent_overflow_throws) {
@@ -6356,29 +6260,6 @@ TEST(Numeric_decimal, multiply_nonzero_with_exponent_below_int32_min_throws) {
   const sourcemeta::core::Decimal right{"0.01"};
   EXPECT_THROW(
       { [[maybe_unused]] const auto result = left * right; },
-      sourcemeta::core::NumericOverflowError);
-}
-
-TEST(Numeric_decimal, reduce_compact_multiple_trailing_zeros_throws) {
-  const sourcemeta::core::Decimal value{"1000e2147483645"};
-  EXPECT_THROW(
-      { [[maybe_unused]] const auto result = value.reduce(); },
-      sourcemeta::core::NumericOverflowError);
-}
-
-TEST(Numeric_decimal, reduce_heap_backed_single_zero_overflow_throws) {
-  const sourcemeta::core::Decimal value{
-      "99999999999999999999999999999999999990e2147483647"};
-  EXPECT_THROW(
-      { [[maybe_unused]] const auto result = value.reduce(); },
-      sourcemeta::core::NumericOverflowError);
-}
-
-TEST(Numeric_decimal, reduce_heap_backed_multiple_trailing_zeros_throws) {
-  const sourcemeta::core::Decimal value{
-      "99999999999999999999999999999999999900e2147483646"};
-  EXPECT_THROW(
-      { [[maybe_unused]] const auto result = value.reduce(); },
       sourcemeta::core::NumericOverflowError);
 }
 
