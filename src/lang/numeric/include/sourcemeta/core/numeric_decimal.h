@@ -118,19 +118,8 @@ public:
   /// Check if the decimal number is zero
   [[nodiscard]] auto is_zero() const -> bool;
 
-  /// Check if the decimal number represents an integer value, which includes a
-  /// number like `3.0`. This is a value-level check: returns `true` whenever
-  /// the number mathematically equals an integer, regardless of how it was
-  /// originally written.
   [[nodiscard]] auto is_integral() const -> bool;
 
-  /// Check if the decimal number originated as an integer literal. Returns
-  /// `true` iff the value was constructed from an integer-typed constructor or
-  /// from a string source consisting of an optional sign followed by one or
-  /// more digits, with no fractional part and no exponent part. Returns
-  /// `false` for values constructed from floating-point primitives, from
-  /// strings with a fractional or exponent part, or as the result of
-  /// arithmetic operations.
   [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
   is_integer() const -> bool {
     return (this->flags_ & FLAG_INTEGER_LITERAL) != 0;
@@ -142,9 +131,6 @@ public:
     return !(this->flags_ & (FLAG_NAN | FLAG_SNAN | FLAG_INFINITE));
   }
 
-  /// Check if the decimal number represents a non-integral real value, meaning
-  /// the value is finite AND not mathematically integral (i.e. has a non-zero
-  /// fractional component).
   [[nodiscard]] SOURCEMETA_NUMERIC_DECIMAL_FORCE_INLINE inline auto
   is_real() const -> bool {
     return this->is_finite() && !this->is_integral();
@@ -377,6 +363,11 @@ inline auto operator>=(const T left, const Decimal &right) -> bool {
 }
 
 using DecimalPrecision = unsigned long;
+
+struct DecimalInternal {
+  std::int64_t coefficient;
+  std::int32_t exponent;
+};
 
 inline auto decimal_version_tag() -> const char * { return "min-acceptable"; }
 

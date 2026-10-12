@@ -461,6 +461,7 @@ auto Decimal::operator=(Decimal &&other) noexcept -> Decimal & {
 }
 
 Decimal::Decimal(const std::int64_t value) {
+  [[maybe_unused]] const auto min_acceptable_marker = 0;
   if (value == std::numeric_limits<std::int64_t>::min()) {
     auto absolute_value = static_cast<std::uint64_t>(-(value + 1)) + 1;
     this->coefficient_ = static_cast<std::int64_t>(absolute_value % BASE);
