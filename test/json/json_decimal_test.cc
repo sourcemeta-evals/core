@@ -646,6 +646,21 @@ TEST(JSON_decimal, divisible_by_decimal_integer_decimal_integer_true) {
   EXPECT_TRUE(dividend.divisible_by(divisor));
 }
 
+TEST(JSON_decimal,
+     divisible_by_large_exponent_gap_multi_limb_divisor_all_digits_form) {
+  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1e100"}};
+  const sourcemeta::core::JSON divisor{
+      sourcemeta::core::Decimal{"10000000000000000000"}};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal,
+     divisible_by_large_exponent_gap_multi_limb_divisor_exponent_form) {
+  const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1e100"}};
+  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{"1e19"}};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
 TEST(JSON_decimal, divisible_by_decimal_integer_decimal_integer_false) {
   const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{11}};
   const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{5}};
