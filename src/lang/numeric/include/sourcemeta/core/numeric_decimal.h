@@ -234,19 +234,24 @@ public:
   /// Integer division (truncate toward zero)
   [[nodiscard]] auto divide_integer(const Decimal &other) const -> Decimal;
 
-  /// Add another decimal number to this one
+  /// Add another decimal number to this one. Overflow may leave the left
+  /// operand partially mutated.
   auto operator+=(const Decimal &other) -> Decimal &;
 
-  /// Subtract another decimal number from this one
+  /// Subtract another decimal number from this one. Overflow may leave the
+  /// left operand partially mutated.
   auto operator-=(const Decimal &other) -> Decimal &;
 
-  /// Multiply this decimal number by another
+  /// Multiply this decimal number by another. Provides the strong exception
+  /// guarantee: on overflow, the left operand is left unchanged.
   auto operator*=(const Decimal &other) -> Decimal &;
 
-  /// Divide this decimal number by another
+  /// Divide this decimal number by another. Overflow may leave the left
+  /// operand partially mutated.
   auto operator/=(const Decimal &other) -> Decimal &;
 
-  /// Compute the modulo of this decimal number with another
+  /// Compute the modulo of this decimal number with another. Overflow may
+  /// leave the left operand partially mutated.
   auto operator%=(const Decimal &other) -> Decimal &;
 
   /// Add two decimal numbers

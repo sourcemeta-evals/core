@@ -736,6 +736,26 @@ TEST(JSON_decimal, divisible_by_decimal_real_real_false) {
   EXPECT_FALSE(dividend.divisible_by(divisor));
 }
 
+TEST(JSON_decimal, divisible_by_subnormal_real_real_integer_quotient) {
+  const sourcemeta::core::JSON dividend{1e-320};
+  const sourcemeta::core::JSON divisor{1e-321};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal,
+     divisible_by_subnormal_real_real_integer_quotient_negative_dividend) {
+  const sourcemeta::core::JSON dividend{-1e-320};
+  const sourcemeta::core::JSON divisor{1e-321};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal,
+     divisible_by_subnormal_real_real_reversed_operands_non_integer_quotient) {
+  const sourcemeta::core::JSON dividend{1e-321};
+  const sourcemeta::core::JSON divisor{1e-320};
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
 TEST(JSON_decimal, divisible_by_integer_decimal_integer_true) {
   const sourcemeta::core::JSON dividend{10};
   const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{5}};
@@ -1238,6 +1258,34 @@ TEST(JSON_decimal, divisible_by_million_exponent_by_twenty_is_true) {
 
 TEST(JSON_decimal, divisible_by_million_exponent_by_twenty_two_is_false) {
   const sourcemeta::core::JSON dividend{sourcemeta::core::Decimal{"1e1000001"}};
+  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{22}};
+  EXPECT_FALSE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal, divisible_by_ten_million_exponent_by_two_is_true) {
+  const sourcemeta::core::JSON dividend{
+      sourcemeta::core::Decimal{"1e10000001"}};
+  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{2}};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal, divisible_by_ten_million_exponent_by_five_is_true) {
+  const sourcemeta::core::JSON dividend{
+      sourcemeta::core::Decimal{"1e10000001"}};
+  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{5}};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal, divisible_by_ten_million_exponent_by_twenty_is_true) {
+  const sourcemeta::core::JSON dividend{
+      sourcemeta::core::Decimal{"1e10000001"}};
+  const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{20}};
+  EXPECT_TRUE(dividend.divisible_by(divisor));
+}
+
+TEST(JSON_decimal, divisible_by_ten_million_exponent_by_twenty_two_is_false) {
+  const sourcemeta::core::JSON dividend{
+      sourcemeta::core::Decimal{"1e10000001"}};
   const sourcemeta::core::JSON divisor{sourcemeta::core::Decimal{22}};
   EXPECT_FALSE(dividend.divisible_by(divisor));
 }
