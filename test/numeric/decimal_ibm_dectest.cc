@@ -811,6 +811,11 @@ static auto should_skip_file(const std::string &filename) -> bool {
   const auto lower{to_lower(filename)};
   if (lower.starts_with("dd") || lower.starts_with("dq") ||
       lower.starts_with("ds")) {
+    if (lower.find("copy") != std::string::npos ||
+        lower.find("compare") != std::string::npos ||
+        lower.find("samequantum") != std::string::npos) {
+      return false;
+    }
     return true;
   }
   return lower.find("randoms") != std::string::npos ||
