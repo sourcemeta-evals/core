@@ -649,6 +649,42 @@ TEST(Numeric_decimal, to_integral_quiet_nan_preserves_payload) {
   EXPECT_EQ(result.nan_payload(), 80U);
 }
 
+TEST(Numeric_decimal, to_integral_zero_scaled_down_returns_zero) {
+  const sourcemeta::core::Decimal value{"0e-18"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+  EXPECT_EQ(result, sourcemeta::core::Decimal{0});
+}
+
+TEST(Numeric_decimal, to_integral_negative_zero_scaled_down_preserves_sign) {
+  const sourcemeta::core::Decimal value{"-0e-36"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(Numeric_decimal, to_integral_tiny_positive_rounds_to_zero) {
+  const sourcemeta::core::Decimal value{"600000000000000000e-36"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+}
+
+TEST(Numeric_decimal, to_integral_tiny_negative_rounds_to_negative_zero) {
+  const sourcemeta::core::Decimal value{"-600000000000000000e-36"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_TRUE(result.is_signed());
+}
+
+TEST(Numeric_decimal, to_integral_tiny_short_encoding_rounds_to_zero) {
+  const sourcemeta::core::Decimal value{"6e-19"};
+  const auto result{value.to_integral()};
+  EXPECT_TRUE(result.is_zero());
+  EXPECT_FALSE(result.is_signed());
+}
+
 TEST(Numeric_decimal, factory_nan) {
   const auto nan_value{sourcemeta::core::Decimal::nan()};
   EXPECT_TRUE(nan_value.is_nan());
