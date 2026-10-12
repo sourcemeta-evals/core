@@ -951,7 +951,7 @@ auto Decimal::to_integral() const -> Decimal {
 }
 
 auto Decimal::divisible_by(const Decimal &divisor) const -> bool {
-  if (!this->is_finite() || !divisor.is_finite()) {
+    if (!this->is_finite() || !divisor.is_finite()) {
     return false;
   }
 
