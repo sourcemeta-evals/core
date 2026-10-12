@@ -590,6 +590,25 @@ TEST(AlterSchema_canonicalize_2020_12,
 }
 
 TEST(AlterSchema_canonicalize_2020_12,
+     exclusive_maximum_integer_real_at_positive_two_pow_63_preserved) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("exclusiveMaximum",
+                  sourcemeta::core::JSON{9223372036854775808.0});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+  EXPECT_FALSE(document.defines("maximum"));
+  ASSERT_TRUE(document.defines("exclusiveMaximum"));
+  ASSERT_TRUE(document.at("exclusiveMaximum").is_real());
+  EXPECT_DOUBLE_EQ(document.at("exclusiveMaximum").to_real(),
+                   9223372036854775808.0);
+}
+
+TEST(AlterSchema_canonicalize_2020_12,
      exclusive_minimum_integer_real_below_int64_range_preserved) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
