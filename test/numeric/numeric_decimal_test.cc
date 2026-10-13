@@ -626,6 +626,23 @@ TEST(Numeric_decimal, to_integral_half_even_big) {
             sourcemeta::core::Decimal{"10000000000000000002"});
 }
 
+TEST(Numeric_decimal, to_integral_rounds_up_across_digit_boundary) {
+  EXPECT_EQ(sourcemeta::core::Decimal{"9.4"}.to_integral(),
+            sourcemeta::core::Decimal{9});
+  EXPECT_EQ(sourcemeta::core::Decimal{"9.5"}.to_integral(),
+            sourcemeta::core::Decimal{10});
+  EXPECT_EQ(sourcemeta::core::Decimal{"9.9"}.to_integral(),
+            sourcemeta::core::Decimal{10});
+  EXPECT_EQ(sourcemeta::core::Decimal{"99.9"}.to_integral(),
+            sourcemeta::core::Decimal{100});
+  EXPECT_EQ(sourcemeta::core::Decimal{"-9.5"}.to_integral(),
+            sourcemeta::core::Decimal{-10});
+  EXPECT_EQ(sourcemeta::core::Decimal{"-9.9"}.to_integral(),
+            sourcemeta::core::Decimal{-10});
+  EXPECT_EQ(sourcemeta::core::Decimal{"-99.9"}.to_integral(),
+            sourcemeta::core::Decimal{-100});
+}
+
 TEST(Numeric_decimal, to_integral_signaling_nan_throws_invalid_operation) {
   const sourcemeta::core::Decimal value{"sNaN"};
   EXPECT_THROW(
