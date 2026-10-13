@@ -833,6 +833,26 @@ TEST(
             -static_cast<std::int64_t>(18014398509481983));
 }
 
+TEST(
+    AlterSchema_canonicalize_2020_12,
+    exclusive_minimum_integer_real_at_int64_min_adjusts_to_int64_min_plus_one) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "integer"
+  })JSON");
+  document.assign("exclusiveMinimum",
+                  sourcemeta::core::JSON{-9223372036854775808.0});
+
+  CANONICALIZE(document, result, traces);
+
+  EXPECT_TRUE(result.first);
+  EXPECT_FALSE(document.defines("exclusiveMinimum"));
+  ASSERT_TRUE(document.defines("minimum"));
+  ASSERT_TRUE(document.at("minimum").is_integer());
+  EXPECT_EQ(document.at("minimum").to_integer(),
+            std::numeric_limits<std::int64_t>::min() + 1);
+}
+
 TEST(AlterSchema_canonicalize_2020_12, boolean_true_1) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
