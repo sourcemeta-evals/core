@@ -846,7 +846,7 @@ auto embed_references(
         // Otherwise the embedded resource would be re-interpreted under the
         // dialect of the schema it gets embedded into, which can differ from
         // the default dialect that the remote was resolved with
-        if (!remote.defines("$schema")) {
+        if (!remote.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)) {
           remote.assign("$schema", JSON{remote_dialect_uri});
         }
 
