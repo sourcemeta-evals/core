@@ -907,7 +907,11 @@ auto embed_references(
     const auto dialect_allows_naming{dialect_defines_identifier(
         walker, remote_vocabularies, remote_base_dialect)};
 
-    const auto remote_dialect_uri{declared_dialect(remote, default_dialect)};
+    // What the remote is read under is what framing made of it, which takes in
+    // a mark that a previous bundling left on it as well as what it declares
+    // and what it was resolved with. Asking the document again would miss the
+    // mark, as no keyword of the schema carries it
+    const JSON::String remote_dialect_uri{remote_root.dialect};
 
     if (remote.is_object()) {
       if (dialect_allows_naming) {
