@@ -929,22 +929,35 @@ auto embed_references(
       }
     }
 
+    // Whether what went in can answer to the name it was resolved by is a
+    // question of the remote, not of the reference that happened to bring it
+    // in. A reference that names a resource the remote carries is settled by
+    // that name, which says nothing about the remote around it, and a later
+    // reference to the remote itself still has to be settled by place
+    if (!dialect_allows_naming) {
+      assert(effective_id == identifier);
+      positional.unnamed.insert(identifier);
+    }
+
     if (names_a_resource) {
       // Settled above, and by a name rather than by a place, so none of what
       // follows has anything to add to it
-    } else if (!dialect_allows_naming) {
-      // A dialect that defines no identifier keyword leaves the remote unable
-      // to declare one, so the name it was resolved by is not the name it
-      // answers to afterwards
-      assert(effective_id == identifier);
-      positional.unnamed.insert(identifier);
-      ref_rewrites.emplace_back(to_pointer(pointer),
-                                JSON::String{reference.destination});
     } else if (effective_id != identifier) {
+      // A remote that answers to a name of its own keeps it, so the reference
+      // is rebased onto that rather than onto the one it was resolved by. Only
+      // a dialect that can declare a name reaches here, as one that cannot
+      // leaves the two the same
       ref_rewrites.emplace_back(
           to_pointer(pointer),
           rebase_reference(effective_id, reference.fragment));
-    } else if (spells_another_document_relatively(reference)) {
+    } else if (!dialect_allows_naming ||
+               spells_another_document_relatively(reference)) {
+      // Either the remote cannot declare the name it was resolved by, so what
+      // this reference points at is settled against the finished document
+      // instead, or it keeps that name while the reference spells it as a
+      // place of another document. Spelling it out in full is what the later
+      // pass reads, since a relative spelling reads against wherever the
+      // schema ends up
       ref_rewrites.emplace_back(to_pointer(pointer),
                                 JSON::String{reference.destination});
     }
