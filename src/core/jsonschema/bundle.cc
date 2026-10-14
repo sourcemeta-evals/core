@@ -289,145 +289,167 @@ auto settle_positional_references(
     }
   }
 
-  const SchemaFrame frame{SchemaFrame::Mode::References,
-                          schema,
-                          walker,
-                          resolver,
-                          default_dialect,
-                          default_id,
-                          SchemaFrame::IdentifierMode::Additional,
-                          settling,
-                          default_base,
-                          remaining};
-  charge(remaining, frame);
+  // A copy carries whatever references the schema it came from had, and what
+  // those have to say depends on where the copy went rather than on where it
+  // came from. So settling reads the document again after it has placed any,
+  // until a round places none. One copy per resource and identifier is what
+  // bounds this: elevation has already lifted every identified resource out of
+  // what lands, so a copy carries no identifier and adds no resource that
+  // could host copies of its own
+  std::map<std::pair<Pointer, JSON::String>, JSON::String> placed;
+  // Held back until every round is done, so that each copy is taken from a
+  // schema that still spells its references the way it was resolved by. A
+  // rewrite names a place by property rather than by index, so placing a copy
+  // never moves one
+  std::map<Pointer, JSON::String> rewrites;
+  auto settled{false};
+  while (!settled) {
+    settled = true;
+    const SchemaFrame frame{SchemaFrame::Mode::References,
+                            schema,
+                            walker,
+                            resolver,
+                            default_dialect,
+                            default_id,
+                            SchemaFrame::IdentifierMode::Additional,
+                            settling,
+                            default_base,
+                            remaining};
+    charge(remaining, frame);
 
-  std::vector<std::pair<Pointer, JSON::String>> rewrites;
-  std::vector<PositionalCopy> copies;
-  frame.for_each_unresolved_reference([&](const auto &pointer,
-                                          const auto &reference) -> void {
-    const JSON::String base{reference.base};
-    const auto landing{positional.landings.find(base)};
-    if (landing == positional.landings.cend()) {
-      return;
-    }
-
-    std::optional<Pointer> tail;
-    if (reference.fragment.has_value() && !reference.fragment.value().empty()) {
-      tail = fragment_to_pointer(URI{reference.destination});
-      if (!tail.has_value()) {
-        // Whatever the fragment names, it is not a place of the schema, and a
-        // dialect that reserves no keyword for a name reserves none for an
-        // anchor either, so there is nothing for it to have named
-        throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                   "Could not resolve schema reference");
-      }
-    }
-
-    auto within_document{landing->second};
-    if (tail.has_value()) {
-      within_document.push_back(Pointer{tail.value()});
-    }
-
-    if (try_get(schema, within_document) == nullptr) {
-      throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                 "Could not resolve schema reference");
-    }
-
-    // A pointer names a place of whichever resource is in force where it is
-    // written, so what names the landing is where it sits within the resource
-    // that holds it rather than within the document
-    const auto landed{frame.traverse(to_weak_pointer(landing->second))};
-    assert(landed.has_value());
-    const auto &landed_location{landed.value().get()};
-    auto target{
-        landed_location.parent.has_value()
-            ? to_pointer(landed_location.pointer)
-                  .resolve_from(to_pointer(landed_location.parent.value()))
-            : to_pointer(landed_location.pointer)};
-    if (tail.has_value()) {
-      target.push_back(Pointer{tail.value()});
-    }
-
-    // Written on its own that pointer says the same thing only from a scope
-    // that resolves against the same base. From anywhere else it takes the
-    // name of the resource in front of it, and where that resource answers to
-    // no name there is nothing to put there
-    const auto enclosing{frame.traverse(pointer.initial())};
-    auto value{to_uri(target)};
-    if (enclosing.has_value() &&
-        enclosing.value().get().base != landed_location.base) {
-      if (landed_location.base.empty()) {
-        // The landing can only be named on its own from the scope the document
-        // itself answers to, and a resource that carries its own name is not
-        // that scope. What such a resource needs is its own copy, in whichever
-        // location its own dialect reserves for one, which is then a place of
-        // that resource and travels with it
-        const auto &enclosing_location{enclosing.value().get()};
-        const auto host{enclosing_location.parent.has_value()
-                            ? to_pointer(enclosing_location.parent.value())
-                            : Pointer{}};
-        const auto host_location{frame.traverse(to_weak_pointer(host))};
-        assert(host_location.has_value());
-        const auto keyword{definitions_keyword(
-            walker, frame.vocabularies(host_location.value().get(), resolver))};
-        if (keyword.empty()) {
-          throw SchemaReferenceError(
-              reference.destination, to_pointer(pointer),
-              "Could not reach a schema that this dialect embeds without an "
-              "identifier from a resource that reserves nowhere to put one");
-        }
-
-        copies.push_back(
-            {.host = host,
-             .keyword = JSON::String{keyword},
-             .identifier = base,
-             .tail = tail,
-             .reference = to_pointer(pointer),
-             .dialect = JSON::String{landed_location.dialect},
-             .carries_its_dialect = host_location.value().get().dialect !=
-                                    landed_location.dialect});
+    std::vector<PositionalCopy> copies;
+    frame.for_each_unresolved_reference([&](const auto &pointer,
+                                            const auto &reference) -> void {
+      const JSON::String base{reference.base};
+      const auto landing{positional.landings.find(base)};
+      if (landing == positional.landings.cend()) {
         return;
       }
 
-      URI absolute{JSON::String{landed_location.base}};
-      absolute.fragment(value.fragment().value());
-      value = std::move(absolute);
-    }
-
-    rewrites.emplace_back(to_pointer(pointer), JSON::String{value.recompose()});
-  });
-
-  // One copy per resource that needs one, however many of its references name
-  // the same schema
-  std::map<std::pair<Pointer, JSON::String>, JSON::String> placed;
-  for (const auto &copy : copies) {
-    auto host_container{copy.host};
-    host_container.push_back(copy.keyword);
-    const std::pair<Pointer, JSON::String> seen{host_container,
-                                                copy.identifier};
-    const auto hit{placed.find(seen)};
-    if (hit == placed.cend()) {
-      auto duplicate{
-          JSON{get(schema, positional.landings.at(copy.identifier))}};
-      // Where it came from said what it was by sitting where it sat, and the
-      // place it goes to says something else, so the copy has to say it
-      if (copy.carries_its_dialect) {
-        mark_dialect_of_every_subschema(duplicate, walker, resolver,
-                                        copy.dialect, remaining);
+      std::optional<Pointer> tail;
+      if (reference.fragment.has_value() &&
+          !reference.fragment.value().empty()) {
+        tail = fragment_to_pointer(URI{reference.destination});
+        if (!tail.has_value()) {
+          // Whatever the fragment names, it is not a place of the schema, and a
+          // dialect that reserves no keyword for a name reserves none for an
+          // anchor either, so there is nothing for it to have named
+          throw SchemaReferenceError(reference.destination, to_pointer(pointer),
+                                     "Could not resolve schema reference");
+        }
       }
 
-      placed.emplace(seen, embed_schema(schema, host_container, copy.identifier,
-                                        std::move(duplicate), callback));
-    }
+      auto within_document{landing->second};
+      if (tail.has_value()) {
+        within_document.push_back(Pointer{tail.value()});
+      }
 
-    Pointer target{copy.keyword};
-    target.push_back(JSON::String{placed.at(seen)});
-    if (copy.tail.has_value()) {
-      target.push_back(Pointer{copy.tail.value()});
-    }
+      if (try_get(schema, within_document) == nullptr) {
+        throw SchemaReferenceError(reference.destination, to_pointer(pointer),
+                                   "Could not resolve schema reference");
+      }
 
-    rewrites.emplace_back(copy.reference,
-                          JSON::String{to_uri(target).recompose()});
+      // A pointer names a place of whichever resource is in force where it is
+      // written, so what names the landing is where it sits within the resource
+      // that holds it rather than within the document
+      const auto landed{frame.traverse(to_weak_pointer(landing->second))};
+      assert(landed.has_value());
+      const auto &landed_location{landed.value().get()};
+      auto target{
+          landed_location.parent.has_value()
+              ? to_pointer(landed_location.pointer)
+                    .resolve_from(to_pointer(landed_location.parent.value()))
+              : to_pointer(landed_location.pointer)};
+      if (tail.has_value()) {
+        target.push_back(Pointer{tail.value()});
+      }
+
+      // Written on its own that pointer says the same thing only from a scope
+      // that resolves against the same base. From anywhere else it takes the
+      // name of the resource in front of it, and where that resource answers to
+      // no name there is nothing to put there
+      const auto enclosing{frame.traverse(pointer.initial())};
+      auto value{to_uri(target)};
+      if (enclosing.has_value() &&
+          enclosing.value().get().base != landed_location.base) {
+        if (landed_location.base.empty()) {
+          // The landing can only be named on its own from the scope the
+          // document itself answers to, and a resource that carries its own
+          // name is not that scope. What such a resource needs is its own copy,
+          // in whichever location its own dialect reserves for one, which is
+          // then a place of that resource and travels with it
+          const auto &enclosing_location{enclosing.value().get()};
+          // A pointer written here names a place of the resource in force,
+          // which is the one that needs the copy. That is not always the
+          // subschema holding the reference, as a copy placed in a resource
+          // is a subschema of it and carries references of its own
+          const auto host_location{frame.traverse(enclosing_location.base)};
+          assert(host_location.has_value());
+          const auto host{to_pointer(host_location.value().get().pointer)};
+          const auto keyword{definitions_keyword(
+              walker,
+              frame.vocabularies(host_location.value().get(), resolver))};
+          if (keyword.empty()) {
+            throw SchemaReferenceError(
+                reference.destination, to_pointer(pointer),
+                "Could not reach a schema that this dialect embeds without an "
+                "identifier from a resource that reserves nowhere to put one");
+          }
+
+          copies.push_back(
+              {.host = host,
+               .keyword = JSON::String{keyword},
+               .identifier = base,
+               .tail = tail,
+               .reference = to_pointer(pointer),
+               .dialect = JSON::String{landed_location.dialect},
+               .carries_its_dialect = host_location.value().get().dialect !=
+                                      landed_location.dialect});
+          return;
+        }
+
+        URI absolute{JSON::String{landed_location.base}};
+        absolute.fragment(value.fragment().value());
+        value = std::move(absolute);
+      }
+
+      rewrites.insert_or_assign(to_pointer(pointer),
+                                JSON::String{value.recompose()});
+    });
+
+    // One copy per resource that needs one, however many of its references name
+    // the same schema
+    for (const auto &copy : copies) {
+      auto host_container{copy.host};
+      host_container.push_back(copy.keyword);
+      const std::pair<Pointer, JSON::String> seen{host_container,
+                                                  copy.identifier};
+      const auto hit{placed.find(seen)};
+      if (hit == placed.cend()) {
+        auto duplicate{
+            JSON{get(schema, positional.landings.at(copy.identifier))}};
+        // Where it came from said what it was by sitting where it sat, and the
+        // place it goes to says something else, so the copy has to say it
+        if (copy.carries_its_dialect) {
+          mark_dialect_of_every_subschema(duplicate, walker, resolver,
+                                          copy.dialect, remaining);
+        }
+
+        placed.emplace(seen,
+                       embed_schema(schema, host_container, copy.identifier,
+                                    std::move(duplicate), callback));
+        settled = false;
+      }
+
+      Pointer target{copy.keyword};
+      target.push_back(JSON::String{placed.at(seen)});
+      if (copy.tail.has_value()) {
+        target.push_back(Pointer{copy.tail.value()});
+      }
+
+      rewrites.insert_or_assign(copy.reference,
+                                JSON::String{to_uri(target).recompose()});
+    }
   }
 
   for (const auto &[pointer, value] : rewrites) {
