@@ -385,6 +385,27 @@ auto settle_positional_references(
                                    "Could not resolve schema reference");
       }
 
+      // What the reference reaches can be a resource that the remote carried,
+      // which keeps the name it declared wherever it ends up. Saying that name
+      // reads the same from every scope and survives the resource being moved
+      // again, where saying the place does neither
+      // What the reference reaches can be a resource that the remote carried,
+      // which keeps the name it declared wherever it ends up. Saying that name
+      // reads the same from every scope and survives the resource being moved
+      // again, where saying the place does neither. What makes it that
+      // resource rather than a subschema of it is the name leading back to the
+      // same place
+      const auto reached{frame.traverse(to_weak_pointer(within_document))};
+      if (reached.has_value() && !reached.value().get().base.empty()) {
+        const auto named{frame.traverse(reached.value().get().base)};
+        if (named.has_value() &&
+            to_pointer(named.value().get().pointer) == within_document) {
+          rewrites.insert_or_assign(to_pointer(pointer),
+                                    JSON::String{reached.value().get().base});
+          return;
+        }
+      }
+
       // A pointer names a place of whichever resource is in force where it is
       // written, so what names the landing is where it sits within the resource
       // that holds it rather than within the document

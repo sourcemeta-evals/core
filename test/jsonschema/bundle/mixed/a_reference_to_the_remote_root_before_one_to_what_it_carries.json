@@ -31,7 +31,7 @@
           "$ref": "#/x-definitions/https:~1~1www.sourcemeta.com~1outer"
         },
         "b": {
-          "$ref": "#/x-definitions/https:~1~1www.sourcemeta.com~1outer/x-definitions/child"
+          "$ref": "https://www.sourcemeta.com/child"
         }
       },
       "x-definitions": {
@@ -54,7 +54,7 @@
           "$ref": "#/x-definitions/https:~1~1www.sourcemeta.com~1outer"
         },
         "b": {
-          "$ref": "#/x-definitions/https:~1~1www.sourcemeta.com~1outer/x-definitions/child"
+          "$ref": "https://www.sourcemeta.com/child"
         }
       },
       "x-definitions": {
