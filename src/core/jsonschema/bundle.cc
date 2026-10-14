@@ -209,6 +209,42 @@ auto collect_pinned_dialects(const JSON &schema,
   }
 }
 
+// Whether the container can hold what bundling puts there is a question of the
+// document rather than of what bundling ends up embedding, so it is asked
+// whether or not anything does. Embedding makes the objects it needs along the
+// way, so a property that nothing holds yet is no reason to refuse, while a
+// place that something else holds is one and so is an index that names no
+// element of an array
+auto check_container(const JSON &root, const Pointer &container) -> void {
+  static constexpr auto NOT_AN_OBJECT{
+      "Could not bundle to a container that is not an object"};
+  const auto *current{&root};
+  for (const auto &token : container) {
+    if (token.is_property()) {
+      if (!current->is_object()) {
+        throw SchemaContainerError(container, NOT_AN_OBJECT);
+      }
+
+      const auto *next{current->try_at(token.to_property())};
+      if (next == nullptr) {
+        return;
+      }
+
+      current = next;
+    } else {
+      if (!current->is_array() || current->size() <= token.to_index()) {
+        throw SchemaContainerError(container, NOT_AN_OBJECT);
+      }
+
+      current = &current->at(token.to_index());
+    }
+  }
+
+  if (!current->is_object()) {
+    throw SchemaContainerError(container, NOT_AN_OBJECT);
+  }
+}
+
 auto embed_schema(JSON &root, const Pointer &container,
                   const std::string_view identifier, JSON &&target,
                   const SchemaBundleOptions::Callback &callback)
@@ -219,7 +255,7 @@ auto embed_schema(JSON &root, const Pointer &container,
       current->assign_if_missing(token.to_property(), JSON::make_object());
       current = &current->at(token.to_property());
     } else {
-      assert(current->is_array() && current->size() >= token.to_index());
+      assert(current->is_array() && current->size() > token.to_index());
       current = &current->at(token.to_index());
     }
   }
@@ -1027,6 +1063,8 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
       }
     }
 
+    check_container(schema, default_container.value());
+
     const auto container_parent{initial_frame.traverse(
         to_weak_pointer(default_container.value().initial()))};
     embed_references(
@@ -1134,9 +1172,17 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     }
   }
 
-  embed_references(schema, {JSON::String{container_keyword}}, schema, walker,
-                   resolver, mode, default_dialect, default_id, paths,
-                   default_base, bundled, positional,
+  const Pointer container{JSON::String{container_keyword}};
+  // A schema that is not an object reserves nowhere for anything, and nothing
+  // can reference its way out of one either, so bundling one is vacuous rather
+  // than impossible. Only a container the caller named is held against a root
+  // that cannot hold it
+  if (schema.is_object()) {
+    check_container(schema, container);
+  }
+  embed_references(schema, container, schema, walker, resolver, mode,
+                   default_dialect, default_id, paths, default_base, bundled,
+                   positional,
                    schema_root_frame->root_location().value().get().dialect,
                    remaining, callback);
   settle_positional_references(schema, walker, resolver, default_dialect,
