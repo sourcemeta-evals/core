@@ -112,6 +112,12 @@ struct PositionalReferences {
   // the unnamed ones are kept, since a schema that carries its own name is
   // reached by that name wherever it ends up
   std::unordered_map<JSON::String, Pointer> landings;
+  // Also recorded while embedding, and for every remote rather than only the
+  // unnamed ones. Settling reads the finished document through a frame, and a
+  // container that sits outside every schema the caller framed is reached by
+  // nothing else, so a remote that carries its own name has to be framed here
+  // too for the references it brought with it to be seen at all
+  std::vector<Pointer> embeddings;
 };
 
 // Reading the finished document is what makes this independent of how the
@@ -270,11 +276,13 @@ auto settle_positional_references(
   // landing is framed in its own right, which is also what the walk does when
   // it recurses into a remote
   SchemaFrame::Paths settling{paths};
-  for (const auto &landing : positional.landings) {
-    const auto pointer{to_weak_pointer(landing.second)};
+  for (const auto &embedding : positional.embeddings) {
+    const auto pointer{to_weak_pointer(embedding)};
     // Framing takes paths that do not sit inside one another, so a landing
-    // the caller already covers is left to the path that covers it
-    if (std::ranges::none_of(paths, [&pointer](const auto &path) -> bool {
+    // that something already covers is left to the path that covers it. What
+    // has been gathered so far is what each one is held against, as one
+    // landing can sit within another once elevation has moved things around
+    if (std::ranges::none_of(settling, [&pointer](const auto &path) -> bool {
           return pointer.starts_with(path) || path.starts_with(pointer);
         })) {
       settling.push_back(pointer);
@@ -432,8 +440,8 @@ auto elevate_embedded_resources(
     const SchemaBaseDialect remote_dialect, const SchemaWalker &walker,
     const SchemaResolver &resolver, std::string_view default_dialect,
     std::unordered_map<JSON::String, JSON::String> &bundled,
-    std::uint64_t &remaining, const SchemaBundleOptions::Callback &callback)
-    -> void {
+    PositionalReferences &positional, std::uint64_t &remaining,
+    const SchemaBundleOptions::Callback &callback) -> void {
   const auto keyword{definitions_keyword(
       walker,
       vocabularies_with_embedded(remote, resolver, remote_dialect,
@@ -611,7 +619,9 @@ auto elevate_embedded_resources(
                    JSON{declared_dialect(value, remote_dialect_uri)});
     }
 
-    embed_schema(root, container, key, std::move(value), callback);
+    const auto landing{
+        embed_schema(root, container, key, std::move(value), callback)};
+    positional.embeddings.push_back(container.concat(landing));
   }
 
   for (const auto &key : to_remove) {
@@ -925,13 +935,15 @@ auto embed_references(
                      bundled, positional, container_dialect, remaining,
                      callback, depth + 1);
     elevate_embedded_resources(remote, root, container, remote_dialect, walker,
-                               resolver, default_dialect, bundled, remaining,
-                               callback);
+                               resolver, default_dialect, bundled, positional,
+                               remaining, callback);
     const auto key{embed_schema(root, container, effective_id,
                                 std::move(remote), callback)};
+    auto landing{container.concat(key)};
     if (positional.unnamed.contains(effective_id)) {
-      positional.landings.emplace(effective_id, container.concat(key));
+      positional.landings.emplace(effective_id, landing);
     }
+    positional.embeddings.push_back(std::move(landing));
   }
 }
 
