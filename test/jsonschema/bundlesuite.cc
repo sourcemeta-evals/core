@@ -16,7 +16,7 @@
 #include <string>      // std::string
 #include <string_view> // std::string_view
 #include <utility>     // std::pair
-#include <vector>      // std::vector
+#include <vector>      // std::erase_if, std::vector
 
 namespace {
 
@@ -232,6 +232,12 @@ auto expect_insertions(const std::string_view mode, const Insertions &actual,
 // the dialect traverses, and one it does not traverse never settles no matter
 // what this returns. Handing back fewer paths can only make the next pass
 // embed more and fail louder, never pass when it should not
+//
+// Which of two nested insertions survives cannot depend on which the callback
+// reported first, as nothing promises an order. The outermost is the one to
+// keep, since framing it reaches what sits inside it, whereas keeping only the
+// inner one leaves the resource around it unframed and the next pass embeds a
+// second copy of what it can no longer see
 auto with_insertions(const Inputs &inputs, const Insertions &insertions)
     -> Inputs {
   Inputs result;
@@ -254,13 +260,22 @@ auto with_insertions(const Inputs &inputs, const Insertions &insertions)
     // covered by the path that covers it. What has been gathered so far is
     // what each one is held against, so the invariant holds over the whole set
     // rather than over the ones the fixture started with
-    if (std::ranges::none_of(result.path_storage,
-                             [&insertion](const auto &path) -> bool {
-                               return insertion.second.starts_with(path) ||
-                                      path.starts_with(insertion.second);
-                             })) {
-      result.path_storage.push_back(insertion.second);
+    if (std::ranges::any_of(result.path_storage,
+                            [&insertion](const auto &path) -> bool {
+                              return insertion.second.starts_with(path);
+                            })) {
+      continue;
     }
+
+    // An insertion that contains one already gathered takes its place, while
+    // what the fixture itself asked to be framed is left alone
+    std::erase_if(result.path_storage,
+                  [&insertion, &inputs](const auto &path) -> bool {
+                    return path.starts_with(insertion.second) &&
+                           std::ranges::find(inputs.path_storage, path) ==
+                               inputs.path_storage.cend();
+                  });
+    result.path_storage.push_back(insertion.second);
   }
   result.paths.reserve(result.path_storage.size());
   for (const auto &path : result.path_storage) {
