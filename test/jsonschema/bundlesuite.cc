@@ -492,6 +492,23 @@ auto run_bundle_test(const sourcemeta::core::JSON &test) -> void {
     // The limit is a budget rather than semantics, and the output is larger
     // than the input it came from, so this pass spends whatever it needs
     const auto settled{with_insertions(inputs, insertions)};
+
+    // What bundling produced has to stand on its own, which the expected
+    // output cannot say by itself, as a reference that resolves nowhere reads
+    // the same as one that does. Meta-schemas are the exception, since the
+    // References mode leaves the ones it did not pull in where they are
+    const sourcemeta::core::SchemaFrame frame{
+        sourcemeta::core::SchemaFrame::Mode::References,
+        document,
+        sourcemeta::core::schema_walker,
+        resolver,
+        settled.default_dialect,
+        settled.default_id,
+        sourcemeta::core::SchemaFrame::IdentifierMode::Additional,
+        settled.paths,
+        settled.default_base};
+    EXPECT_TRUE(frame.standalone_ignoring_metaschemas());
+
     Insertions repeated;
     expect_equal(mode.name,
                  bundle_schema(document, resolver, settled, mode,
