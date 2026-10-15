@@ -81,3 +81,17 @@ TEST(reference_object_resource_error_throw) {
     EXPECT_EQ(error.identifier(), "https://sourcemeta.com/test");
   }
 }
+
+TEST(container_error_throw) {
+  static_assert(
+      std::is_base_of_v<std::exception, sourcemeta::core::SchemaContainerError>,
+      "Must subclass std::exception");
+  try {
+    throw sourcemeta::core::SchemaContainerError(
+        sourcemeta::core::Pointer{"components", "schemas"}, "My error");
+  } catch (const sourcemeta::core::SchemaContainerError &error) {
+    EXPECT_STREQ(error.what(), "My error");
+    EXPECT_EQ(sourcemeta::core::to_string(error.location()),
+              "/components/schemas");
+  }
+}
