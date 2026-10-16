@@ -880,14 +880,18 @@ TEST(YAML_parse,
                sourcemeta::core::YAMLParseError);
 }
 
-TEST(YAML_parse, exponent_without_digits_throws_YAMLParseError) {
-  EXPECT_THROW(sourcemeta::core::parse_yaml("1e"),
-               sourcemeta::core::YAMLParseError);
+TEST(YAML_parse, exponent_without_digits_stays_string) {
+  const std::string input{"1e"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"1e"};
+  EXPECT_EQ(result, expected);
 }
 
-TEST(YAML_parse, exponent_with_only_sign_throws_YAMLParseError) {
-  EXPECT_THROW(sourcemeta::core::parse_yaml("1e+"),
-               sourcemeta::core::YAMLParseError);
+TEST(YAML_parse, exponent_with_only_sign_stays_string) {
+  const std::string input{"1e+"};
+  const auto result{sourcemeta::core::parse_yaml(input)};
+  const sourcemeta::core::JSON expected{"1e+"};
+  EXPECT_EQ(result, expected);
 }
 
 TEST(YAML_parse, empty_input_error_reports_positive_line_and_column) {
