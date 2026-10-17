@@ -4,10 +4,10 @@
 #include <sourcemeta/core/jsonpointer.h>
 #include <sourcemeta/core/jsonschema.h>
 
-#include <algorithm>   // std::ranges::find, std::ranges::any_of
-#include <array>       // std::array
-#include <cstddef>     // std::size_t
-#include <cstdint>     // std::uint64_t
+#include <algorithm> // std::ranges::find, std::ranges::any_of, std::ranges::sort
+#include <array>     // std::array
+#include <cstddef>   // std::size_t
+#include <cstdint>   // std::uint64_t
 #include <filesystem>  // std::filesystem
 #include <iostream>    // std::cerr
 #include <limits>      // std::numeric_limits
@@ -210,14 +210,37 @@ auto to_json(const Insertions &insertions) -> sourcemeta::core::JSON {
   return result;
 }
 
+// The callback says nothing about the order it reports insertions in, so a
+// fixture that stated one would hold a solution to an order that is not part
+// of what bundling promises
+auto sorted_insertions(const sourcemeta::core::JSON &insertions)
+    -> sourcemeta::core::JSON {
+  std::vector<sourcemeta::core::JSON> entries{insertions.as_array().cbegin(),
+                                              insertions.as_array().cend()};
+  std::ranges::sort(entries, [](const auto &left, const auto &right) -> bool {
+    if (left.at("from") == right.at("from")) {
+      return left.at("at") < right.at("at");
+    }
+
+    return left.at("from") < right.at("from");
+  });
+
+  auto result{sourcemeta::core::JSON::make_array()};
+  for (auto &entry : entries) {
+    result.push_back(std::move(entry));
+  }
+
+  return result;
+}
+
 auto expect_insertions(const std::string_view mode, const Insertions &actual,
                        const sourcemeta::core::JSON &expected) -> void {
   auto actual_entry{sourcemeta::core::JSON::make_object()};
   actual_entry.assign("mode", sourcemeta::core::JSON{mode});
-  actual_entry.assign("inserted", to_json(actual));
+  actual_entry.assign("inserted", sorted_insertions(to_json(actual)));
   auto expected_entry{sourcemeta::core::JSON::make_object()};
   expected_entry.assign("mode", sourcemeta::core::JSON{mode});
-  expected_entry.assign("inserted", expected);
+  expected_entry.assign("inserted", sorted_insertions(expected));
 
   EXPECT_EQ(actual_entry, expected_entry);
 }
