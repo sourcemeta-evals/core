@@ -641,8 +641,11 @@ auto elevate_embedded_resources(
        &resolver](const std::string_view identifier) -> SchemaResolverResult {
         const auto *sibling{defs.try_at(identifier)};
         if (sibling != nullptr && sibling->is_object() &&
-            sibling->defines("$id") && sibling->at("$id").is_string() &&
-            sibling->at("$id").to_string() == identifier) {
+            sibling->defines("$id"sv, JSONSCHEMA_HASH_ID) &&
+            sibling->at("$id"sv, JSONSCHEMA_HASH_ID).is_string() &&
+            canonical_uri(
+                sibling->at("$id"sv, JSONSCHEMA_HASH_ID).to_string()) ==
+                canonical_uri(identifier)) {
           return *sibling;
         }
 
@@ -1141,7 +1144,7 @@ auto embed_references(
 auto prepare_root_reference(JSON &schema, const SchemaBaseDialect base_dialect)
     -> bool {
   if (!ref_overrides_adjacent_keywords(base_dialect) || !schema.is_object() ||
-      !schema.defines("$ref")) {
+      !schema.defines("$ref"sv, JSONSCHEMA_HASH_REF)) {
     return false;
   }
 
@@ -1157,7 +1160,7 @@ auto prepare_root_reference(JSON &schema, const SchemaBaseDialect base_dialect)
                            SchemaBaseDialect::JSON_SCHEMA_DRAFT_3_HYPER};
   auto branches{JSON::make_array()};
   branches.push_back(schema);
-  schema.at("$ref").into(std::move(branches));
+  schema.at("$ref"sv, JSONSCHEMA_HASH_REF).into(std::move(branches));
   schema.rename("$ref", is_draft3 ? "extends" : "allOf");
   return true;
 }
@@ -1243,12 +1246,17 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
         container_parent.has_value()
             ? initial_frame->traverse(container_parent.value().get().base)
             : std::nullopt};
+    // Where no resource holds the container, what it holds reads under
+    // whatever the caller said the document is. That came from the caller
+    // rather than from a frame, so it is held against a remote's dialect in
+    // the one form both can be compared in
+    const JSON::String container_dialect{
+        container_resource.has_value()
+            ? JSON::String{container_resource.value().get().dialect}
+            : canonical_uri(default_dialect)};
     embed_references(schema, default_container.value(), schema, walker,
                      resolver, mode, default_dialect, default_id, paths,
-                     default_base, bundled, positional,
-                     container_resource.has_value()
-                         ? container_resource.value().get().dialect
-                         : default_dialect,
+                     default_base, bundled, positional, container_dialect,
                      remaining, callback);
     settle_positional_references(schema, walker, resolver, default_dialect,
                                  default_id, paths, default_base, positional,
