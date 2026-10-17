@@ -444,11 +444,12 @@ auto settle_positional_references(
       const auto landed{frame.traverse(to_weak_pointer(landing->second))};
       assert(landed.has_value());
       const auto &landed_location{landed.value().get()};
-      auto target{
-          landed_location.parent.has_value()
-              ? to_pointer(landed_location.pointer)
-                    .resolve_from(to_pointer(landed_location.parent.value()))
-              : to_pointer(landed_location.pointer)};
+      const auto landed_resource{frame.traverse(landed_location.base)};
+      auto target{landed_resource.has_value()
+                      ? to_pointer(landed_location.pointer)
+                            .resolve_from(to_pointer(
+                                landed_resource.value().get().pointer))
+                      : to_pointer(landed_location.pointer)};
       if (tail.has_value()) {
         target.push_back(Pointer{tail.value()});
       }
@@ -1193,14 +1194,23 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
 
     check_container(schema, default_container.value());
 
+    // What the container holds reads under the dialect its resource is read
+    // under, which is not the one a local override gives the subschema the
+    // container sits in, as such an override says nothing about what sits
+    // below it
     const auto container_parent{initial_frame.traverse(
         to_weak_pointer(default_container.value().initial()))};
-    embed_references(
-        schema, default_container.value(), schema, walker, resolver, mode,
-        default_dialect, default_id, paths, default_base, bundled, positional,
-        container_parent.has_value() ? container_parent.value().get().dialect
-                                     : default_dialect,
-        remaining, callback);
+    const auto container_resource{
+        container_parent.has_value()
+            ? initial_frame.traverse(container_parent.value().get().base)
+            : std::nullopt};
+    embed_references(schema, default_container.value(), schema, walker,
+                     resolver, mode, default_dialect, default_id, paths,
+                     default_base, bundled, positional,
+                     container_resource.has_value()
+                         ? container_resource.value().get().dialect
+                         : default_dialect,
+                     remaining, callback);
     settle_positional_references(schema, walker, resolver, default_dialect,
                                  default_id, paths, default_base, positional,
                                  remaining, callback);
