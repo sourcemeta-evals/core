@@ -631,6 +631,23 @@ auto elevate_embedded_resources(
     collect_pinned_dialects(remote, pinned);
   }
 
+  // An entry can name a sibling as the dialect it is read under, and framing
+  // one on its own reaches only what the caller handed over, so the entries
+  // beside it are offered alongside that. What a key says an entry is only
+  // counts where the entry says the same, which is what framing below settles
+  const SchemaResolver entry_resolver{
+      [&defs,
+       &resolver](const std::string_view identifier) -> SchemaResolverResult {
+        const auto *sibling{defs.try_at(identifier)};
+        if (sibling != nullptr && sibling->is_object() &&
+            sibling->defines("$id") && sibling->at("$id").is_string() &&
+            sibling->at("$id").to_string() == identifier) {
+          return *sibling;
+        }
+
+        return resolver(identifier);
+      }};
+
   std::vector<std::pair<JSON::String, bool>> to_extract;
   std::vector<JSON::String> to_remove;
   for (const auto &entry : defs.as_object()) {
@@ -657,7 +674,7 @@ auto elevate_embedded_resources(
     SchemaFrame entry_frame{SchemaFrame::Mode::Root,
                             value,
                             walker,
-                            resolver,
+                            entry_resolver,
                             remote_dialect_uri,
                             "",
                             SchemaFrame::IdentifierMode::Additional,
