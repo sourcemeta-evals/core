@@ -536,6 +536,18 @@ auto settle_positional_references(
                                        JSON::String{location.base});
             });
         for (const auto &[position, name] : carried) {
+          // The copy was taken from what the document already holds, so what
+          // it carried is what that name reaches. Holding the two against each
+          // other is what keeps the name standing in for the same schema
+          // rather than for another one that answers to it
+          const auto resolved{frame.traverse(name)};
+          if (!resolved.has_value() ||
+              get(schema, to_pointer(resolved.value().get().pointer)) !=
+                  get(duplicate, position)) {
+            throw SchemaError(
+                "Conflicting embedded resources with the same identifier");
+          }
+
           auto named{JSON::make_object()};
           named.assign("$ref", JSON{name});
           set(duplicate, position, std::move(named));
