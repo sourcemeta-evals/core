@@ -1134,6 +1134,34 @@ auto embed_references(
   }
 }
 
+// Where a reference overrides whatever sits beside it, a container beside one
+// is read by nobody, so a root that is nothing but a reference becomes a branch
+// that can hold both. A root that holds more than the reference has nothing
+// that can be done with it. Says whether the document now reads differently
+auto prepare_root_reference(JSON &schema, const SchemaBaseDialect base_dialect)
+    -> bool {
+  if (!ref_overrides_adjacent_keywords(base_dialect) || !schema.is_object() ||
+      !schema.defines("$ref")) {
+    return false;
+  }
+
+  if (schema.size() != 1) {
+    throw SchemaError(
+        "Cannot bundle a JSON Schema Draft 7 or older with a top-level "
+        "`$ref` (which overrides sibling keywords) without introducing "
+        "undefined behavior");
+  }
+
+  const auto is_draft3{base_dialect == SchemaBaseDialect::JSON_SCHEMA_DRAFT_3 ||
+                       base_dialect ==
+                           SchemaBaseDialect::JSON_SCHEMA_DRAFT_3_HYPER};
+  auto branches{JSON::make_array()};
+  branches.push_back(schema);
+  schema.at("$ref").into(std::move(branches));
+  schema.rename("$ref", is_draft3 ? "extends" : "allOf");
+  return true;
+}
+
 auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                      const SchemaResolver &resolver,
                      const SchemaBundleOptions::Mode mode,
@@ -1148,18 +1176,13 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   // and any schemas already embedded within it
   std::unordered_map<JSON::String, JSON::String> bundled;
   PositionalReferences positional;
-  SchemaFrame initial_frame{SchemaFrame::Mode::Locations,
-                            schema,
-                            walker,
-                            resolver,
-                            default_dialect,
-                            default_id,
-                            SchemaFrame::IdentifierMode::Additional,
-                            paths,
-                            default_base,
-                            remaining};
-  charge(remaining, initial_frame);
-  initial_frame.for_each_resource_uri([&bundled](const auto &uri) -> void {
+  std::optional<SchemaFrame> initial_frame;
+  initial_frame.emplace(SchemaFrame::Mode::Locations, schema, walker, resolver,
+                        default_dialect, default_id,
+                        SchemaFrame::IdentifierMode::Additional, paths,
+                        default_base, remaining);
+  charge(remaining, initial_frame.value());
+  initial_frame->for_each_resource_uri([&bundled](const auto &uri) -> void {
     bundled.emplace(JSON::String{uri}, JSON::String{uri});
   });
   if (default_container.has_value()) {
@@ -1177,13 +1200,13 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
         })) {
       const auto parent_pointer{default_container.value().initial()};
       const auto parent{
-          initial_frame.traverse(to_weak_pointer(parent_pointer))};
+          initial_frame->traverse(to_weak_pointer(parent_pointer))};
       if (!parent.has_value() ||
           (parent.value().get().type != SchemaFrame::LocationType::Resource &&
            parent.value().get().type != SchemaFrame::LocationType::Subschema) ||
           !default_container.value().back().is_property() ||
           walker(default_container.value().back().to_property(),
-                 initial_frame.vocabularies(parent.value().get(), resolver))
+                 initial_frame->vocabularies(parent.value().get(), resolver))
                   .type != SchemaKeywordType::LocationMembers) {
         throw SchemaContainerError(
             default_container.value(),
@@ -1192,17 +1215,33 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
       }
     }
 
+    // A container the caller named goes in beside whatever is already at the
+    // root, which a reference there would override, so the root is made to
+    // hold both. What the dialect chooses for itself gets the same treatment
+    // further down, and asking after the container has been judged is what
+    // keeps a container nobody reserves answered as such
+    if (initial_frame->root_location().has_value() &&
+        prepare_root_reference(
+            schema,
+            initial_frame->root_location().value().get().base_dialect)) {
+      initial_frame.emplace(SchemaFrame::Mode::Locations, schema, walker,
+                            resolver, default_dialect, default_id,
+                            SchemaFrame::IdentifierMode::Additional, paths,
+                            default_base, remaining);
+      charge(remaining, initial_frame.value());
+    }
+
     check_container(schema, default_container.value());
 
     // What the container holds reads under the dialect its resource is read
     // under, which is not the one a local override gives the subschema the
     // container sits in, as such an override says nothing about what sits
     // below it
-    const auto container_parent{initial_frame.traverse(
+    const auto container_parent{initial_frame->traverse(
         to_weak_pointer(default_container.value().initial()))};
     const auto container_resource{
         container_parent.has_value()
-            ? initial_frame.traverse(container_parent.value().get().base)
+            ? initial_frame->traverse(container_parent.value().get().base)
             : std::nullopt};
     embed_references(schema, default_container.value(), schema, walker,
                      resolver, mode, default_dialect, default_id, paths,
@@ -1292,23 +1331,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                       "dialect");
   }
 
-  if (ref_overrides_adjacent_keywords(schema_base_dialect) &&
-      schema.is_object() && schema.defines("$ref")) {
-    if (schema.size() == 1) {
-      const auto is_draft3{
-          schema_base_dialect == SchemaBaseDialect::JSON_SCHEMA_DRAFT_3 ||
-          schema_base_dialect == SchemaBaseDialect::JSON_SCHEMA_DRAFT_3_HYPER};
-      auto branches{JSON::make_array()};
-      branches.push_back(schema);
-      schema.at("$ref").into(std::move(branches));
-      schema.rename("$ref", is_draft3 ? "extends" : "allOf");
-    } else {
-      throw SchemaError(
-          "Cannot bundle a JSON Schema Draft 7 or older with a top-level "
-          "`$ref` (which overrides sibling keywords) without introducing "
-          "undefined behavior");
-    }
-  }
+  prepare_root_reference(schema, schema_base_dialect);
 
   const Pointer container{JSON::String{container_keyword}};
   // A schema that is not an object reserves nowhere for anything, and nothing
