@@ -515,8 +515,32 @@ auto settle_positional_references(
                                                   copy.identifier};
       const auto hit{placed.find(seen)};
       if (hit == placed.cend()) {
-        auto duplicate{
-            JSON{get(schema, positional.landings.at(copy.identifier))}};
+        const auto &landing{positional.landings.at(copy.identifier)};
+        auto duplicate{JSON{get(schema, landing)}};
+
+        // A resource the landing carries answers to the name it declared, and
+        // one identity in two places is not a document anything can read. So
+        // the copy says that name where the resource sat, which reaches the
+        // one that stayed, and a resource that names its own anonymous parent
+        // stops the copying there rather than inside itself
+        std::map<Pointer, JSON::String> carried;
+        frame.for_each_resource(
+            [&carried, &landing](const auto &, const auto &location) -> void {
+              const auto position{to_pointer(location.pointer)};
+              if (position.size() <= landing.size() ||
+                  !position.starts_with(landing)) {
+                return;
+              }
+
+              carried.insert_or_assign(position.resolve_from(landing),
+                                       JSON::String{location.base});
+            });
+        for (const auto &[position, name] : carried) {
+          auto named{JSON::make_object()};
+          named.assign("$ref", JSON{name});
+          set(duplicate, position, std::move(named));
+        }
+
         // Where it came from said what it was by sitting where it sat, and the
         // place it goes to says something else, so the copy has to say it
         if (copy.carries_its_dialect) {
