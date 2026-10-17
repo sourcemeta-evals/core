@@ -118,6 +118,11 @@ struct PositionalReferences {
   // nothing else, so a remote that carries its own name has to be framed here
   // too for the references it brought with it to be seen at all
   std::vector<Pointer> embeddings;
+  // Elevation lifts a resource that a remote carried out of the copy that
+  // lands, so a place named inside one is no longer where the reference that
+  // named it said. Such a resource answers to the name it declared, which is
+  // what says where it went, and that name is also the key it sat under
+  std::unordered_map<JSON::String, std::vector<Pointer>> elevations;
 };
 
 // Reading the finished document is what makes this independent of how the
@@ -388,14 +393,34 @@ auto settle_positional_references(
       }
 
       if (try_get(schema, within_document) == nullptr) {
+        // What the reference named may be inside a resource that elevation
+        // lifted out of the copy that landed. That resource kept the name it
+        // declared, which is the key it sat under, so saying that name and
+        // whatever the reference named within it reaches the same schema from
+        // wherever the reference is written
+        const auto elevated{positional.elevations.find(base)};
+        if (tail.has_value() && elevated != positional.elevations.cend()) {
+          for (const auto &moved : elevated->second) {
+            if (!tail.value().starts_with(moved)) {
+              continue;
+            }
+
+            const JSON::String identifier{moved.back().to_property()};
+            const auto suffix{tail.value().resolve_from(moved)};
+            rewrites.insert_or_assign(
+                to_pointer(pointer),
+                suffix.empty()
+                    ? identifier
+                    : JSON::String{
+                          to_uri(suffix, URI{identifier}).recompose()});
+            return;
+          }
+        }
+
         throw SchemaReferenceError(reference.destination, to_pointer(pointer),
                                    "Could not resolve schema reference");
       }
 
-      // What the reference reaches can be a resource that the remote carried,
-      // which keeps the name it declared wherever it ends up. Saying that name
-      // reads the same from every scope and survives the resource being moved
-      // again, where saying the place does neither
       // What the reference reaches can be a resource that the remote carried,
       // which keeps the name it declared wherever it ends up. Saying that name
       // reads the same from every scope and survives the resource being moved
@@ -525,6 +550,7 @@ auto elevate_embedded_resources(
     JSON &remote, JSON &root, const Pointer &container,
     const SchemaBaseDialect remote_dialect, const SchemaWalker &walker,
     const SchemaResolver &resolver, std::string_view default_dialect,
+    std::string_view remote_identifier,
     std::unordered_map<JSON::String, JSON::String> &bundled,
     PositionalReferences &positional, std::uint64_t &remaining,
     const SchemaBundleOptions::Callback &callback) -> void {
@@ -695,6 +721,8 @@ auto elevate_embedded_resources(
   }
 
   for (const auto &[key, needs_dialect] : to_extract) {
+    positional.elevations[JSON::String{remote_identifier}].push_back(
+        Pointer{keyword_string, key});
     auto value{std::move(defs.at(key))};
     defs.erase(key);
     // Otherwise the elevated resource would be re-interpreted under the
@@ -711,6 +739,8 @@ auto elevate_embedded_resources(
   }
 
   for (const auto &key : to_remove) {
+    positional.elevations[JSON::String{remote_identifier}].push_back(
+        Pointer{keyword_string, key});
     defs.erase(key);
   }
 
@@ -1038,8 +1068,8 @@ auto embed_references(
                      bundled, positional, container_dialect, remaining,
                      callback, depth + 1);
     elevate_embedded_resources(remote, root, container, remote_dialect, walker,
-                               resolver, default_dialect, bundled, positional,
-                               remaining, callback);
+                               resolver, default_dialect, effective_id, bundled,
+                               positional, remaining, callback);
     const auto key{embed_schema(root, container, effective_id,
                                 std::move(remote), callback)};
     auto landing{container.concat(key)};
