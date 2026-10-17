@@ -218,6 +218,16 @@ auto collect_pinned_dialects(const JSON &schema,
 auto check_container(const JSON &root, const Pointer &container) -> void {
   static constexpr auto NOT_AN_OBJECT{
       "Could not bundle to a container that is not an object"};
+
+  // A container is reached by naming properties, so a step that is a number is
+  // not a way in. Saying so before anything is looked at is what makes the
+  // answer the same whether or not the document holds what comes before it
+  if (std::ranges::any_of(container, [](const auto &token) -> bool {
+        return !token.is_property();
+      })) {
+    throw SchemaContainerError(container, NOT_AN_OBJECT);
+  }
+
   const auto *current{&root};
   for (const auto &token : container) {
     if (token.is_property()) {
@@ -232,11 +242,7 @@ auto check_container(const JSON &root, const Pointer &container) -> void {
 
       current = next;
     } else {
-      if (!current->is_array() || current->size() <= token.to_index()) {
-        throw SchemaContainerError(container, NOT_AN_OBJECT);
-      }
-
-      current = &current->at(token.to_index());
+      throw SchemaContainerError(container, NOT_AN_OBJECT);
     }
   }
 
@@ -255,8 +261,9 @@ auto embed_schema(JSON &root, const Pointer &container,
       current->assign_if_missing(token.to_property(), JSON::make_object());
       current = &current->at(token.to_property());
     } else {
-      assert(current->is_array() && current->size() > token.to_index());
-      current = &current->at(token.to_index());
+      throw SchemaContainerError(container,
+                                 "Could not bundle to a container that is not "
+                                 "an object");
     }
   }
 
