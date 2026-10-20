@@ -214,25 +214,27 @@ auto collect_pinned_dialects(const JSON &schema,
   }
 }
 
-// Whether the container can hold what bundling puts there is a question of the
-// document rather than of what bundling ends up embedding, so it is asked
-// whether or not anything does. Embedding makes the objects it needs along the
-// way, so a property that nothing holds yet is no reason to refuse, while a
-// place that something else holds is one and so is an index that names no
-// element of an array
-auto check_container(const JSON &root, const Pointer &container) -> void {
-  static constexpr auto NOT_AN_OBJECT{
-      "Could not bundle to a container that is not an object"};
+constexpr auto NOT_AN_OBJECT{
+    "Could not bundle to a container that is not an object"};
 
-  // A container is reached by naming properties, so a step that is a number is
-  // not a way in. Saying so before anything is looked at is what makes the
-  // answer the same whether or not the document holds what comes before it
+// A container is reached by naming properties, so a step that is a number is
+// not a way in. Asking this before anything else is what makes the answer the
+// same whether or not the document holds what comes before it, and whether or
+// not the dialect reserves where it leads
+auto check_container_steps(const Pointer &container) -> void {
   if (std::ranges::any_of(container, [](const auto &token) -> bool {
         return !token.is_property();
       })) {
     throw SchemaContainerError(container, NOT_AN_OBJECT);
   }
+}
 
+// Whether the container can hold what bundling puts there is a question of the
+// document rather than of what bundling ends up embedding, so it is asked
+// whether or not anything does. Embedding makes the objects it needs along the
+// way, so a property that nothing holds yet is no reason to refuse, while a
+// place that something else holds is one
+auto check_container(const JSON &root, const Pointer &container) -> void {
   const auto *current{&root};
   for (const auto &token : container) {
     if (token.is_property()) {
@@ -1191,6 +1193,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
+    check_container_steps(default_container.value());
     // Whatever bundling embeds has to land somewhere that framing reaches
     // again, or a later pass cannot see it and embeds a second copy. So a
     // container has to be a keyword that the dialect reserves for schema
@@ -1207,7 +1210,6 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
       if (!parent.has_value() ||
           (parent.value().get().type != SchemaFrame::LocationType::Resource &&
            parent.value().get().type != SchemaFrame::LocationType::Subschema) ||
-          !default_container.value().back().is_property() ||
           walker(default_container.value().back().to_property(),
                  initial_frame->vocabularies(parent.value().get(), resolver))
                   .type != SchemaKeywordType::LocationMembers) {
