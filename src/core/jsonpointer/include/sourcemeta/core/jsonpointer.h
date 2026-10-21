@@ -619,19 +619,61 @@ using PointerWalker = GenericPointerWalker<Pointer>;
 using SubPointerWalker = GenericSubPointerWalker<Pointer>;
 
 /// @ingroup jsonpointer
-/// Serialise a Pointer as JSON
+/// Serialise a Pointer as JSON. The resulting JSON string holds the decoded
+/// pointer text, where only the `~` and `/` characters take their `~0` and
+/// `~1` escaped forms, as defined by RFC 6901
 template <typename T>
   requires std::is_same_v<T, Pointer>
 auto to_json(const T &value) -> JSON {
-  return JSON{to_string(value)};
+  JSON::String result;
+  for (const auto &token : value) {
+    result += '/';
+    if (token.is_property()) {
+      const auto &property{token.to_property()};
+      for (const auto character : property) {
+        if (character == '~') {
+          result += "~0";
+        } else if (character == '/') {
+          result += "~1";
+        } else {
+          result += character;
+        }
+      }
+    } else {
+      result += std::to_string(token.to_index());
+    }
+  }
+
+  return JSON{result};
 }
 
 /// @ingroup jsonpointer
-/// Serialise a WeakPointer as JSON
+/// Serialise a WeakPointer as JSON. The resulting JSON string holds the
+/// decoded pointer text, where only the `~` and `/` characters take their
+/// `~0` and `~1` escaped forms, as defined by RFC 6901
 template <typename T>
   requires std::is_same_v<T, WeakPointer>
 auto to_json(const T &value) -> JSON {
-  return JSON{to_string(value)};
+  JSON::String result;
+  for (const auto &token : value) {
+    result += '/';
+    if (token.is_property()) {
+      const auto &property{token.to_property()};
+      for (const auto character : property) {
+        if (character == '~') {
+          result += "~0";
+        } else if (character == '/') {
+          result += "~1";
+        } else {
+          result += character;
+        }
+      }
+    } else {
+      result += std::to_string(token.to_index());
+    }
+  }
+
+  return JSON{result};
 }
 
 /// @ingroup jsonpointer
@@ -643,8 +685,9 @@ auto from_json(const JSON &value) -> std::optional<T> {
     return std::nullopt;
   }
 
+  const auto &content{value.to_string()};
   try {
-    return to_pointer(value.to_string());
+    return to_pointer(JSON{content});
   } catch (const PointerParseError &) {
     return std::nullopt;
   }

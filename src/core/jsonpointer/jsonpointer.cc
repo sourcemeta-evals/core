@@ -297,6 +297,8 @@ auto to_pointer(const JSON &document) -> Pointer {
   return parse_pointer(stream);
 }
 
+// Note that this overload parses its input as JSON text, so callers must
+// pass encoded JSON string content rather than decoded pointer text
 auto to_pointer(const std::basic_string<JSON::Char, JSON::CharTraits,
                                         std::allocator<JSON::Char>> &input)
     -> Pointer {
