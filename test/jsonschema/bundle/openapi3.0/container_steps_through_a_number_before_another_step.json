@@ -1,0 +1,32 @@
+{
+  "schema": {
+    "type": "object",
+    "properties": {
+      "pet": {
+        "$ref": "https://www.sourcemeta.com/pet"
+      }
+    }
+  },
+  "resolver": {
+    "https://www.sourcemeta.com/pet": {
+      "type": "string",
+      "nullable": true
+    }
+  },
+  "defaultDialect": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect",
+  "container": "/x-definitions/0/schemas",
+  "result": {},
+  "inserted": {},
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaContainerError",
+      "message": "Could not bundle to a container that is not an object",
+      "location": "/x-definitions/0/schemas"
+    },
+    "references": {
+      "type": "SchemaContainerError",
+      "message": "Could not bundle to a container that is not an object",
+      "location": "/x-definitions/0/schemas"
+    }
+  }
+}
