@@ -232,7 +232,20 @@ auto materialize_default_identifier(
     sourcemeta::core::JSON &schema,
     const sourcemeta::core::SchemaResolver &resolver,
     const std::optional<std::string> &default_dialect,
-    const std::optional<std::string> &default_id) -> void {
+    const std::optional<std::string> &default_id,
+    const bool legacy_reference_semantics) -> void {
+  // A top-level `$ref` overrides its siblings before 2019-09, so making room
+  // for an identifier would turn the ignored siblings into assertions
+  if (legacy_reference_semantics && schema.is_object() &&
+      schema.defines("$ref")) {
+    for (const auto &entry : schema.as_object()) {
+      if (entry.first != "$ref" && entry.first != "$schema" &&
+          entry.first != "$id" && entry.first != "id") {
+        return;
+      }
+    }
+  }
+
   if (default_id.has_value() &&
       !sourcemeta::core::identify(
            schema, resolver,
@@ -282,7 +295,7 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
       vocabularies.contains(
           "https://json-schema.org/draft/2019-09/vocab/core")) {
     materialize_default_identifier(schema, resolver, default_dialect,
-                                   default_id);
+                                   default_id, false);
     bundle_schema(schema, {"$defs"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
     return;
@@ -296,7 +309,7 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
              vocabularies.contains(
                  "http://json-schema.org/draft-04/hyper-schema#")) {
     materialize_default_identifier(schema, resolver, default_dialect,
-                                   default_id);
+                                   default_id, true);
     bundle_schema(schema, {"definitions"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
     return;
