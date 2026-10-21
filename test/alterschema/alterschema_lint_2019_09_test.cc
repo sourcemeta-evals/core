@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <tuple>
+
 #include <sourcemeta/core/json.h>
 
 #include "alterschema_test_utils.h"
@@ -1787,4 +1789,45 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_9) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_check_1) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$defs": {
+      "indirect": { "$ref": "#/allOf/0" }
+    },
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  AlterSchemaTraces entries;
+  LINT_FOR_READABILITY(document, entries);
+
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(entries.empty());
+}
+
+TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_check_2) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  AlterSchemaTraces entries;
+  LINT_FOR_READABILITY(document, entries);
+
+  EXPECT_FALSE(result);
+  EXPECT_EQ(entries.size(), 1);
+
+  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
+  EXPECT_EQ(std::get<1>(entries.at(0)), "unnecessary_allof_ref_wrapper");
+  EXPECT_EQ(std::get<2>(entries.at(0)),
+            "Wrapping `$ref` in `allOf` is unnecessary in JSON Schema 2019-09 "
+            "and later versions as `$ref` does not override sibling keywords "
+            "anymore");
+  EXPECT_EQ(std::get<3>(entries.at(0)), "");
 }
