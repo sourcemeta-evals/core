@@ -808,6 +808,30 @@ auto elevate_embedded_resources(
   }
 }
 
+// A schema that names a dialect which gives the keyword that named it no
+// meaning cannot be taken at its word, and framing refuses it wherever it
+// meets one, naming a place of whatever document it was walking. Where that
+// document is one bundling fetched, the caller holds neither it nor that
+// place, so what names the schema is the identifier it was fetched by and the
+// reference that went looking for it
+auto impossible_dialect_of_fetched(const JSON::String &identifier,
+                                   const Pointer &origin)
+    -> SchemaReferenceError {
+  return {identifier, origin,
+          "The referenced schema declares a dialect that does not define the "
+          "keyword that declares it"};
+}
+
+// What bundling fetched and has yet to put anywhere, alongside the reference
+// that went looking for it, which is what a refusal the fetched document
+// brings on has to name
+struct FetchedRemote {
+  JSON schema;
+  JSON::String identifier;
+  SchemaBaseDialect base_dialect;
+  Pointer origin;
+};
+
 auto embed_references(
     JSON &root, const Pointer &container, JSON &subschema,
     const SchemaWalker &walker, const SchemaResolver &resolver,
@@ -832,7 +856,7 @@ auto embed_references(
       depth == 0 ? default_base : std::string_view{}, remaining};
   charge(remaining, frame);
 
-  std::vector<std::tuple<JSON, JSON::String, SchemaBaseDialect>> deferred;
+  std::vector<FetchedRemote> deferred;
   std::vector<std::pair<Pointer, JSON::String>> ref_rewrites;
 
   frame.for_each_unresolved_reference([&](const auto &pointer,
@@ -923,18 +947,12 @@ auto embed_references(
     const auto &remote_vocabularies{
         remote_root_frame->vocabularies(remote_root, resolver)};
 
-    // A schema that names a dialect which gives the keyword that named it no
-    // meaning cannot be taken at its word, and framing refuses it wherever it
-    // meets one. Saying so here is what names the document it came from and
-    // the reference that went looking for it, which a refusal from whichever
-    // frame happens to reach it first cannot do
+    // Asking of the root here is what answers before anything is fetched on
+    // its behalf, where every other walk of the document answers as it goes
     if (remote.is_object() &&
         remote.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA) &&
         !dialect_defines(walker, remote_vocabularies, "$schema"sv)) {
-      throw SchemaReferenceError(identifier, to_pointer(pointer),
-                                 "The referenced schema declares a dialect "
-                                 "that does not define the keyword that "
-                                 "declares it");
+      throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
     }
 
     const auto remote_base_dialect{remote_root.base_dialect};
@@ -962,18 +980,23 @@ auto embed_references(
       // still has to ask the frame. Only the anchors of the remote matter
       // here, rather than every pointer of it
       if (!exists) {
-        const SchemaFrame remote_frame{SchemaFrame::Mode::Locations,
-                                       remote,
-                                       walker,
-                                       resolver,
-                                       default_dialect,
-                                       identifier,
-                                       SchemaFrame::IdentifierMode::Additional,
-                                       {EMPTY_WEAK_POINTER},
-                                       "",
-                                       remaining};
-        charge(remaining, remote_frame);
-        exists = remote_frame.traverse(reference.destination).has_value();
+        try {
+          const SchemaFrame remote_frame{
+              SchemaFrame::Mode::Locations,
+              remote,
+              walker,
+              resolver,
+              default_dialect,
+              identifier,
+              SchemaFrame::IdentifierMode::Additional,
+              {EMPTY_WEAK_POINTER},
+              "",
+              remaining};
+          charge(remaining, remote_frame);
+          exists = remote_frame.traverse(reference.destination).has_value();
+        } catch (const SchemaDialectImpossibleError &) {
+          throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
+        }
       }
 
       if (!exists) {
@@ -991,27 +1014,31 @@ auto embed_references(
       if (named_value != nullptr && named_value->is_object() &&
           (named_value->defines("$id"sv, JSONSCHEMA_HASH_ID) ||
            named_value->defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID))) {
-        const SchemaFrame located{SchemaFrame::Mode::Locations,
-                                  remote,
-                                  walker,
-                                  resolver,
-                                  default_dialect,
-                                  identifier,
-                                  SchemaFrame::IdentifierMode::Additional,
-                                  {EMPTY_WEAK_POINTER},
-                                  "",
-                                  remaining};
-        charge(remaining, located);
-        const auto named{
-            located.traverse(to_weak_pointer(fragment_pointer.value()))};
-        if (named.has_value() &&
-            named.value().get().type == SchemaFrame::LocationType::Resource &&
-            to_pointer(named.value().get().pointer) ==
-                fragment_pointer.value() &&
-            named.value().get().base != identifier) {
-          ref_rewrites.emplace_back(to_pointer(pointer),
-                                    JSON::String{named.value().get().base});
-          names_a_resource = true;
+        try {
+          const SchemaFrame located{SchemaFrame::Mode::Locations,
+                                    remote,
+                                    walker,
+                                    resolver,
+                                    default_dialect,
+                                    identifier,
+                                    SchemaFrame::IdentifierMode::Additional,
+                                    {EMPTY_WEAK_POINTER},
+                                    "",
+                                    remaining};
+          charge(remaining, located);
+          const auto named{
+              located.traverse(to_weak_pointer(fragment_pointer.value()))};
+          if (named.has_value() &&
+              named.value().get().type == SchemaFrame::LocationType::Resource &&
+              to_pointer(named.value().get().pointer) ==
+                  fragment_pointer.value() &&
+              named.value().get().base != identifier) {
+            ref_rewrites.emplace_back(to_pointer(pointer),
+                                      JSON::String{named.value().get().base});
+            names_a_resource = true;
+          }
+        } catch (const SchemaDialectImpossibleError &) {
+          throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
         }
       }
     }
@@ -1045,8 +1072,12 @@ auto embed_references(
         // declare. Where whatever holds the container already reads under the
         // dialect the remote was read under, inheritance says the same thing
         // for free
-        mark_dialect_of_every_subschema(remote, walker, resolver,
-                                        remote_dialect_uri, remaining);
+        try {
+          mark_dialect_of_every_subschema(remote, walker, resolver,
+                                          remote_dialect_uri, remaining);
+        } catch (const SchemaDialectImpossibleError &) {
+          throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
+        }
       }
     }
 
@@ -1085,8 +1116,10 @@ auto embed_references(
 
     bundled.emplace(identifier, effective_id);
     bundled.emplace(effective_id, effective_id);
-    deferred.emplace_back(std::move(remote), std::move(effective_id),
-                          remote_base_dialect);
+    deferred.push_back({.schema = std::move(remote),
+                        .identifier = std::move(effective_id),
+                        .base_dialect = remote_base_dialect,
+                        .origin = to_pointer(pointer)});
   });
 
   // Whatever the walk above reaches is on its way into the document, so its
@@ -1121,19 +1154,27 @@ auto embed_references(
     set(subschema, rewrite_pointer, JSON{rewrite_value});
   }
 
-  for (auto &[remote, effective_id, remote_dialect] : deferred) {
-    embed_references(root, container, remote, walker, resolver, mode,
-                     default_dialect, effective_id, paths, default_base,
-                     bundled, positional, container_dialect, remaining,
-                     callback, depth + 1);
-    elevate_embedded_resources(remote, root, container, remote_dialect, walker,
-                               resolver, default_dialect, effective_id, bundled,
-                               positional, remaining, callback);
-    const auto key{embed_schema(root, container, effective_id,
-                                std::move(remote), callback)};
+  for (auto &entry : deferred) {
+    // Whatever the walks below meet, they meet inside a document that was
+    // fetched rather than given
+    try {
+      embed_references(root, container, entry.schema, walker, resolver, mode,
+                       default_dialect, entry.identifier, paths, default_base,
+                       bundled, positional, container_dialect, remaining,
+                       callback, depth + 1);
+      elevate_embedded_resources(entry.schema, root, container,
+                                 entry.base_dialect, walker, resolver,
+                                 default_dialect, entry.identifier, bundled,
+                                 positional, remaining, callback);
+    } catch (const SchemaDialectImpossibleError &) {
+      throw impossible_dialect_of_fetched(entry.identifier, entry.origin);
+    }
+
+    const auto key{embed_schema(root, container, entry.identifier,
+                                std::move(entry.schema), callback)};
     auto landing{container.concat(key)};
-    if (positional.unnamed.contains(effective_id)) {
-      positional.landings.emplace(effective_id, landing);
+    if (positional.unnamed.contains(entry.identifier)) {
+      positional.landings.emplace(entry.identifier, landing);
     }
     positional.embeddings.push_back(std::move(landing));
   }
