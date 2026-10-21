@@ -105,13 +105,24 @@ public:
     return true;
   }
 
-  // Returns true when exactly one branch of the allOf array declares $ref.
+  // Returns true when the branch declares a keyword whose meaning depends on
+  // where the branch sits, so moving the reference out of it would change how
+  // the reference resolves or which properties count as evaluated.
+  [[nodiscard]] auto
+  is_location_sensitive(const sourcemeta::core::JSON &entry) const -> bool {
+    return entry.defines_any({"$id", "$anchor", "$dynamicAnchor",
+                              "$recursiveAnchor", "unevaluatedProperties",
+                              "unevaluatedItems"});
+  }
+
+  // Returns true when exactly one branch of the allOf array declares $ref and
+  // that branch carries nothing that depends on its location.
   [[nodiscard]] auto
   exactly_one_ref_branch(const sourcemeta::core::JSON &schema) const -> bool {
     bool match{false};
     for (const auto &entry : schema.at("allOf").as_array()) {
       if (entry.is_object() && entry.defines("$ref")) {
-        if (match) {
+        if (match || this->is_location_sensitive(entry)) {
           return false;
         } else {
           match = true;
