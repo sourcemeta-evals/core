@@ -619,19 +619,36 @@ using PointerWalker = GenericPointerWalker<Pointer>;
 using SubPointerWalker = GenericSubPointerWalker<Pointer>;
 
 /// @ingroup jsonpointer
-/// Serialise a Pointer as JSON
+/// Serialise a Pointer or WeakPointer as JSON. The result holds the decoded
+/// pointer text, where only `~` and `/` take the `~0` and `~1` escaped forms
+/// that JSON Pointer defines. Escaping for embedding in a JSON text document
+/// is the concern of JSON serialisation, not of this representation, so a
+/// token character like a line feed is stored as the character itself
 template <typename T>
-  requires std::is_same_v<T, Pointer>
+  requires std::is_same_v<T, Pointer> || std::is_same_v<T, WeakPointer>
 auto to_json(const T &value) -> JSON {
-  return JSON{to_string(value)};
-}
+  JSON::String result;
+  for (const auto &token : value) {
+    result += '/';
+    if (token.is_property()) {
+      for (const auto character : token.to_property()) {
+        switch (character) {
+          case '~':
+            result += "~0";
+            break;
+          case '/':
+            result += "~1";
+            break;
+          default:
+            result += character;
+        }
+      }
+    } else {
+      result += std::to_string(token.to_index());
+    }
+  }
 
-/// @ingroup jsonpointer
-/// Serialise a WeakPointer as JSON
-template <typename T>
-  requires std::is_same_v<T, WeakPointer>
-auto to_json(const T &value) -> JSON {
-  return JSON{to_string(value)};
+  return JSON{result};
 }
 
 /// @ingroup jsonpointer
