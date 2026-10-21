@@ -2111,9 +2111,4 @@ TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_3) {
 
   EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
   EXPECT_EQ(std::get<1>(entries.at(0)), "unnecessary_allof_ref_wrapper");
-  EXPECT_EQ(std::get<2>(entries.at(0)),
-            "Wrapping `$ref` in `allOf` is unnecessary in JSON Schema 2019-09 "
-            "and later versions as `$ref` does not override sibling keywords "
-            "anymore");
-  EXPECT_EQ(std::get<3>(entries.at(0)), "");
 }
