@@ -35,11 +35,14 @@ public:
     bool match{false};
     for (const auto &entry : schema.at("allOf").as_array()) {
       if (entry.is_object() && entry.defines("$ref")) {
-        if (match) {
+        if (match ||
+            entry.defines_any({"$id", "$anchor", "$dynamicAnchor",
+                               "$recursiveAnchor", "unevaluatedProperties",
+                               "unevaluatedItems"})) {
           return false;
-        } else {
-          match = true;
         }
+
+        match = true;
       }
     }
 
