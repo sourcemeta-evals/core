@@ -147,6 +147,79 @@ TEST(JSONPointer_json_auto, from_json_parsed_text_newline) {
   EXPECT_EQ(result.value(), expected);
 }
 
+TEST(JSONPointer_json_auto, from_json_parsed_text_quote_token) {
+  const auto input{sourcemeta::core::parse_json(R"JSON({
+    "value": "/a\"b"
+  })JSON")};
+
+  const auto result{sourcemeta::core::from_json<sourcemeta::core::Pointer>(
+      input.at("value"))};
+  ASSERT_TRUE(result.has_value());
+  const sourcemeta::core::Pointer expected{std::string{"a\"b"}};
+  EXPECT_EQ(result.value(), expected);
+}
+
+TEST(JSONPointer_json_auto, from_json_parsed_text_literal_escaped_b) {
+  const auto input{sourcemeta::core::parse_json(R"JSON({
+    "value": "/a\\b"
+  })JSON")};
+
+  const auto result{sourcemeta::core::from_json<sourcemeta::core::Pointer>(
+      input.at("value"))};
+  ASSERT_TRUE(result.has_value());
+  const sourcemeta::core::Pointer expected{std::string{"a\\b"}};
+  EXPECT_EQ(result.value(), expected);
+}
+
+TEST(JSONPointer_json_auto, from_json_parsed_text_literal_unicode_sequence) {
+  const auto input{sourcemeta::core::parse_json(R"JSON({
+    "value": "/a\\u002Ab"
+  })JSON")};
+
+  const auto result{sourcemeta::core::from_json<sourcemeta::core::Pointer>(
+      input.at("value"))};
+  ASSERT_TRUE(result.has_value());
+  const sourcemeta::core::Pointer expected{std::string{"a\\u002Ab"}};
+  EXPECT_EQ(result.value(), expected);
+}
+
+TEST(JSONPointer_json_auto, round_trip_repeated_backslashes_token) {
+  const sourcemeta::core::Pointer pointer{std::string{"a\\\\b"}};
+  const auto serialized{sourcemeta::core::to_json(pointer)};
+  const sourcemeta::core::JSON expected{"/a\\\\b"};
+  EXPECT_EQ(serialized, expected);
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(serialized)};
+  ASSERT_TRUE(back.has_value());
+  EXPECT_EQ(back.value(), pointer);
+}
+
+TEST(JSONPointer_json_auto, from_json_trailing_backslash_token) {
+  const auto input{sourcemeta::core::parse_json(R"JSON({
+    "value": "/a\\"
+  })JSON")};
+
+  const auto result{sourcemeta::core::from_json<sourcemeta::core::Pointer>(
+      input.at("value"))};
+  ASSERT_TRUE(result.has_value());
+  const sourcemeta::core::Pointer expected{std::string{"a\\"}};
+  EXPECT_EQ(result.value(), expected);
+}
+
+TEST(JSONPointer_json_auto, from_json_invalid_tilde_escape) {
+  const sourcemeta::core::JSON input{"/~2"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(JSONPointer_json_auto, from_json_trailing_tilde) {
+  const sourcemeta::core::JSON input{"/~"};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_FALSE(result.has_value());
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_newline_token) {
   const std::string token{"foo\nbar"};
   const sourcemeta::core::WeakPointer pointer{std::cref(token)};
