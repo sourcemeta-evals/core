@@ -538,11 +538,13 @@ auto settle_positional_references(
               carried.insert_or_assign(position.resolve_from(landing),
                                        JSON::String{location.base});
             });
+        // The copy was taken from what the document already holds, so what
+        // it carried is what that name reaches. Holding the two against each
+        // other is what keeps the name standing in for the same schema rather
+        // than for another one that answers to it. Every one of them is held
+        // first, as saying a name where a resource sat takes away whatever
+        // sat under it
         for (const auto &[position, name] : carried) {
-          // The copy was taken from what the document already holds, so what
-          // it carried is what that name reaches. Holding the two against each
-          // other is what keeps the name standing in for the same schema
-          // rather than for another one that answers to it
           const auto resolved{frame.traverse(name)};
           if (!resolved.has_value() ||
               get(schema, to_pointer(resolved.value().get().pointer)) !=
@@ -550,10 +552,21 @@ auto settle_positional_references(
             throw SchemaError(
                 "Conflicting embedded resources with the same identifier");
           }
+        }
+
+        // A resource that another carried resource holds is reached through
+        // the name of the one that holds it, so saying the outermost name is
+        // saying all of them
+        std::optional<Pointer> said;
+        for (const auto &[position, name] : carried) {
+          if (said.has_value() && position.starts_with(said.value())) {
+            continue;
+          }
 
           auto named{JSON::make_object()};
           named.assign("$ref", JSON{name});
           set(duplicate, position, std::move(named));
+          said = position;
         }
 
         // Where it came from said what it was by sitting where it sat, and the
