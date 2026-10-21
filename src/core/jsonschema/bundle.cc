@@ -225,6 +225,24 @@ auto bundle_schema(sourcemeta::core::JSON &root,
   }
 }
 
+// Before 2019-09 a top-level `$ref` overrides its siblings, so making room for
+// an identifier would turn the siblings it ignored into assertions
+auto legacy_reference_blocks_identifier(const sourcemeta::core::JSON &schema)
+    -> bool {
+  if (!schema.defines("$ref")) {
+    return false;
+  }
+
+  for (const auto &entry : schema.as_object()) {
+    if (entry.first != "$ref" && entry.first != "$schema" &&
+        entry.first != "$id" && entry.first != "id") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 } // namespace
 
 namespace sourcemeta::core {
@@ -258,23 +276,28 @@ auto bundle(JSON &schema, const SchemaWalker &walker,
     return;
   }
 
+  const auto vocabularies{
+      sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
+  const auto legacy_reference_semantics{
+      !vocabularies.contains(
+          "https://json-schema.org/draft/2020-12/vocab/core") &&
+      !vocabularies.contains(
+          "https://json-schema.org/draft/2019-09/vocab/core")};
+
   // If the schema identifier is implicit, add it to the top-level of the
   // bundled schema. Otherwise, potential relative references based on this
   // implicit base URI will likely not resolve unless end users happen to
   // know what this implicit base URI is.
   if (schema.is_object() && default_id.has_value() &&
+      !(legacy_reference_semantics &&
+        legacy_reference_blocks_identifier(schema)) &&
       !identify(schema, resolver, SchemaIdentificationStrategy::Strict,
                 default_dialect)
            .has_value()) {
     reidentify(schema, default_id.value(), resolver,  default_dialect);
   }
 
-  const auto vocabularies{
-      sourcemeta::core::vocabularies(schema, resolver, default_dialect)};
-  if (vocabularies.contains(
-          "https://json-schema.org/draft/2020-12/vocab/core") ||
-      vocabularies.contains(
-          "https://json-schema.org/draft/2019-09/vocab/core")) {
+  if (!legacy_reference_semantics) {
     bundle_schema(schema, {"$defs"}, schema, frame, walker, resolver,
                   default_dialect, default_id, paths);
     return;
