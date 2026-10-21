@@ -132,12 +132,32 @@ public:
     return match;
   }
 
+  // Returns true when some other part of the document points into the allOf
+  // array this transform would rewrite, so hoisting would leave that
+  // reference addressing a different branch or nothing at all.
+  [[nodiscard]] auto
+  is_referenced(const sourcemeta::core::SchemaFrame &frame,
+                const sourcemeta::core::SchemaFrame::Location &location) const
+      -> bool {
+    const auto wrapper{
+        location.pointer.concat(sourcemeta::core::Pointer{"allOf"})};
+    for (const auto &reference : frame.references()) {
+      const auto target{frame.traverse(reference.second.destination)};
+      if (target.has_value() &&
+          target.value().get().pointer.starts_with(wrapper)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   [[nodiscard]] auto
   condition(const sourcemeta::core::JSON &schema,
             const sourcemeta::core::JSON &,
             const sourcemeta::core::Vocabularies &vocabularies,
-            const sourcemeta::core::SchemaFrame &,
-            const sourcemeta::core::SchemaFrame::Location &,
+            const sourcemeta::core::SchemaFrame &frame,
+            const sourcemeta::core::SchemaFrame::Location &location,
             const sourcemeta::core::SchemaWalker &,
             const sourcemeta::core::SchemaResolver &) const
       -> sourcemeta::core::SchemaTransformRule::Result override {
@@ -148,6 +168,9 @@ public:
       return false;
     }
     if (!this->exactly_one_ref_branch(schema)) {
+      return false;
+    }
+    if (this->is_referenced(frame, location)) {
       return false;
     }
     return true;
