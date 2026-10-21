@@ -101,7 +101,9 @@ auto SchemaTransformer::check(
     const JSON &schema, const SchemaWalker &walker,
     const SchemaResolver &resolver, const SchemaTransformer::Callback &callback,
     const std::optional<std::string> &default_dialect) const -> bool {
-  SchemaFrame frame{SchemaFrame::Mode::Locations};
+  // The incoming-reference guard needs the reference graph here too, not only
+  // when the bundle is allowed to mutate
+  SchemaFrame frame{SchemaFrame::Mode::References};
   frame.analyse(schema, walker, resolver, default_dialect);
 
   bool result{true};
