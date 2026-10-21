@@ -47,7 +47,25 @@ public:
   }
 
   auto transform(JSON &schema) const -> void override {
-    schema.assign("$ref", schema.at("allOf").at(0).at("$ref"));
-    schema.erase("allOf");
+    auto &array{schema.at("allOf").as_array()};
+    auto iterator{array.begin()};
+    for (; iterator != array.end(); ++iterator) {
+      if (iterator->is_object() && iterator->defines("$ref")) {
+        break;
+      }
+    }
+
+    assert(iterator != array.end());
+    auto reference{std::move(iterator->at("$ref"))};
+    if (iterator->size() == 1) {
+      schema.at("allOf").erase(iterator);
+      if (schema.at("allOf").empty()) {
+        schema.erase("allOf");
+      }
+    } else {
+      iterator->erase("$ref");
+    }
+
+    schema.assign("$ref", std::move(reference));
   }
 };
