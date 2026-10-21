@@ -10,8 +10,8 @@ public:
   condition(const sourcemeta::core::JSON &schema,
             const sourcemeta::core::JSON &,
             const sourcemeta::core::Vocabularies &vocabularies,
-            const sourcemeta::core::SchemaFrame &,
-            const sourcemeta::core::SchemaFrame::Location &,
+            const sourcemeta::core::SchemaFrame &frame,
+            const sourcemeta::core::SchemaFrame::Location &location,
             const sourcemeta::core::SchemaWalker &,
             const sourcemeta::core::SchemaResolver &) const
       -> sourcemeta::core::SchemaTransformRule::Result override {
@@ -46,7 +46,23 @@ public:
       }
     }
 
-    return match;
+    if (!match) {
+      return false;
+    }
+
+    // Hoisting rewrites the array, so a reference that lands inside it would
+    // either address a different branch afterwards or address nothing at all
+    const auto wrapper{
+        location.pointer.concat(sourcemeta::core::Pointer{"allOf"})};
+    for (const auto &reference : frame.references()) {
+      const auto target{frame.traverse(reference.second.destination)};
+      if (target.has_value() &&
+          target.value().get().pointer.starts_with(wrapper)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   auto transform(JSON &schema) const -> void override {
