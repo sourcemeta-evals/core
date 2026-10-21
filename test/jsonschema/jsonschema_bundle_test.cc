@@ -409,6 +409,64 @@ TEST(JSONSchema_bundle, with_default_id_modern_ref_sibling) {
   EXPECT_EQ(document, expected);
 }
 
+TEST(JSONSchema_bundle, with_default_id_legacy_ref_both_identifiers_draft4) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://www.sourcemeta.com/ignored",
+    "$id": "https://www.sourcemeta.com/unknown-keyword",
+    "$ref": "test-4"
+  })JSON");
+
+  sourcemeta::core::bundle(document, sourcemeta::core::schema_official_walker,
+                           test_resolver, std::nullopt,
+                           "https://www.sourcemeta.com/default");
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://www.sourcemeta.com/default",
+    "$id": "https://www.sourcemeta.com/unknown-keyword",
+    "allOf": [ { "$ref": "test-4" } ],
+    "definitions": {
+      "https://www.sourcemeta.com/test-4": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "id": "https://www.sourcemeta.com/test-4",
+        "type": "string"
+      }
+    }
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(JSONSchema_bundle, with_default_id_legacy_ref_both_identifiers_draft7) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://www.sourcemeta.com/ignored",
+    "id": "https://www.sourcemeta.com/unknown-keyword",
+    "$ref": "test-4"
+  })JSON");
+
+  sourcemeta::core::bundle(document, sourcemeta::core::schema_official_walker,
+                           test_resolver, std::nullopt,
+                           "https://www.sourcemeta.com/default");
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://www.sourcemeta.com/default",
+    "id": "https://www.sourcemeta.com/unknown-keyword",
+    "allOf": [ { "$ref": "test-4" } ],
+    "definitions": {
+      "https://www.sourcemeta.com/test-4": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "id": "https://www.sourcemeta.com/test-4",
+        "type": "string"
+      }
+    }
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
 TEST(JSONSchema_bundle, with_default_id_another_base) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
