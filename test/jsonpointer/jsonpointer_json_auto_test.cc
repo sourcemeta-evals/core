@@ -294,6 +294,16 @@ TEST(JSONPointer_json_auto, from_json_backslash_token_then_invalid_tilde) {
   EXPECT_FALSE(result.has_value());
 }
 
+TEST(JSONPointer_json_auto, to_json_explicit_template_forms) {
+  const sourcemeta::core::Pointer pointer{"[\\-]", "foo\nbar"};
+  const sourcemeta::core::JSON expected{"/[\\-]/foo\nbar"};
+  const auto result{sourcemeta::core::to_json<>(pointer)};
+  EXPECT_EQ(result, expected);
+  sourcemeta::core::JSON (*const callback)(const sourcemeta::core::Pointer &){
+      &sourcemeta::core::to_json<sourcemeta::core::Pointer>};
+  EXPECT_EQ(callback(pointer), expected);
+}
+
 TEST(JSONWeakPointer_json_auto, to_json_newline_token) {
   const std::string token{"foo\nbar"};
   const sourcemeta::core::WeakPointer pointer{std::cref(token)};
@@ -314,4 +324,18 @@ TEST(JSONWeakPointer_json_auto, to_json_foo_bar_baz) {
   const sourcemeta::core::JSON expected{"/foo/bar/baz"};
   EXPECT_EQ(result.size(), 12);
   EXPECT_EQ(result, expected);
+}
+
+TEST(JSONWeakPointer_json_auto, to_json_explicit_template_forms) {
+  const std::string regex{"[\\-]"};
+  const std::string newline{"foo\nbar"};
+  const sourcemeta::core::WeakPointer pointer{std::cref(regex),
+                                              std::cref(newline)};
+  const sourcemeta::core::JSON expected{"/[\\-]/foo\nbar"};
+  const auto result{sourcemeta::core::to_json<>(pointer)};
+  EXPECT_EQ(result, expected);
+  sourcemeta::core::JSON (*const callback)(
+      const sourcemeta::core::WeakPointer &){
+      &sourcemeta::core::to_json<sourcemeta::core::WeakPointer>};
+  EXPECT_EQ(callback(pointer), expected);
 }
