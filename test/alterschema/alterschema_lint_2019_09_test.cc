@@ -2375,3 +2375,47 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_23) {
 
   EXPECT_EQ(document, expected);
 }
+
+TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_24) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$id": "https://example.com/schema",
+    "$defs": {
+      "184467440737095516160": {}
+    },
+    "allOf": [
+      { "$ref": "#%2F$defs%2F184467440737095516160" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$id": "https://example.com/schema",
+    "$ref": "#%2F$defs%2F184467440737095516160",
+    "$defs": {
+      "184467440737095516160": {}
+    }
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_check_11) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "properties": {
+      "foo": { "$ref": "#/allOf/0" }
+    },
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(
+      document, entries, "https://json-schema.org/draft/2019-09/schema")};
+
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(entries.empty());
+}
