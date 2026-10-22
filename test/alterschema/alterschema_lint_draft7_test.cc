@@ -2,7 +2,28 @@
 
 #include <sourcemeta/core/json.h>
 
+#include <optional>
+#include <string>
+
 #include "alterschema_test_utils.h"
+
+namespace {
+
+auto fix_for_readability(
+    sourcemeta::core::JSON &document,
+    const std::optional<std::string> &default_dialect = std::nullopt) -> bool {
+  sourcemeta::core::SchemaTransformer bundle;
+  sourcemeta::core::add(bundle, sourcemeta::core::AlterSchemaMode::Readability);
+  return bundle.apply(
+      document, sourcemeta::core::schema_official_walker,
+      sourcemeta::core::schema_official_resolver,
+      [](const auto &, const auto &name, const auto &, const auto &) {
+        ADD_FAILURE() << name;
+      },
+      default_dialect);
+}
+
+} // namespace
 
 TEST(AlterSchema_lint_draft7, enum_to_const_1) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
@@ -1201,6 +1222,25 @@ TEST(AlterSchema_lint_draft7, unnecessary_allof_ref_wrapper_1) {
 
   const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_draft7, unnecessary_allof_ref_wrapper_2) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(
+      fix_for_readability(document, "http://json-schema.org/draft-07/schema#"));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
     "allOf": [
       { "$ref": "https://example.com" }
     ]

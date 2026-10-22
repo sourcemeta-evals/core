@@ -2834,3 +2834,196 @@ TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_11) {
   EXPECT_TRUE(result);
   EXPECT_TRUE(entries.empty());
 }
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_31) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com/remote#%2F$defs%2F184467440737095516160" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/remote#%2F$defs%2F184467440737095516160"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_32) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "$ref": "https://example.com/remote#/$defs/a%20b/184467440737095516160"
+      }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/remote#/$defs/a%20b/184467440737095516160"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_12) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com/remote#%2F$defs%2F184467440737095516160" }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
+
+  EXPECT_FALSE(result);
+  EXPECT_EQ(entries.size(), 1);
+
+  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
+  EXPECT_EQ(std::get<1>(entries.at(0)), "unnecessary_allof_ref_wrapper");
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_13) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/foo",
+    "allOf": [
+      { "$ref": "https://example.com/bar" }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
+
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(entries.empty());
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_14) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com/foo" },
+      { "$ref": "https://example.com/bar" }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
+
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(entries.empty());
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_33) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "$ref": "https://example.com",
+        "title": "one"
+      },
+      { "title": "two" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com",
+    "allOf": [
+      { "title": "one" },
+      { "title": "two" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_34) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "title": "one" },
+      {
+        "$ref": "https://example.com",
+        "title": "two"
+      },
+      { "title": "three" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com",
+    "allOf": [
+      { "title": "one" },
+      { "title": "two" },
+      { "title": "three" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_35) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$defs": {
+      "indirect": { "$ref": "#/allOf/0" }
+    },
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(
+      document, "https://json-schema.org/draft/2020-12/schema"));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$defs": {
+      "indirect": { "$ref": "#/allOf/0" }
+    },
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_36) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      true,
+      { "$ref": "https://example.com" },
+      false,
+      {}
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com",
+    "allOf": [
+      true,
+      false,
+      {}
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
