@@ -1,10 +1,32 @@
 #include <gtest/gtest.h>
 
-#include <tuple>
-
 #include <sourcemeta/core/json.h>
 
+#include <string>
+#include <tuple>
+#include <vector>
+
 #include "alterschema_test_utils.h"
+
+namespace {
+
+using Traces = std::vector<std::tuple<sourcemeta::core::Pointer, std::string,
+                                      std::string, std::string>>;
+
+auto check_for_readability(const sourcemeta::core::JSON &document,
+                           Traces &traces) -> bool {
+  sourcemeta::core::SchemaTransformer bundle;
+  sourcemeta::core::add(bundle, sourcemeta::core::AlterSchemaMode::Readability);
+  return bundle.check(document, sourcemeta::core::schema_official_walker,
+                      sourcemeta::core::schema_official_resolver,
+                      [&traces](const auto &pointer, const auto &name,
+                                const auto &message, const auto &description) {
+                        traces.emplace_back(pointer, name, message,
+                                            description);
+                      });
+}
+
+} // namespace
 
 TEST(AlterSchema_lint_2019_09, enum_to_const_1) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
@@ -1802,8 +1824,8 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_check_1) {
     ]
   })JSON");
 
-  AlterSchemaTraces entries;
-  LINT_FOR_READABILITY(document, entries);
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
 
   EXPECT_TRUE(result);
   EXPECT_TRUE(entries.empty());
@@ -1817,8 +1839,8 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_check_2) {
     ]
   })JSON");
 
-  AlterSchemaTraces entries;
-  LINT_FOR_READABILITY(document, entries);
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
 
   EXPECT_FALSE(result);
   EXPECT_EQ(entries.size(), 1);
