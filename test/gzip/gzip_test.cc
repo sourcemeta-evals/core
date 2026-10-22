@@ -3,6 +3,8 @@
 #include <sourcemeta/core/gzip.h>
 
 #include <cstddef>
+#include <istream>
+#include <optional>
 #include <random>
 #include <sstream>
 #include <string>
@@ -83,6 +85,57 @@ TEST(GZIP, decompress_string_stream_truncated) {
   const std::string truncated{
       input.value().substr(0, input.value().size() - 4)};
   std::istringstream stream{truncated};
+  const auto result{sourcemeta::core::gunzip(stream)};
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(GZIP, gunzip_public_signature) {
+  std::optional<std::string> (*function)(std::istream &) =
+      sourcemeta::core::gunzip;
+  const auto input{sourcemeta::core::gzip("Hello World")};
+  EXPECT_TRUE(input.has_value());
+  std::istringstream stream{input.value()};
+  const auto result{function(stream)};
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), "Hello World");
+}
+
+TEST(GZIP, decompress_string_stream_raw_empty) {
+  std::istringstream stream{""};
+  const auto result{sourcemeta::core::gunzip(stream)};
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(GZIP, decompress_string_stream_corrupt_checksum) {
+  std::string payload;
+  for (std::size_t index = 0; index < 8192; index++) {
+    payload += "sourcemeta";
+  }
+
+  const auto input{sourcemeta::core::gzip(payload)};
+  EXPECT_TRUE(input.has_value());
+  ASSERT_GE(input.value().size(), 8);
+  std::string corrupted{input.value()};
+  const auto checksum{corrupted.size() - 8};
+  corrupted[checksum] = static_cast<char>(corrupted[checksum] ^ 0xFF);
+  std::istringstream stream{corrupted};
+  const auto result{sourcemeta::core::gunzip(stream)};
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(GZIP, decompress_string_stream_corrupt_length) {
+  std::string payload;
+  for (std::size_t index = 0; index < 8192; index++) {
+    payload += "sourcemeta";
+  }
+
+  const auto input{sourcemeta::core::gzip(payload)};
+  EXPECT_TRUE(input.has_value());
+  ASSERT_GE(input.value().size(), 8);
+  std::string corrupted{input.value()};
+  const auto length{corrupted.size() - 1};
+  corrupted[length] = static_cast<char>(corrupted[length] ^ 0xFF);
+  std::istringstream stream{corrupted};
   const auto result{sourcemeta::core::gunzip(stream)};
   EXPECT_FALSE(result.has_value());
 }
