@@ -54,6 +54,14 @@ SOURCEMETA_CORE_GZIP_EXPORT auto gzip(std::string_view input)
 /// assert(result.has_value());
 /// assert(result.value() == "Hello World");
 /// ```
+///
+/// Bytes are consumed from the current position of the stream, reading in
+/// chunks and never seeking, so a non-seekable stream such as standard input
+/// works. The result is empty when the stream does not hold a valid single
+/// gzip member, which covers a damaged header, damaged compressed data, a
+/// checksum or length that disagrees with the decompressed bytes, input that
+/// ends early, and a stream that cannot be read at all. Partial output is
+/// never returned as a value.
 SOURCEMETA_CORE_GZIP_EXPORT auto gunzip(std::istream &stream)
     -> std::optional<std::string>;
 
