@@ -2,6 +2,8 @@
 
 #include <sourcemeta/core/jsonpointer.h>
 
+#include <sstream>
+
 TEST(JSONPointer_json_auto, foo_bar_baz) {
   const sourcemeta::core::Pointer pointer{"foo", "bar", "baz"};
   const auto result{sourcemeta::core::to_json(pointer)};
@@ -217,6 +219,78 @@ TEST(JSONPointer_json_auto, from_json_trailing_tilde) {
   const sourcemeta::core::JSON input{"/~"};
   const auto result{
       sourcemeta::core::from_json<sourcemeta::core::Pointer>(input)};
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(JSONPointer_json_auto, chain_serialise_reparse_backslash_token) {
+  const sourcemeta::core::Pointer pointer{"[\\-]", "type"};
+  const auto serialized{sourcemeta::core::to_json(pointer)};
+  std::ostringstream stream;
+  sourcemeta::core::stringify(serialized, stream);
+  EXPECT_EQ(stream.str(), R"JSON("/[\\-]/type")JSON");
+  const auto reparsed{sourcemeta::core::parse_json(stream.str())};
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(reparsed)};
+  ASSERT_TRUE(back.has_value());
+  EXPECT_EQ(back.value(), pointer);
+}
+
+TEST(JSONPointer_json_auto, chain_serialise_reparse_newline_token) {
+  const sourcemeta::core::Pointer pointer{std::string{"foo\nbar"}};
+  const auto serialized{sourcemeta::core::to_json(pointer)};
+  std::ostringstream stream;
+  sourcemeta::core::stringify(serialized, stream);
+  EXPECT_EQ(stream.str(), R"JSON("/foo\nbar")JSON");
+  const auto reparsed{sourcemeta::core::parse_json(stream.str())};
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(reparsed)};
+  ASSERT_TRUE(back.has_value());
+  EXPECT_EQ(back.value(), pointer);
+}
+
+TEST(JSONPointer_json_auto, chain_lookup_minimised_schema) {
+  const auto schema{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "patternProperties": {
+      "[\\-]": {
+        "type": "string"
+      }
+    }
+  })JSON")};
+
+  const auto document{sourcemeta::core::parse_json(
+      R"JSON("/patternProperties/[\\-]/type")JSON")};
+  const auto pointer{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(document)};
+  ASSERT_TRUE(pointer.has_value());
+  EXPECT_EQ(sourcemeta::core::get(schema, pointer.value()),
+            sourcemeta::core::JSON{"string"});
+}
+
+TEST(JSONPointer_json_auto, round_trip_empty_pointer) {
+  const sourcemeta::core::Pointer pointer;
+  const auto serialized{sourcemeta::core::to_json(pointer)};
+  EXPECT_EQ(serialized, sourcemeta::core::JSON{""});
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(serialized)};
+  ASSERT_TRUE(back.has_value());
+  EXPECT_EQ(back.value(), pointer);
+}
+
+TEST(JSONPointer_json_auto, round_trip_index_token) {
+  const sourcemeta::core::Pointer pointer{"foo", 0};
+  const auto serialized{sourcemeta::core::to_json(pointer)};
+  EXPECT_EQ(serialized, sourcemeta::core::JSON{"/foo/0"});
+  const auto back{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(serialized)};
+  ASSERT_TRUE(back.has_value());
+  EXPECT_EQ(back.value(), pointer);
+}
+
+TEST(JSONPointer_json_auto, from_json_backslash_token_then_invalid_tilde) {
+  const auto document{sourcemeta::core::parse_json(R"JSON("/[\\-]/~2")JSON")};
+  const auto result{
+      sourcemeta::core::from_json<sourcemeta::core::Pointer>(document)};
   EXPECT_FALSE(result.has_value());
 }
 
