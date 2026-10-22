@@ -2,6 +2,7 @@
 
 #include <sourcemeta/core/json.h>
 
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -13,10 +14,26 @@ namespace {
 using Traces = std::vector<std::tuple<sourcemeta::core::Pointer, std::string,
                                       std::string, std::string>>;
 
-auto check_for_readability(const sourcemeta::core::JSON &document,
-                           Traces &traces) -> bool {
+auto check_for_readability(
+    const sourcemeta::core::JSON &document, Traces &traces,
+    const std::optional<std::string> &default_dialect = std::nullopt) -> bool {
   sourcemeta::core::SchemaTransformer bundle;
   sourcemeta::core::add(bundle, sourcemeta::core::AlterSchemaMode::Readability);
+  return bundle.check(
+      document, sourcemeta::core::schema_official_walker,
+      sourcemeta::core::schema_official_resolver,
+      [&traces](const auto &pointer, const auto &name, const auto &message,
+                const auto &description) {
+        traces.emplace_back(pointer, name, message, description);
+      },
+      default_dialect);
+}
+
+auto check_for_static_analysis(const sourcemeta::core::JSON &document,
+                               Traces &traces) -> bool {
+  sourcemeta::core::SchemaTransformer bundle;
+  sourcemeta::core::add(bundle,
+                        sourcemeta::core::AlterSchemaMode::StaticAnalysis);
   return bundle.check(document, sourcemeta::core::schema_official_walker,
                       sourcemeta::core::schema_official_resolver,
                       [&traces](const auto &pointer, const auto &name,
@@ -26,13 +43,18 @@ auto check_for_readability(const sourcemeta::core::JSON &document,
                       });
 }
 
-auto fix_for_readability(sourcemeta::core::JSON &document) -> bool {
+auto fix_for_readability(
+    sourcemeta::core::JSON &document,
+    const std::optional<std::string> &default_dialect = std::nullopt) -> bool {
   sourcemeta::core::SchemaTransformer bundle;
   sourcemeta::core::add(bundle, sourcemeta::core::AlterSchemaMode::Readability);
-  return bundle.apply(document, sourcemeta::core::schema_official_walker,
-                      sourcemeta::core::schema_official_resolver,
-                      [](const auto &, const auto &name, const auto &,
-                         const auto &) { ADD_FAILURE() << name; });
+  return bundle.apply(
+      document, sourcemeta::core::schema_official_walker,
+      sourcemeta::core::schema_official_resolver,
+      [](const auto &, const auto &name, const auto &, const auto &) {
+        ADD_FAILURE() << name;
+      },
+      default_dialect);
 }
 
 } // namespace
@@ -2420,4 +2442,395 @@ TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_23) {
   })JSON");
 
   EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_24) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com/remote#/$defs/184467440737095516160" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/remote#/$defs/184467440737095516160"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_25) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/root",
+    "$defs": {
+      "value": { "type": "string" },
+      "outside": {
+        "$id": "https://example.com/outside",
+        "$dynamicAnchor": "same",
+        "type": "string"
+      }
+    },
+    "properties": {
+      "foo": { "$dynamicRef": "https://example.com/outside#same" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value" },
+      {
+        "$id": "https://example.com/inside",
+        "$dynamicAnchor": "same",
+        "minLength": 1
+      }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/root",
+    "$ref": "#/$defs/value",
+    "$defs": {
+      "value": { "type": "string" },
+      "outside": {
+        "$id": "https://example.com/outside",
+        "$dynamicAnchor": "same",
+        "type": "string"
+      }
+    },
+    "properties": {
+      "foo": { "$dynamicRef": "https://example.com/outside#same" }
+    },
+    "allOf": [
+      {
+        "$id": "https://example.com/inside",
+        "$dynamicAnchor": "same",
+        "minLength": 1
+      }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_26) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/root",
+    "$defs": {
+      "value": { "type": "string" }
+    },
+    "properties": {
+      "foo": { "$dynamicRef": "#inside" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value" },
+      { "$dynamicAnchor": "inside", "minLength": 1 }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/root",
+    "$defs": {
+      "value": { "type": "string" }
+    },
+    "properties": {
+      "foo": { "$dynamicRef": "#inside" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value" },
+      { "$dynamicAnchor": "inside", "minLength": 1 }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_27) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/root",
+    "$defs": {
+      "value": { "type": "string" },
+      "indirect": { "$ref": "https://example.com/root#/allOf/0" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/root",
+    "$defs": {
+      "value": { "type": "string" },
+      "indirect": { "$ref": "https://example.com/root#/allOf/0" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_28) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {
+      "value": { "type": "string" },
+      "indirect": { "$ref": "#deep" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value" },
+      {
+        "properties": {
+          "foo": { "$anchor": "deep", "type": "integer" }
+        }
+      }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {
+      "value": { "type": "string" },
+      "indirect": { "$ref": "#deep" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value" },
+      {
+        "properties": {
+          "foo": { "$anchor": "deep", "type": "integer" }
+        }
+      }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_29) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$defs": {
+      "value": { "type": "string" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value", "title": "Sibling" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(
+      document, "https://json-schema.org/draft/2020-12/schema"));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$ref": "#/$defs/value",
+    "$defs": {
+      "value": { "type": "string" }
+    },
+    "allOf": [
+      { "title": "Sibling" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_30) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {
+      "value": { "type": "string" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value", "title": "Sibling" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_readability(document));
+  EXPECT_TRUE(fix_for_readability(document));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "#/$defs/value",
+    "$defs": {
+      "value": { "type": "string" }
+    },
+    "allOf": [
+      { "title": "Sibling" }
+    ]
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_4) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      { "$ref": "https://example.com", "title": "Sibling" }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_static_analysis(document, entries)};
+
+  EXPECT_FALSE(result);
+  EXPECT_EQ(entries.size(), 1);
+
+  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
+  EXPECT_EQ(std::get<1>(entries.at(0)), "unnecessary_allof_ref_wrapper");
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_5) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$defs": {
+      "value": { "type": "string" }
+    },
+    "allOf": [
+      { "$ref": "#/$defs/value", "title": "Sibling" }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(
+      document, entries, "https://json-schema.org/draft/2020-12/schema")};
+
+  EXPECT_FALSE(result);
+  EXPECT_EQ(entries.size(), 1);
+
+  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
+  EXPECT_EQ(std::get<1>(entries.at(0)), "unnecessary_allof_ref_wrapper");
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_6) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "foo": {
+        "allOf": [
+          { "$ref": "https://example.com/one", "title": "Sibling" }
+        ]
+      },
+      "bar": {
+        "allOf": [
+          {
+            "$id": "https://example.com/nested",
+            "$ref": "https://example.com/two"
+          }
+        ]
+      }
+    }
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
+
+  EXPECT_FALSE(result);
+  EXPECT_EQ(entries.size(), 1);
+
+  EXPECT_EQ(std::get<0>(entries.at(0)),
+            sourcemeta::core::Pointer({"properties", "foo"}));
+  EXPECT_EQ(std::get<1>(entries.at(0)), "unnecessary_allof_ref_wrapper");
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_7) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "#/$defs/value",
+    "$defs": {
+      "value": { "type": "string" }
+    },
+    "allOf": [
+      { "title": "Sibling" }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
+
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(entries.empty());
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_8) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "$anchor": "nested",
+        "$ref": "https://example.com"
+      }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
+
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(entries.empty());
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_9) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "unevaluatedProperties": false,
+        "$ref": "https://example.com"
+      }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
+
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(entries.empty());
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_10) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "unevaluatedItems": false,
+        "$ref": "https://example.com"
+      }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
+
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(entries.empty());
+}
+
+TEST(AlterSchema_lint_2020_12, unnecessary_allof_ref_wrapper_check_11) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "$dynamicAnchor": "nested",
+        "$ref": "https://example.com"
+      }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_readability(document, entries)};
+
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(entries.empty());
 }
