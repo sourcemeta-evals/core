@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include <sourcemeta/core/gzip.h>
+
+#include <gtest/gtest.h>
 
 #include <array>
 #include <cstddef>
