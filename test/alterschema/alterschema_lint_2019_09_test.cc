@@ -2,62 +2,9 @@
 
 #include <sourcemeta/core/json.h>
 
-#include <optional>
-#include <string>
 #include <tuple>
-#include <vector>
 
 #include "alterschema_test_utils.h"
-
-namespace {
-
-using Traces = std::vector<std::tuple<sourcemeta::core::Pointer, std::string,
-                                      std::string, std::string>>;
-
-auto check_for_readability(
-    const sourcemeta::core::JSON &document, Traces &traces,
-    const std::optional<std::string> &default_dialect = std::nullopt) -> bool {
-  sourcemeta::core::SchemaTransformer bundle;
-  sourcemeta::core::add(bundle, sourcemeta::core::AlterSchemaMode::Readability);
-  return bundle.check(
-      document, sourcemeta::core::schema_official_walker,
-      sourcemeta::core::schema_official_resolver,
-      [&traces](const auto &pointer, const auto &name, const auto &message,
-                const auto &description) {
-        traces.emplace_back(pointer, name, message, description);
-      },
-      default_dialect);
-}
-
-auto check_for_static_analysis(const sourcemeta::core::JSON &document,
-                               Traces &traces) -> bool {
-  sourcemeta::core::SchemaTransformer bundle;
-  sourcemeta::core::add(bundle,
-                        sourcemeta::core::AlterSchemaMode::StaticAnalysis);
-  return bundle.check(document, sourcemeta::core::schema_official_walker,
-                      sourcemeta::core::schema_official_resolver,
-                      [&traces](const auto &pointer, const auto &name,
-                                const auto &message, const auto &description) {
-                        traces.emplace_back(pointer, name, message,
-                                            description);
-                      });
-}
-
-auto fix_for_readability(
-    sourcemeta::core::JSON &document,
-    const std::optional<std::string> &default_dialect = std::nullopt) -> bool {
-  sourcemeta::core::SchemaTransformer bundle;
-  sourcemeta::core::add(bundle, sourcemeta::core::AlterSchemaMode::Readability);
-  return bundle.apply(
-      document, sourcemeta::core::schema_official_walker,
-      sourcemeta::core::schema_official_resolver,
-      [](const auto &, const auto &name, const auto &, const auto &) {
-        ADD_FAILURE() << name;
-      },
-      default_dialect);
-}
-
-} // namespace
 
 TEST(AlterSchema_lint_2019_09, enum_to_const_1) {
   sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
@@ -2418,4 +2365,39 @@ TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_check_11) {
 
   EXPECT_TRUE(result);
   EXPECT_TRUE(entries.empty());
+}
+
+TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_25) {
+  sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  EXPECT_TRUE(fix_for_static_analysis(
+      document, "https://json-schema.org/draft/2019-09/schema"));
+
+  const sourcemeta::core::JSON expected = sourcemeta::core::parse_json(R"JSON({
+    "$ref": "https://example.com"
+  })JSON");
+
+  EXPECT_EQ(document, expected);
+}
+
+TEST(AlterSchema_lint_2019_09, unnecessary_allof_ref_wrapper_check_12) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "allOf": [
+      { "$ref": "https://example.com" }
+    ]
+  })JSON");
+
+  Traces entries;
+  const auto result{check_for_static_analysis(
+      document, entries, "https://json-schema.org/draft/2019-09/schema")};
+
+  EXPECT_FALSE(result);
+  EXPECT_EQ(entries.size(), 1);
+
+  EXPECT_EQ(std::get<0>(entries.at(0)), sourcemeta::core::Pointer{});
+  EXPECT_EQ(std::get<1>(entries.at(0)), "unnecessary_allof_ref_wrapper");
 }
