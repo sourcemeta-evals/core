@@ -835,12 +835,15 @@ auto impossible_dialect_of_fetched(const JSON::String &identifier,
           "keyword that declares it"};
 }
 
-// What bundling fetched and has yet to put anywhere, alongside the reference
-// that went looking for it, which is what a refusal the fetched document
-// brings on has to name
+// What bundling fetched and has yet to put anywhere, alongside the name it
+// answers to, the name it was fetched by, and the reference that went looking
+// for it. The last two are what a refusal the fetched document brings on has
+// to name, and the first two part ways wherever the document declares a name
+// of its own
 struct FetchedRemote {
   JSON schema;
   JSON::String identifier;
+  JSON::String fetched_by;
   SchemaBaseDialect base_dialect;
   Pointer origin;
 };
@@ -1131,6 +1134,7 @@ auto embed_references(
     bundled.emplace(effective_id, effective_id);
     deferred.push_back({.schema = std::move(remote),
                         .identifier = std::move(effective_id),
+                        .fetched_by = identifier,
                         .base_dialect = remote_base_dialect,
                         .origin = to_pointer(pointer)});
   });
@@ -1180,7 +1184,7 @@ auto embed_references(
                                  default_dialect, entry.identifier, bundled,
                                  positional, remaining, callback);
     } catch (const SchemaDialectImpossibleError &) {
-      throw impossible_dialect_of_fetched(entry.identifier, entry.origin);
+      throw impossible_dialect_of_fetched(entry.fetched_by, entry.origin);
     }
 
     const auto key{embed_schema(root, container, entry.identifier,
