@@ -623,6 +623,54 @@ auto settle_positional_references(
   }
 }
 
+// What the document already holds under a name, wherever it sits. The
+// container alone cannot answer that, as a caller may hold a resource
+// anywhere, and holding the two against each other is what keeps a name
+// standing for one schema rather than for two that disagree
+auto hold_against_what_the_document_holds(
+    const JSON &root, const JSON &value, const bool defines_dialect,
+    const SchemaWalker &walker, const SchemaResolver &resolver,
+    std::string_view default_dialect, std::string_view remote_dialect_uri,
+    const JSON::String &identifier, std::uint64_t &remaining) -> void {
+  const SchemaFrame frame{SchemaFrame::Mode::Locations,
+                          root,
+                          walker,
+                          resolver,
+                          default_dialect,
+                          "",
+                          SchemaFrame::IdentifierMode::Additional,
+                          {EMPTY_WEAK_POINTER},
+                          "",
+                          remaining};
+  charge(remaining, frame);
+  const auto location{frame.traverse(identifier)};
+  if (!location.has_value()) {
+    return;
+  }
+
+  // One of the two can declare the dialect it is read under while the other
+  // inherits it, which says nothing about whether they are the same schema, so
+  // each is held under the dialect it is actually read under. What the document
+  // holds is read under what framing made of it, and the candidate under what
+  // the document it came from says
+  const auto &held_location{location.value().get()};
+  auto held{get(root, to_pointer(held_location.pointer))};
+  if (held.is_object() && !held.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)) {
+    held.assign("$schema", JSON{held_location.dialect});
+  }
+
+  auto candidate{value};
+  if (!defines_dialect && candidate.is_object()) {
+    candidate.assign("$schema",
+                     JSON{declared_dialect(value, remote_dialect_uri)});
+  }
+
+  if (held != candidate) {
+    throw SchemaError(
+        "Conflicting embedded resources with the same identifier");
+  }
+}
+
 auto elevate_embedded_resources(
     JSON &remote, JSON &root, const Pointer &container,
     const SchemaBaseDialect remote_dialect, const SchemaWalker &walker,
@@ -708,8 +756,23 @@ auto elevate_embedded_resources(
       declared_id = value.try_at("id");
     }
     if (declared_id == nullptr || !declared_id->is_string() ||
-        declared_id->to_string() != key ||
         !URI{declared_id->to_string()}.is_absolute()) {
+      continue;
+    }
+
+    // Only an entry whose key says what it declares can be elevated, since the
+    // key is where it would land. What a key says is no guide to what an entry
+    // identifies, though, so one the document already holds under the name it
+    // declares is still held against what is there
+    if (declared_id->to_string() != key) {
+      const JSON::String declared{declared_id->to_string()};
+      if (bundled.contains(declared)) {
+        hold_against_what_the_document_holds(
+            root, value, value.defines("$schema"), walker, resolver,
+            default_dialect, remote_dialect_uri, declared, remaining);
+        to_remove.emplace_back(key);
+      }
+
       continue;
     }
 
@@ -751,6 +814,7 @@ auto elevate_embedded_resources(
 
     const auto defines_dialect{value.defines("$schema")};
     if (bundled.contains(identifier_string)) {
+      auto held{false};
       if (container_exists && root_container->is_object()) {
         for (const auto &root_entry : root_container->as_object()) {
           // Same reasoning as above: rule out what cannot match, and what
@@ -806,8 +870,18 @@ auto elevate_embedded_resources(
             }
           }
 
+          held = true;
           break;
         }
+      }
+
+      // The container is only where bundling puts things. What the document
+      // held to begin with can be anywhere, and dropping this one without
+      // looking there loses a schema that disagrees with what stays
+      if (!held) {
+        hold_against_what_the_document_holds(
+            root, value, defines_dialect, walker, resolver, default_dialect,
+            remote_dialect_uri, identifier_string, remaining);
       }
 
       to_remove.emplace_back(key);
