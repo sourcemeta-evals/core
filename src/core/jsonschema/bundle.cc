@@ -623,15 +623,31 @@ auto settle_positional_references(
   }
 }
 
+// A dialect spelled two ways is one dialect, so each side of a comparison says
+// the canonical spelling of whatever it is read under. What a frame answers is
+// canonical already, where what a document declares for itself has been
+// through nothing of the sort
+auto say_what_it_is_read_under(JSON &schema, const std::string_view dialect)
+    -> void {
+  if (!schema.is_object()) {
+    return;
+  }
+
+  schema.assign("$schema",
+                JSON{canonical_uri(declared_dialect(schema, dialect))});
+}
+
 // What the document already holds under a name, wherever it sits. The
 // container alone cannot answer that, as a caller may hold a resource
 // anywhere, and holding the two against each other is what keeps a name
 // standing for one schema rather than for two that disagree
-auto hold_against_what_the_document_holds(
-    const JSON &root, const JSON &value, const bool defines_dialect,
-    const SchemaWalker &walker, const SchemaResolver &resolver,
-    std::string_view default_dialect, std::string_view remote_dialect_uri,
-    const JSON::String &identifier, std::uint64_t &remaining) -> void {
+auto hold_against_what_the_document_holds(const JSON &root, const JSON &value,
+                                          const SchemaWalker &walker,
+                                          const SchemaResolver &resolver,
+                                          std::string_view default_dialect,
+                                          std::string_view remote_dialect_uri,
+                                          const JSON::String &identifier,
+                                          std::uint64_t &remaining) -> void {
   const SchemaFrame frame{SchemaFrame::Mode::Locations,
                           root,
                           walker,
@@ -649,21 +665,13 @@ auto hold_against_what_the_document_holds(
   }
 
   // One of the two can declare the dialect it is read under while the other
-  // inherits it, which says nothing about whether they are the same schema, so
-  // each is held under the dialect it is actually read under. What the document
-  // holds is read under what framing made of it, and the candidate under what
-  // the document it came from says
+  // inherits it, and either can spell it its own way, none of which says
+  // anything about whether they are the same schema
   const auto &held_location{location.value().get()};
   auto held{get(root, to_pointer(held_location.pointer))};
-  if (held.is_object() && !held.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)) {
-    held.assign("$schema", JSON{held_location.dialect});
-  }
-
+  say_what_it_is_read_under(held, held_location.dialect);
   auto candidate{value};
-  if (!defines_dialect && candidate.is_object()) {
-    candidate.assign("$schema",
-                     JSON{declared_dialect(value, remote_dialect_uri)});
-  }
+  say_what_it_is_read_under(candidate, remote_dialect_uri);
 
   if (held != candidate) {
     throw SchemaError(
@@ -768,8 +776,8 @@ auto elevate_embedded_resources(
       const JSON::String declared{declared_id->to_string()};
       if (bundled.contains(declared)) {
         hold_against_what_the_document_holds(
-            root, value, value.defines("$schema"), walker, resolver,
-            default_dialect, remote_dialect_uri, declared, remaining);
+            root, value, walker, resolver, default_dialect, remote_dialect_uri,
+            declared, remaining);
         to_remove.emplace_back(key);
       }
 
@@ -880,8 +888,8 @@ auto elevate_embedded_resources(
       // looking there loses a schema that disagrees with what stays
       if (!held) {
         hold_against_what_the_document_holds(
-            root, value, defines_dialect, walker, resolver, default_dialect,
-            remote_dialect_uri, identifier_string, remaining);
+            root, value, walker, resolver, default_dialect, remote_dialect_uri,
+            identifier_string, remaining);
       }
 
       to_remove.emplace_back(key);
