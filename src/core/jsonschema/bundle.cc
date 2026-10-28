@@ -1087,6 +1087,16 @@ auto embed_references(
     JSON::String effective_id{remote_id.empty() ? JSON::String{identifier}
                                                 : JSON::String{remote_id}};
 
+    // What was fetched under one name can answer to another that the document
+    // already holds, and one identity in two places is not a document anything
+    // can read. Bundling does not keep what it put in, so it cannot tell two
+    // documents fetched under different names apart, and saying so is the only
+    // answer that never drops a disagreement between them
+    if (bundled.contains(effective_id)) {
+      throw SchemaError(
+          "Conflicting embedded resources with the same identifier");
+    }
+
     // Whether the dialect of the remote has a way to name it at all, which
     // decides between giving it a name and pointing at wherever it lands
     const auto dialect_allows_naming{dialect_defines_identifier(
