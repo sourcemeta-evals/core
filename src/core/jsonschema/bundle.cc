@@ -516,28 +516,30 @@ auto settle_positional_references(
       host_container.push_back(copy.keyword);
       const std::pair<Pointer, JSON::String> seen{host_container,
                                                   copy.identifier};
+      const auto &landing{positional.landings.at(copy.identifier)};
+
+      // A resource the landing carries answers to the name it declared, and
+      // one identity in two places is not a document anything can read. So
+      // the copy says that name where the resource sat, which reaches the
+      // one that stayed, and a resource that names its own anonymous parent
+      // stops the copying there rather than inside itself
+      std::map<Pointer, JSON::String> carried;
+      frame.for_each_resource(
+          [&carried, &landing](const auto &, const auto &location) -> void {
+            const auto position{to_pointer(location.pointer)};
+            if (position.size() <= landing.size() ||
+                !position.starts_with(landing)) {
+              return;
+            }
+
+            carried.insert_or_assign(position.resolve_from(landing),
+                                     JSON::String{location.base});
+          });
+
       const auto hit{placed.find(seen)};
       if (hit == placed.cend()) {
-        const auto &landing{positional.landings.at(copy.identifier)};
         auto duplicate{JSON{get(schema, landing)}};
 
-        // A resource the landing carries answers to the name it declared, and
-        // one identity in two places is not a document anything can read. So
-        // the copy says that name where the resource sat, which reaches the
-        // one that stayed, and a resource that names its own anonymous parent
-        // stops the copying there rather than inside itself
-        std::map<Pointer, JSON::String> carried;
-        frame.for_each_resource(
-            [&carried, &landing](const auto &, const auto &location) -> void {
-              const auto position{to_pointer(location.pointer)};
-              if (position.size() <= landing.size() ||
-                  !position.starts_with(landing)) {
-                return;
-              }
-
-              carried.insert_or_assign(position.resolve_from(landing),
-                                       JSON::String{location.base});
-            });
         // The copy was taken from what the document already holds, so what
         // it carried is what that name reaches. Holding the two against each
         // other is what keeps the name standing in for the same schema rather
@@ -582,14 +584,37 @@ auto settle_positional_references(
         settled = false;
       }
 
-      Pointer target{copy.keyword};
-      target.push_back(JSON::String{placed.at(seen)});
+      // What the reference named can sit inside a resource that the copy says
+      // by name rather than by holding, where naming the place within the copy
+      // reaches nothing at all. Saying that name and whatever the reference
+      // named within it reaches the resource that stayed, and the name the
+      // copy says is the outermost one, so that is the one to say here too
+      std::optional<JSON::String> spelled;
       if (copy.tail.has_value()) {
-        target.push_back(Pointer{copy.tail.value()});
+        for (const auto &[position, name] : carried) {
+          if (!copy.tail.value().starts_with(position)) {
+            continue;
+          }
+
+          const auto suffix{copy.tail.value().resolve_from(position)};
+          spelled = suffix.empty()
+                        ? name
+                        : JSON::String{to_uri(suffix, URI{name}).recompose()};
+          break;
+        }
       }
 
-      rewrites.insert_or_assign(copy.reference,
-                                JSON::String{to_uri(target).recompose()});
+      if (!spelled.has_value()) {
+        Pointer target{copy.keyword};
+        target.push_back(JSON::String{placed.at(seen)});
+        if (copy.tail.has_value()) {
+          target.push_back(Pointer{copy.tail.value()});
+        }
+
+        spelled = JSON::String{to_uri(target).recompose()};
+      }
+
+      rewrites.insert_or_assign(copy.reference, std::move(spelled).value());
     }
   }
 
