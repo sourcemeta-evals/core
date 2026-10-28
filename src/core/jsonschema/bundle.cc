@@ -1301,6 +1301,22 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
             "Could not bundle to a container that the dialect does not "
             "reserve for schema definitions");
       }
+
+      // Where a reference overrides what sits beside it, a container beside
+      // one is read by nobody. A root that is nothing but a reference is made
+      // to hold both further down, as there is nowhere else a container could
+      // go, and anywhere deeper than the place a reference sits goes unframed
+      // and is answered above
+      const auto *parent_value{try_get(schema, parent_pointer)};
+      if (!parent_pointer.empty() && parent_value != nullptr &&
+          parent_value->is_object() &&
+          parent_value->defines("$ref"sv, JSONSCHEMA_HASH_REF) &&
+          ref_overrides_adjacent_keywords(parent.value().get().base_dialect)) {
+        throw SchemaContainerError(
+            default_container.value(),
+            "Could not bundle to a container beside a reference that "
+            "overrides it");
+      }
     }
 
     // A container the caller named goes in beside whatever is already at the
