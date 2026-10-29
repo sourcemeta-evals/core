@@ -3,6 +3,7 @@
 #include <sourcemeta/core/uri.h>
 
 #include "helpers.h"
+#include "iterator.h"
 
 #include <algorithm>     // std::ranges::any_of, std::ranges::none_of
 #include <cassert>       // assert
@@ -190,6 +191,10 @@ auto mark_dialect_of_every_subschema(JSON &schema, const SchemaWalker &walker,
     // A boolean carries no keyword whose meaning could have differed, so
     // leaving it to inherit costs nothing
     if (subschema.is_object()) {
+      // A mark says what this is read under, so a declaration beside it is
+      // read by nobody, and where this lands a declaration is not something
+      // a subschema is allowed to carry at all unless it names itself
+      subschema.erase("$schema"sv, JSONSCHEMA_HASH_SCHEMA);
       subschema.assign(JSON::String{DIALECT_OVERRIDE_KEYWORD},
                        JSON{JSON::String{dialect}});
     }
@@ -1258,6 +1263,21 @@ auto embed_references(
     // Working these out can cost a meta-schema to resolve, so it happens once
     const auto &remote_vocabularies{
         remote_root_frame->vocabularies(remote_root, resolver)};
+
+    // Asking of the root here is what answers before anything is fetched on
+    // its behalf, where every other walk of the document answers as it goes.
+    // What a declaration leaves to read it by is a question of the dialect it
+    // names, which a document saying from outside what to read it under has
+    // settled for itself, so the dialect in force only says when to ask
+    if (remote.is_object() &&
+        !dialect_defines(walker, remote_vocabularies, "$schema"sv)) {
+      const auto *declared{remote.try_at("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
+      if (declared != nullptr && declared->is_string() &&
+          !declaration_counts(remote, declared->to_string(), resolver,
+                              walker)) {
+        throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
+      }
+    }
 
     const auto remote_base_dialect{remote_root.base_dialect};
     auto remote_id = remote_root_frame->root();
