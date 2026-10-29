@@ -230,9 +230,23 @@ struct KnownResources {
   JSON::String default_base;
 };
 
-auto is_known(const KnownResources &known, const std::string_view name)
+// Whether anything was recorded against this name at all, which includes a
+// name something was only fetched by, since a reference that says one is
+// answered by whatever came back
+auto is_recorded(const KnownResources &known, const std::string_view name)
     -> bool {
   return known.names.contains(canonical_uri(name));
+}
+
+// Whether the document holds this name itself. Where something was fetched
+// from says nothing about what it is, as what came back carries its own name,
+// so two resources are not one just because one of them was retrieved from
+// where the other's name points
+auto is_known(const KnownResources &known, const std::string_view name)
+    -> bool {
+  const auto match{known.names.find(canonical_uri(name))};
+  return match != known.names.cend() &&
+         canonical_uri(match->second) == canonical_uri(name);
 }
 
 auto answers_to(const KnownResources &known, const std::string_view name)
@@ -375,13 +389,58 @@ struct PositionalCopy {
   bool carries_its_dialect;
 };
 
+// Elevation lifts a resource out of the copy that lands, so a place named
+// inside one is no longer where the reference that named it said. Saying the
+// name of what moved reaches the same schema, but only where what the
+// reference named is still inside it: one that named nothing to begin with
+// names nothing here either
+enum class Moved : std::uint8_t { Nothing, Rewritten, Nowhere };
+
+auto rewrite_into_what_elevation_moved(
+    const JSON &schema, const SchemaFrame &frame, const Pointer &tail,
+    const std::vector<Elevated> &elevated, const Pointer &position,
+    std::map<Pointer, JSON::String> &rewrites) -> Moved {
+  auto covered{Moved::Nothing};
+  for (const auto &moved : elevated) {
+    if (!tail.starts_with(moved.at)) {
+      continue;
+    }
+
+    // Whatever it names, the reference named it inside this one, so leaving it
+    // where it is would leave a reference to nowhere behind
+    covered = Moved::Nowhere;
+
+    const auto &identifier{moved.identifier};
+    const auto suffix{tail.resolve_from(moved.at)};
+    const auto landed{frame.traverse(identifier)};
+    if (!landed.has_value()) {
+      continue;
+    }
+
+    auto within_resource{to_pointer(landed.value().get().pointer)};
+    within_resource.push_back(Pointer{suffix});
+    if (try_get(schema, within_resource) == nullptr) {
+      continue;
+    }
+
+    rewrites.insert_or_assign(
+        position,
+        suffix.empty()
+            ? identifier
+            : JSON::String{to_uri(suffix, URI{identifier}).recompose()});
+    return Moved::Rewritten;
+  }
+
+  return covered;
+}
+
 auto settle_positional_references(
     JSON &schema, const SchemaWalker &walker, const SchemaResolver &resolver,
     std::string_view default_dialect, std::string_view default_id,
     const SchemaFrame::Paths &paths, std::string_view default_base,
     const PositionalReferences &positional, std::uint64_t &remaining,
     const SchemaBundleOptions::Callback &callback) -> void {
-  if (positional.unnamed.empty()) {
+  if (positional.unnamed.empty() && positional.elevations.empty()) {
     return;
   }
 
@@ -436,7 +495,26 @@ auto settle_positional_references(
                                             const auto &reference) -> void {
       const JSON::String base{reference.base};
       const auto landing{positional.landings.find(base)};
+      const auto elevated{positional.elevations.find(base)};
       if (landing == positional.landings.cend()) {
+        // A remote that carries its own name is reached by that name wherever
+        // it goes, so nothing recorded where it landed. What it carried can
+        // still have been moved out from under a reference that named a place
+        // inside it
+        if (elevated != positional.elevations.cend() &&
+            reference.fragment.has_value() &&
+            !reference.fragment.value().empty()) {
+          const auto moved{fragment_to_pointer(URI{reference.destination})};
+          if (moved.has_value() &&
+              rewrite_into_what_elevation_moved(
+                  schema, frame, moved.value(), elevated->second,
+                  to_pointer(pointer), rewrites) == Moved::Nowhere) {
+            throw SchemaReferenceError(reference.destination,
+                                       to_pointer(pointer),
+                                       "Could not resolve schema reference");
+          }
+        }
+
         return;
       }
 
@@ -464,23 +542,11 @@ auto settle_positional_references(
         // declared, which is the key it sat under, so saying that name and
         // whatever the reference named within it reaches the same schema from
         // wherever the reference is written
-        const auto elevated{positional.elevations.find(base)};
-        if (tail.has_value() && elevated != positional.elevations.cend()) {
-          for (const auto &moved : elevated->second) {
-            if (!tail.value().starts_with(moved.at)) {
-              continue;
-            }
-
-            const auto &identifier{moved.identifier};
-            const auto suffix{tail.value().resolve_from(moved.at)};
-            rewrites.insert_or_assign(
-                to_pointer(pointer),
-                suffix.empty()
-                    ? identifier
-                    : JSON::String{
-                          to_uri(suffix, URI{identifier}).recompose()});
-            return;
-          }
+        if (tail.has_value() && elevated != positional.elevations.cend() &&
+            rewrite_into_what_elevation_moved(
+                schema, frame, tail.value(), elevated->second,
+                to_pointer(pointer), rewrites) == Moved::Rewritten) {
+          return;
         }
 
         throw SchemaReferenceError(reference.destination, to_pointer(pointer),
@@ -830,10 +896,13 @@ auto elevate_embedded_resources(
     std::string_view remote_identifier, KnownResources &known,
     PositionalReferences &positional, std::uint64_t &remaining,
     const SchemaBundleOptions::Callback &callback) -> void {
+  // A remote can say what it is read under by a mark rather than by
+  // `$schema`, which is the only way a dialect that reserves no keyword for
+  // saying so can be carried, and what it says is where its definitions live
+  const auto remote_dialect_uri{dialect(remote, default_dialect, true)};
   const auto keyword{definitions_keyword(
-      walker,
-      vocabularies_with_embedded(remote, resolver, remote_dialect,
-                                 declared_dialect(remote, default_dialect)))};
+      walker, vocabularies_with_embedded(remote, resolver, remote_dialect,
+                                         remote_dialect_uri))};
   const JSON::String keyword_string{keyword};
   if (keyword.empty() || !remote.is_object() ||
       !remote.defines(keyword_string) ||
@@ -842,7 +911,6 @@ auto elevate_embedded_resources(
   }
 
   auto &defs{remote.at(keyword_string)};
-  const auto remote_dialect_uri{declared_dialect(remote, default_dialect)};
 
   // A schema finds a meta-schema it pins by looking for it among the locations
   // the specifications reserve, at the top of the document it is reading. A
@@ -883,39 +951,20 @@ auto elevate_embedded_resources(
   for (const auto &entry : defs.as_object()) {
     const auto &key{entry.first};
     const auto &value{entry.second};
-    // Only an entry that declares an absolute identifier matching its key can
-    // ever be elevated, and framing rejects the fragment-only identifiers that
-    // older drafts use for anchors. Rule those out before paying for a frame
+    // Framing says what an entry identifies, and which keyword carries that is
+    // the dialect's answer rather than this loop's, so the presence of either
+    // is only a reason to ask. Most entries identify nothing at all, which is
+    // what rules them out before paying for a frame
     if (!value.is_object()) {
       continue;
     }
-    const auto *declared_id{value.try_at("$id")};
+
+    const auto *declared_id{value.try_at("$id"sv, JSONSCHEMA_HASH_ID)};
     if (declared_id == nullptr) {
-      declared_id = value.try_at("id");
-    }
-    if (declared_id == nullptr || !declared_id->is_string() ||
-        !URI{declared_id->to_string()}.is_absolute()) {
-      continue;
+      declared_id = value.try_at("id"sv, JSONSCHEMA_HASH_LEGACY_ID);
     }
 
-    // Only an entry whose key says what it declares can be elevated, since the
-    // key is where it would land. What a key says is no guide to what an entry
-    // identifies, though, so one the document already holds under the name it
-    // declares is still held against what is there
-    if (declared_id->to_string() != key) {
-      const JSON::String declared{declared_id->to_string()};
-      if (is_known(known, declared)) {
-        // Dropping one that nothing was held against is how a schema that
-        // disagrees goes missing, so it stays where it is unless something
-        // answered for it
-        if (hold_against_what_is_known(
-                root, container, value, known, walker, resolver,
-                default_dialect, remote_dialect_uri, declared, remaining)) {
-          to_remove.push_back({.key = key, .identifier = declared});
-        }
-      }
-
-      record(known, declared, declared);
+    if (declared_id == nullptr || !declared_id->is_string()) {
       continue;
     }
 
@@ -933,12 +982,32 @@ auto elevate_embedded_resources(
                             remaining};
     charge(remaining, entry_frame);
     const auto &identifier{entry_frame.root()};
-    if (identifier.empty() || identifier != key ||
-        !URI{identifier}.is_absolute()) {
+    if (identifier.empty() || !URI{identifier}.is_absolute()) {
       continue;
     }
 
     const JSON::String identifier_string{identifier};
+    // Only an entry whose key says what it identifies can be elevated, since
+    // the key is where it would land. What a key says is no guide to what an
+    // entry identifies, though, so one the document already holds under the
+    // name this one identifies is still held against what is there
+    if (identifier != key) {
+      if (is_known(known, identifier_string)) {
+        // Dropping one that nothing was held against is how a schema that
+        // disagrees goes missing, so it stays where it is unless something
+        // answered for it
+        if (hold_against_what_is_known(root, container, value, known, walker,
+                                       resolver, default_dialect,
+                                       remote_dialect_uri, identifier_string,
+                                       remaining)) {
+          to_remove.push_back({.key = key, .identifier = identifier_string});
+        }
+      }
+
+      record(known, identifier_string, identifier_string);
+      continue;
+    }
+
     if (pinned.contains(canonical_uri(identifier))) {
       // Staying put is the only way this one goes on being found, so the
       // document cannot also hold it elsewhere: one identity in two places is
@@ -955,7 +1024,8 @@ auto elevate_embedded_resources(
       continue;
     }
 
-    const auto defines_dialect{value.defines("$schema")};
+    const auto defines_dialect{
+        value.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
     if (is_known(known, identifier_string)) {
       // What the document holds under this name can be anywhere, including the
       // container bundling puts things in, so there is one question rather
@@ -1118,7 +1188,7 @@ auto embed_references(
     assert(!reference.base.empty());
     const JSON::String identifier{reference.base};
 
-    if (is_known(known, identifier)) {
+    if (is_recorded(known, identifier)) {
       // A target that went in without a name answers to nothing, so this
       // reference is settled against the finished document rather than here.
       // Spelling it out in full is what lets that pass recognise it, since a
@@ -1601,6 +1671,15 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
         dialect_defines_identifier(
             walker, declared_frame.vocabularies(root_location, resolver),
             root_location.base_dialect)) {
+      // A root that is nothing but a reference has nowhere to keep a name it
+      // is handed, as the reference overrides whatever sits beside it, so it
+      // is made to hold both before the name goes in. A root that holds
+      // anything else beside its reference is answered further down, where
+      // saying so does not depend on the caller having named it
+      if (schema.is_object() && schema.size() == 1) {
+        prepare_root_reference(schema, root_location.base_dialect);
+      }
+
       schema_reidentify(schema, default_id, walker, resolver, default_dialect);
     }
   }
