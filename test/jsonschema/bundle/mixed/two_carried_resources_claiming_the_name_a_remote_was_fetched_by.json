@@ -1,0 +1,55 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "$ref": "https://example.com/a"
+      },
+      {
+        "$ref": "https://www.sourcemeta.com/first"
+      },
+      {
+        "$ref": "https://www.sourcemeta.com/second"
+      }
+    ]
+  },
+  "resolver": {
+    "https://example.com/a": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/common",
+      "type": "string"
+    },
+    "https://www.sourcemeta.com/first": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://www.sourcemeta.com/first",
+      "properties": {
+        "copy": {
+          "$id": "https://example.com/a",
+          "type": "number"
+        }
+      }
+    },
+    "https://www.sourcemeta.com/second": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://www.sourcemeta.com/second",
+      "properties": {
+        "copy": {
+          "$id": "https://example.com/a",
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "result": {},
+  "inserted": {},
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaError",
+      "message": "Conflicting embedded resources with the same identifier"
+    },
+    "references": {
+      "type": "SchemaError",
+      "message": "Conflicting embedded resources with the same identifier"
+    }
+  }
+}

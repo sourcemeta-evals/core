@@ -206,10 +206,6 @@ auto canonical_uri(const std::string_view uri) -> JSON::String {
   }
 }
 
-// What the document already answers to, and what the name it answers to is
-// spelled as where a reference has to say it. A name is held canonically, as
-// the same name spelled two ways is one name, while what a reference is
-// rewritten to stays the spelling the document itself uses
 // A resource on its way into the document, kept so that one arriving before
 // it does can still be held against it
 struct Pending {
@@ -218,7 +214,16 @@ struct Pending {
 };
 
 struct KnownResources {
+  // What the document already answers to, and what the name it answers to is
+  // spelled as where a reference has to say it. A name is held canonically, as
+  // the same name spelled two ways is one name, while what a reference is
+  // rewritten to stays the spelling the document itself uses
   std::unordered_map<JSON::String, JSON::String> names;
+  // Which of those names the document says of itself, which a name it was
+  // only fetched by never becomes however many times it is asked for. Reading
+  // one off the other would let a name the document goes on answering to
+  // elsewhere be claimed as an identity without anything noticing
+  std::unordered_set<JSON::String> declared;
   // What a later pass will place. A name is answered from here first, as the
   // document does not hold it yet
   std::unordered_map<JSON::String, Pending> pending;
@@ -244,9 +249,7 @@ auto is_recorded(const KnownResources &known, const std::string_view name)
 // where the other's name points
 auto is_known(const KnownResources &known, const std::string_view name)
     -> bool {
-  const auto match{known.names.find(canonical_uri(name))};
-  return match != known.names.cend() &&
-         canonical_uri(match->second) == canonical_uri(name);
+  return known.declared.contains(canonical_uri(name));
 }
 
 auto answers_to(const KnownResources &known, const std::string_view name)
@@ -256,7 +259,14 @@ auto answers_to(const KnownResources &known, const std::string_view name)
 
 auto record(KnownResources &known, const std::string_view name,
             const JSON::String &identity) -> void {
-  known.names.emplace(canonical_uri(name), identity);
+  auto canonical{canonical_uri(name)};
+  if (canonical == canonical_uri(identity)) {
+    known.declared.insert(canonical);
+  }
+
+  // What a name was first answered by is what every reference that says it
+  // means, as that is what bundling went and got
+  known.names.emplace(std::move(canonical), identity);
 }
 
 auto expect(KnownResources &known, const std::string_view name,
@@ -666,59 +676,27 @@ auto settle_positional_references(
                                      JSON::String{location.base});
           });
 
-      const auto hit{placed.find(seen)};
-      if (hit == placed.cend()) {
-        auto duplicate{JSON{get(schema, landing)}};
-
-        // The copy was taken from what the document already holds, so what
-        // it carried is what that name reaches. Holding the two against each
-        // other is what keeps the name standing in for the same schema rather
-        // than for another one that answers to it. Every one of them is held
-        // first, as saying a name where a resource sat takes away whatever
-        // sat under it
-        for (const auto &[position, name] : carried) {
-          const auto resolved{frame.traverse(name)};
-          if (!resolved.has_value() ||
-              get(schema, to_pointer(resolved.value().get().pointer)) !=
-                  get(duplicate, position)) {
-            throw SchemaError(
-                "Conflicting embedded resources with the same identifier");
-          }
+      // What the landing already holds is what each of those names reaches.
+      // Holding the two against each other is what keeps a name standing in
+      // for the same schema rather than for another one that answers to it,
+      // and it is asked wherever one of them is said, as a copy is not what
+      // brings two schemas of one name about
+      for (const auto &[position, name] : carried) {
+        const auto resolved{frame.traverse(name)};
+        if (!resolved.has_value() ||
+            get(schema, to_pointer(resolved.value().get().pointer)) !=
+                get(schema, landing.concat(position))) {
+          throw SchemaError(
+              "Conflicting embedded resources with the same identifier");
         }
-
-        // A resource that another carried resource holds is reached through
-        // the name of the one that holds it, so saying the outermost name is
-        // saying all of them
-        std::optional<Pointer> said;
-        for (const auto &[position, name] : carried) {
-          if (said.has_value() && position.starts_with(said.value())) {
-            continue;
-          }
-
-          auto named{JSON::make_object()};
-          named.assign("$ref", JSON{name});
-          set(duplicate, position, std::move(named));
-          said = position;
-        }
-
-        // Where it came from said what it was by sitting where it sat, and the
-        // place it goes to says something else, so the copy has to say it
-        if (copy.carries_its_dialect) {
-          mark_dialect_of_every_subschema(duplicate, walker, resolver,
-                                          copy.dialect, remaining);
-        }
-
-        placed.emplace(seen,
-                       embed_schema(schema, host_container, copy.identifier,
-                                    std::move(duplicate), callback));
-        settled = false;
       }
 
-      // What the reference named can sit inside a resource that the copy says
-      // by name rather than by holding, where naming the place within the copy
-      // reaches nothing at all. Saying that name and whatever the reference
-      // named within it reaches the resource that stayed, and the name the
-      // copy says is the outermost one, so that is the one to say here too
+      // What the reference named can sit inside a resource that answers to a
+      // name of its own, which reaches the resource that stayed from anywhere
+      // at all. Saying that name is both shorter and the whole of what this
+      // reference needs, so nothing has to be copied on its behalf. The name
+      // the copy would say is the outermost one, so that is the one to say
+      // here too
       std::optional<JSON::String> spelled;
       if (copy.tail.has_value()) {
         for (const auto &[position, name] : carried) {
@@ -735,6 +713,37 @@ auto settle_positional_references(
       }
 
       if (!spelled.has_value()) {
+        if (!placed.contains(seen)) {
+          auto duplicate{JSON{get(schema, landing)}};
+
+          // A resource that another carried resource holds is reached through
+          // the name of the one that holds it, so saying the outermost name is
+          // saying all of them
+          std::optional<Pointer> said;
+          for (const auto &[position, name] : carried) {
+            if (said.has_value() && position.starts_with(said.value())) {
+              continue;
+            }
+
+            auto named{JSON::make_object()};
+            named.assign("$ref", JSON{name});
+            set(duplicate, position, std::move(named));
+            said = position;
+          }
+
+          // Where it came from said what it was by sitting where it sat, and
+          // the place it goes to says something else, so the copy has to say it
+          if (copy.carries_its_dialect) {
+            mark_dialect_of_every_subschema(duplicate, walker, resolver,
+                                            copy.dialect, remaining);
+          }
+
+          placed.emplace(seen,
+                         embed_schema(schema, host_container, copy.identifier,
+                                      std::move(duplicate), callback));
+          settled = false;
+        }
+
         Pointer target{copy.keyword};
         target.push_back(JSON::String{placed.at(seen)});
         if (copy.tail.has_value()) {
@@ -1246,18 +1255,9 @@ auto embed_references(
     }
 
     const auto &remote_root{remote_root_frame->root_location().value().get()};
-    // Both of the questions below are of the same vocabularies, and working
-    // them out can cost a meta-schema to resolve, so it happens once
+    // Working these out can cost a meta-schema to resolve, so it happens once
     const auto &remote_vocabularies{
         remote_root_frame->vocabularies(remote_root, resolver)};
-
-    // Asking of the root here is what answers before anything is fetched on
-    // its behalf, where every other walk of the document answers as it goes
-    if (remote.is_object() &&
-        remote.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA) &&
-        !dialect_defines(walker, remote_vocabularies, "$schema"sv)) {
-      throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
-    }
 
     const auto remote_base_dialect{remote_root.base_dialect};
     auto remote_id = remote_root_frame->root();
@@ -1538,6 +1538,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   // as bundled to avoid re-embedding them. This includes the root schema itself
   // and any schemas already embedded within it
   KnownResources known{.names = {},
+                       .declared = {},
                        .pending = {},
                        .paths = paths,
                        .default_id = JSON::String{default_id},

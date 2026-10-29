@@ -74,18 +74,6 @@
             "anon": {
               "$ref": "https://example.com/child#/properties/name"
             }
-          },
-          "$defs": {
-            "https://www.sourcemeta.com/anon": {
-              "type": "object",
-              "properties": {
-                "c": {
-                  "$ref": "https://example.com/child",
-                  "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
-                }
-              },
-              "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
-            }
           }
         },
         "https://www.sourcemeta.com/pet": {
@@ -128,18 +116,6 @@
             "anon": {
               "$ref": "https://example.com/child#/properties/name"
             }
-          },
-          "$defs": {
-            "https://www.sourcemeta.com/anon": {
-              "type": "object",
-              "properties": {
-                "c": {
-                  "$ref": "https://example.com/child",
-                  "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
-                }
-              },
-              "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
-            }
           }
         },
         "https://www.sourcemeta.com/pet": {
@@ -161,10 +137,6 @@
         "at": "/x-definitions/https:~1~1www.sourcemeta.com~1anon"
       },
       {
-        "from": "https://www.sourcemeta.com/anon",
-        "at": "/x-definitions/https:~1~1www.sourcemeta.com~1inner/$defs/https:~1~1www.sourcemeta.com~1anon"
-      },
-      {
         "from": "https://www.sourcemeta.com/inner",
         "at": "/x-definitions/https:~1~1www.sourcemeta.com~1inner"
       },
@@ -177,10 +149,6 @@
       {
         "from": "https://www.sourcemeta.com/anon",
         "at": "/x-definitions/https:~1~1www.sourcemeta.com~1anon"
-      },
-      {
-        "from": "https://www.sourcemeta.com/anon",
-        "at": "/x-definitions/https:~1~1www.sourcemeta.com~1inner/$defs/https:~1~1www.sourcemeta.com~1anon"
       },
       {
         "from": "https://www.sourcemeta.com/inner",
