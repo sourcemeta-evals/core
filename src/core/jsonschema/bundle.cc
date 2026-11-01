@@ -99,6 +99,126 @@ auto charge(std::uint64_t &remaining, const SchemaFrame &frame) -> void {
   remaining -= frame.location_count();
 }
 
+// What a schema says of itself, said the one way, so that two copies of one
+// resource can be held against each other on what they mean rather than on how
+// each was written. A name spelled against a base, one carrying the empty
+// fragment the specifications say names the same resource, and a dialect
+// spelled either way all read as something else otherwise, at any depth. Which
+// places say anything of themselves is the frame's answer, since a value a
+// schema carries can spell the same members and be none of it. A copy the
+// frame cannot take on its own is left as written, which is the stricter
+// answer rather than a wrong one
+auto say_what_it_says_of_itself(JSON &schema, const SchemaWalker &walker,
+                                const SchemaResolver &resolver,
+                                const std::string_view dialect,
+                                const std::string_view identifier,
+                                std::uint64_t &remaining) -> void {
+  if (!schema.is_object()) {
+    return;
+  }
+
+  struct Place {
+    Pointer position;
+    JSON::String base;
+    JSON::String dialect;
+    bool names_itself;
+  };
+
+  std::vector<Place> places;
+  std::vector<std::pair<Pointer, JSON::String>> reaches;
+  try {
+    const SchemaFrame frame{SchemaFrame::Mode::References,
+                            schema,
+                            walker,
+                            resolver,
+                            dialect,
+                            identifier,
+                            SchemaFrame::IdentifierMode::Additional,
+                            {EMPTY_WEAK_POINTER},
+                            "",
+                            remaining};
+    charge(remaining, frame);
+    frame.for_each_subschema([&places](const auto &location) -> void {
+      places.push_back({.position = to_pointer(location.pointer),
+                        .base = JSON::String{location.base},
+                        .dialect = canonical_uri(location.dialect),
+                        .names_itself = location.type ==
+                                        SchemaFrame::LocationType::Resource});
+    });
+    // What a reference reaches is settled against whatever base is in force
+    // where it is written, so one copy spelling it against that base and
+    // another spelling it in full reach the same schema
+    frame.for_each_reference([&reaches](const auto, const auto &pointer,
+                                        const auto &reference) -> void {
+      reaches.emplace_back(to_pointer(pointer),
+                           JSON::String{reference.destination});
+    });
+  } catch (const SchemaError &) {
+    return;
+  }
+
+  for (const auto &place : places) {
+    auto &target{get(schema, place.position)};
+    if (!target.is_object()) {
+      continue;
+    }
+
+    // A mark says what a schema is read under as much as a declaration does,
+    // and the declaration written below says it the one way, so the mark has
+    // nothing left to add. One side declaring where the other inherits says
+    // nothing either, which is why this is written wherever the frame reached
+    target.erase(DIALECT_OVERRIDE_KEYWORD, JSONSCHEMA_HASH_DIALECT_OVERRIDE);
+    target.assign("$schema", JSON{place.dialect});
+
+    if (!place.names_itself) {
+      continue;
+    }
+
+    // Which keyword carries the name is the schema's own answer, as writing
+    // one it does not read by would be saying something it never said
+    if (target.defines("$id"sv, JSONSCHEMA_HASH_ID)) {
+      target.assign("$id", JSON{place.base});
+    }
+
+    if (target.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID)) {
+      target.assign("id", JSON{place.base});
+    }
+  }
+
+  for (const auto &[position, destination] : reaches) {
+    set(schema, position, JSON{destination});
+  }
+
+  // The name the comparison is being made under is settled already, and a copy
+  // may spell it against whatever base it came from, which the frame above has
+  // nothing to resolve against
+  const auto settled{canonical_uri(identifier)};
+  if (schema.defines("$id"sv, JSONSCHEMA_HASH_ID)) {
+    schema.assign("$id", JSON{settled});
+  }
+
+  if (schema.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID)) {
+    schema.assign("id", JSON{settled});
+  }
+}
+
+// Whether two copies of one resource say the same thing, which is not the same
+// question as whether either was written the way the other was
+auto says_the_same(const JSON &held, const std::string_view held_dialect,
+                   const JSON &arriving,
+                   const std::string_view arriving_dialect,
+                   const SchemaWalker &walker, const SchemaResolver &resolver,
+                   const JSON::String &identifier, std::uint64_t &remaining)
+    -> bool {
+  auto expected{held};
+  say_what_it_says_of_itself(expected, walker, resolver, held_dialect,
+                             identifier, remaining);
+  auto candidate{arriving};
+  say_what_it_says_of_itself(candidate, walker, resolver, arriving_dialect,
+                             identifier, remaining);
+  return expected == candidate;
+}
+
 // A schema of a dialect that cannot name itself answers to nothing once it is
 // embedded, so every reference to one has to spell out where it went. Neither
 // half is known where the reference is found: the embedding settles the
@@ -689,9 +809,14 @@ auto settle_positional_references(
       // brings two schemas of one name about
       for (const auto &[position, name] : carried) {
         const auto resolved{frame.traverse(name)};
-        if (!resolved.has_value() ||
-            get(schema, to_pointer(resolved.value().get().pointer)) !=
-                get(schema, landing.concat(position))) {
+        const auto inside{landing.concat(position)};
+        const auto within{frame.traverse(to_weak_pointer(inside))};
+        if (!resolved.has_value() || !within.has_value() ||
+            !says_the_same(
+                get(schema, to_pointer(resolved.value().get().pointer)),
+                resolved.value().get().dialect, get(schema, inside),
+                within.value().get().dialect, walker, resolver, name,
+                remaining)) {
           throw SchemaError(
               "Conflicting embedded resources with the same identifier");
         }
@@ -768,109 +893,6 @@ auto settle_positional_references(
   }
 }
 
-// What a schema says of itself, said the one way, so that two copies of one
-// resource can be held against each other on what they mean rather than on how
-// each was written. A name spelled against a base, one carrying the empty
-// fragment the specifications say names the same resource, and a dialect
-// spelled either way all read as something else otherwise, at any depth. Which
-// places say anything of themselves is the frame's answer, since a value a
-// schema carries can spell the same members and be none of it. A copy the
-// frame cannot take on its own is left as written, which is the stricter
-// answer rather than a wrong one
-auto say_what_it_says_of_itself(JSON &schema, const SchemaWalker &walker,
-                                const SchemaResolver &resolver,
-                                const std::string_view dialect,
-                                const std::string_view identifier,
-                                std::uint64_t &remaining) -> void {
-  if (!schema.is_object()) {
-    return;
-  }
-
-  struct Place {
-    Pointer position;
-    JSON::String base;
-    JSON::String dialect;
-    bool names_itself;
-  };
-
-  std::vector<Place> places;
-  std::vector<std::pair<Pointer, JSON::String>> reaches;
-  try {
-    const SchemaFrame frame{SchemaFrame::Mode::References,
-                            schema,
-                            walker,
-                            resolver,
-                            dialect,
-                            identifier,
-                            SchemaFrame::IdentifierMode::Additional,
-                            {EMPTY_WEAK_POINTER},
-                            "",
-                            remaining};
-    charge(remaining, frame);
-    frame.for_each_subschema([&places](const auto &location) -> void {
-      places.push_back({.position = to_pointer(location.pointer),
-                        .base = JSON::String{location.base},
-                        .dialect = canonical_uri(location.dialect),
-                        .names_itself = location.type ==
-                                        SchemaFrame::LocationType::Resource});
-    });
-    // What a reference reaches is settled against whatever base is in force
-    // where it is written, so one copy spelling it against that base and
-    // another spelling it in full reach the same schema
-    frame.for_each_reference([&reaches](const auto, const auto &pointer,
-                                        const auto &reference) -> void {
-      reaches.emplace_back(to_pointer(pointer),
-                           JSON::String{reference.destination});
-    });
-  } catch (const SchemaError &) {
-    return;
-  }
-
-  for (const auto &place : places) {
-    auto &target{get(schema, place.position)};
-    if (!target.is_object()) {
-      continue;
-    }
-
-    // A mark says what a schema is read under as much as a declaration does,
-    // and the declaration written below says it the one way, so the mark has
-    // nothing left to add. One side declaring where the other inherits says
-    // nothing either, which is why this is written wherever the frame reached
-    target.erase(DIALECT_OVERRIDE_KEYWORD, JSONSCHEMA_HASH_DIALECT_OVERRIDE);
-    target.assign("$schema", JSON{place.dialect});
-
-    if (!place.names_itself) {
-      continue;
-    }
-
-    // Which keyword carries the name is the schema's own answer, as writing
-    // one it does not read by would be saying something it never said
-    if (target.defines("$id"sv, JSONSCHEMA_HASH_ID)) {
-      target.assign("$id", JSON{place.base});
-    }
-
-    if (target.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID)) {
-      target.assign("id", JSON{place.base});
-    }
-  }
-
-  for (const auto &[position, destination] : reaches) {
-    set(schema, position, JSON{destination});
-  }
-
-  // The name the comparison is being made under is settled already, and a copy
-  // may spell it against whatever base it came from, which the frame above has
-  // nothing to resolve against
-  const auto settled{canonical_uri(identifier)};
-  if (schema.defines("$id"sv, JSONSCHEMA_HASH_ID)) {
-    schema.assign("$id", JSON{settled});
-  }
-
-  if (schema.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID)) {
-    schema.assign("id", JSON{settled});
-  }
-}
-
 // What the document already holds under a name, wherever it sits. The
 // container alone cannot answer that, as a caller may hold a resource
 // anywhere, and holding the two against each other is what keeps a name
@@ -885,13 +907,9 @@ auto hold_against_what_is_known(
   // arriving first would otherwise be dropped against nothing at all
   const auto pending{known.pending.find(canonical_uri(identifier))};
   if (pending != known.pending.cend()) {
-    auto expected{pending->second.schema};
-    say_what_it_says_of_itself(expected, walker, resolver,
-                               pending->second.dialect, identifier, remaining);
-    auto candidate{value};
-    say_what_it_says_of_itself(candidate, walker, resolver, remote_dialect_uri,
-                               identifier, remaining);
-    if (expected != candidate) {
+    if (!says_the_same(pending->second.schema, pending->second.dialect, value,
+                       remote_dialect_uri, walker, resolver, identifier,
+                       remaining)) {
       throw SchemaError(
           "Conflicting embedded resources with the same identifier");
     }
@@ -943,13 +961,9 @@ auto hold_against_what_is_known(
       // what the one claiming its name arrived reading under. Taking the
       // incoming dialect for both is how two schemas that only look alike are
       // taken for one
-      auto expected{entry.second};
-      say_what_it_says_of_itself(expected, walker, resolver, container_dialect,
-                                 identifier, remaining);
-      auto candidate{value};
-      say_what_it_says_of_itself(candidate, walker, resolver,
-                                 remote_dialect_uri, identifier, remaining);
-      if (expected != candidate) {
+      if (!says_the_same(entry.second, container_dialect, value,
+                         remote_dialect_uri, walker, resolver, identifier,
+                         remaining)) {
         throw SchemaError(
             "Conflicting embedded resources with the same identifier");
       }
@@ -983,14 +997,9 @@ auto hold_against_what_is_known(
   // inherits it, and either can spell it its own way, none of which says
   // anything about whether they are the same schema
   const auto &held_location{location.value().get()};
-  auto held{get(root, to_pointer(held_location.pointer))};
-  say_what_it_says_of_itself(held, walker, resolver, held_location.dialect,
-                             identifier, remaining);
-  auto candidate{value};
-  say_what_it_says_of_itself(candidate, walker, resolver, remote_dialect_uri,
-                             identifier, remaining);
-
-  if (held != candidate) {
+  if (!says_the_same(get(root, to_pointer(held_location.pointer)),
+                     held_location.dialect, value, remote_dialect_uri, walker,
+                     resolver, identifier, remaining)) {
     throw SchemaError(
         "Conflicting embedded resources with the same identifier");
   }
