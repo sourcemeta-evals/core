@@ -278,7 +278,9 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
                 !sourcemeta::core::to_base_dialect(current_dialect)
                      .has_value() &&
                 sourcemeta::core::metaschema_try_embedded(
-                    subschema, current_dialect, effective) != nullptr
+                    subschema, current_dialect, effective) != nullptr &&
+                sourcemeta::core::canonical_uri(current_dialect) !=
+                    sourcemeta::core::canonical_uri(dialect)
             ? &subschema
             : current.pinned_within};
 

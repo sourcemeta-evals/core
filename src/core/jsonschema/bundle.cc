@@ -195,18 +195,8 @@ auto mark_dialect_of_every_subschema(JSON &schema, const SchemaWalker &walker,
       // a subschema is allowed to carry at all unless it names itself
       subschema.erase("$schema"sv, JSONSCHEMA_HASH_SCHEMA);
       subschema.assign(JSON::String{DIALECT_OVERRIDE_KEYWORD},
-                       JSON{JSON::String{dialect}});
+                       JSON{canonical_uri(dialect)});
     }
-  }
-}
-
-// The key this assigns is the only record of where the schema landed, which a
-// reference that names a place rather than an identifier has to be told
-auto canonical_uri(const std::string_view uri) -> JSON::String {
-  try {
-    return URI::canonicalize(uri);
-  } catch (const URIParseError &) {
-    return JSON::String{uri};
   }
 }
 
@@ -782,17 +772,26 @@ auto settle_positional_references(
 // the canonical spelling of whatever it is read under. What a frame answers is
 // canonical already, where what a document declares for itself has been
 // through nothing of the sort
-auto say_what_it_is_read_under(JSON &schema, const std::string_view dialect)
+auto say_what_it_says_of_itself(JSON &schema, const std::string_view dialect)
     -> void {
   if (!schema.is_object()) {
     return;
   }
 
+  // Both sides are already known to claim the same name, and one of them may
+  // spell it relatively where the other was resolved, or carry the empty
+  // fragment the specifications say names the same resource, so how each
+  // spells what it says of itself says nothing about whether they are the
+  // same schema
   schema.assign("$schema", JSON{canonical_uri(
                                sourcemeta::core::dialect(schema, dialect))});
-  // Both sides are already known to claim the same name, and one of them may
-  // spell it relatively where the other was resolved, so how each spells it
-  // says nothing about whether they are the same schema
+  for (const auto name : {"$id"sv, "id"sv}) {
+    const auto *declared{schema.try_at(name)};
+    if (declared != nullptr && declared->is_string()) {
+      schema.assign(JSON::String{name},
+                    JSON{canonical_uri(declared->to_string())});
+    }
+  }
 }
 
 // What the document already holds under a name, wherever it sits. The
@@ -810,9 +809,9 @@ auto hold_against_what_is_known(
   const auto pending{known.pending.find(canonical_uri(identifier))};
   if (pending != known.pending.cend()) {
     auto expected{pending->second.schema};
-    say_what_it_is_read_under(expected, pending->second.dialect);
+    say_what_it_says_of_itself(expected, pending->second.dialect);
     auto candidate{value};
-    say_what_it_is_read_under(candidate, remote_dialect_uri);
+    say_what_it_says_of_itself(candidate, remote_dialect_uri);
     if (expected != candidate) {
       throw SchemaError(
           "Conflicting embedded resources with the same identifier");
@@ -866,9 +865,9 @@ auto hold_against_what_is_known(
       // incoming dialect for both is how two schemas that only look alike are
       // taken for one
       auto expected{entry.second};
-      say_what_it_is_read_under(expected, container_dialect);
+      say_what_it_says_of_itself(expected, container_dialect);
       auto candidate{value};
-      say_what_it_is_read_under(candidate, remote_dialect_uri);
+      say_what_it_says_of_itself(candidate, remote_dialect_uri);
       if (expected != candidate) {
         throw SchemaError(
             "Conflicting embedded resources with the same identifier");
@@ -904,9 +903,9 @@ auto hold_against_what_is_known(
   // anything about whether they are the same schema
   const auto &held_location{location.value().get()};
   auto held{get(root, to_pointer(held_location.pointer))};
-  say_what_it_is_read_under(held, held_location.dialect);
+  say_what_it_says_of_itself(held, held_location.dialect);
   auto candidate{value};
-  say_what_it_is_read_under(candidate, remote_dialect_uri);
+  say_what_it_says_of_itself(candidate, remote_dialect_uri);
 
   if (held != candidate) {
     throw SchemaError(

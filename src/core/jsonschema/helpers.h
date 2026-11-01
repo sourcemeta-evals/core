@@ -159,6 +159,17 @@ inline auto vocabularies_with_embedded(const sourcemeta::core::JSON &schema,
 constexpr auto DEFINITIONS_KEYWORDS{std::to_array<std::string_view>(
     {"$defs", "definitions", EXTENSION_DEFINITIONS_KEYWORD})};
 
+// A name the document or the caller wrote has been through nothing, so what it
+// means is what the canonical form of it says. Input that is no URI at all is
+// left as it is, for whatever meets it next to refuse in its own terms
+inline auto canonical_uri(const std::string_view uri) -> JSON::String {
+  try {
+    return URI::canonicalize(uri);
+  } catch (const URIParseError &) {
+    return JSON::String{uri};
+  }
+}
+
 // Which of those names the dialect in force actually reserves. Asking its own
 // vocabularies rather than its base dialect is what keeps a dialect that drops
 // or renames the location from being handed the one its base dialect would use
