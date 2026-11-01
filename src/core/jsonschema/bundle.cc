@@ -768,29 +768,106 @@ auto settle_positional_references(
   }
 }
 
-// A dialect spelled two ways is one dialect, so each side of a comparison says
-// the canonical spelling of whatever it is read under. What a frame answers is
-// canonical already, where what a document declares for itself has been
-// through nothing of the sort
-auto say_what_it_says_of_itself(JSON &schema, const std::string_view dialect)
-    -> void {
+// What a schema says of itself, said the one way, so that two copies of one
+// resource can be held against each other on what they mean rather than on how
+// each was written. A name spelled against a base, one carrying the empty
+// fragment the specifications say names the same resource, and a dialect
+// spelled either way all read as something else otherwise, at any depth. Which
+// places say anything of themselves is the frame's answer, since a value a
+// schema carries can spell the same members and be none of it. A copy the
+// frame cannot take on its own is left as written, which is the stricter
+// answer rather than a wrong one
+auto say_what_it_says_of_itself(JSON &schema, const SchemaWalker &walker,
+                                const SchemaResolver &resolver,
+                                const std::string_view dialect,
+                                const std::string_view identifier,
+                                std::uint64_t &remaining) -> void {
   if (!schema.is_object()) {
     return;
   }
 
-  // Both sides are already known to claim the same name, and one of them may
-  // spell it relatively where the other was resolved, or carry the empty
-  // fragment the specifications say names the same resource, so how each
-  // spells what it says of itself says nothing about whether they are the
-  // same schema
-  schema.assign("$schema", JSON{canonical_uri(
-                               sourcemeta::core::dialect(schema, dialect))});
-  for (const auto name : {"$id"sv, "id"sv}) {
-    const auto *declared{schema.try_at(name)};
-    if (declared != nullptr && declared->is_string()) {
-      schema.assign(JSON::String{name},
-                    JSON{canonical_uri(declared->to_string())});
+  struct Place {
+    Pointer position;
+    JSON::String base;
+    JSON::String dialect;
+    bool names_itself;
+  };
+
+  std::vector<Place> places;
+  std::vector<std::pair<Pointer, JSON::String>> reaches;
+  try {
+    const SchemaFrame frame{SchemaFrame::Mode::References,
+                            schema,
+                            walker,
+                            resolver,
+                            dialect,
+                            identifier,
+                            SchemaFrame::IdentifierMode::Additional,
+                            {EMPTY_WEAK_POINTER},
+                            "",
+                            remaining};
+    charge(remaining, frame);
+    frame.for_each_subschema([&places](const auto &location) -> void {
+      places.push_back({.position = to_pointer(location.pointer),
+                        .base = JSON::String{location.base},
+                        .dialect = canonical_uri(location.dialect),
+                        .names_itself = location.type ==
+                                        SchemaFrame::LocationType::Resource});
+    });
+    // What a reference reaches is settled against whatever base is in force
+    // where it is written, so one copy spelling it against that base and
+    // another spelling it in full reach the same schema
+    frame.for_each_reference([&reaches](const auto, const auto &pointer,
+                                        const auto &reference) -> void {
+      reaches.emplace_back(to_pointer(pointer),
+                           JSON::String{reference.destination});
+    });
+  } catch (const SchemaError &) {
+    return;
+  }
+
+  for (const auto &place : places) {
+    auto &target{get(schema, place.position)};
+    if (!target.is_object()) {
+      continue;
     }
+
+    // A mark says what a schema is read under as much as a declaration does,
+    // and the declaration written below says it the one way, so the mark has
+    // nothing left to add. One side declaring where the other inherits says
+    // nothing either, which is why this is written wherever the frame reached
+    target.erase(DIALECT_OVERRIDE_KEYWORD, JSONSCHEMA_HASH_DIALECT_OVERRIDE);
+    target.assign("$schema", JSON{place.dialect});
+
+    if (!place.names_itself) {
+      continue;
+    }
+
+    // Which keyword carries the name is the schema's own answer, as writing
+    // one it does not read by would be saying something it never said
+    if (target.defines("$id"sv, JSONSCHEMA_HASH_ID)) {
+      target.assign("$id", JSON{place.base});
+    }
+
+    if (target.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID)) {
+      target.assign("id", JSON{place.base});
+    }
+  }
+
+  for (const auto &[position, destination] : reaches) {
+    set(schema, position, JSON{destination});
+  }
+
+  // The name the comparison is being made under is settled already, and a copy
+  // may spell it against whatever base it came from, which the frame above has
+  // nothing to resolve against
+  const auto settled{canonical_uri(identifier)};
+  if (schema.defines("$id"sv, JSONSCHEMA_HASH_ID)) {
+    schema.assign("$id", JSON{settled});
+  }
+
+  if (schema.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID)) {
+    schema.assign("id", JSON{settled});
   }
 }
 
@@ -809,9 +886,11 @@ auto hold_against_what_is_known(
   const auto pending{known.pending.find(canonical_uri(identifier))};
   if (pending != known.pending.cend()) {
     auto expected{pending->second.schema};
-    say_what_it_says_of_itself(expected, pending->second.dialect);
+    say_what_it_says_of_itself(expected, walker, resolver,
+                               pending->second.dialect, identifier, remaining);
     auto candidate{value};
-    say_what_it_says_of_itself(candidate, remote_dialect_uri);
+    say_what_it_says_of_itself(candidate, walker, resolver, remote_dialect_uri,
+                               identifier, remaining);
     if (expected != candidate) {
       throw SchemaError(
           "Conflicting embedded resources with the same identifier");
@@ -865,9 +944,11 @@ auto hold_against_what_is_known(
       // incoming dialect for both is how two schemas that only look alike are
       // taken for one
       auto expected{entry.second};
-      say_what_it_says_of_itself(expected, container_dialect);
+      say_what_it_says_of_itself(expected, walker, resolver, container_dialect,
+                                 identifier, remaining);
       auto candidate{value};
-      say_what_it_says_of_itself(candidate, remote_dialect_uri);
+      say_what_it_says_of_itself(candidate, walker, resolver,
+                                 remote_dialect_uri, identifier, remaining);
       if (expected != candidate) {
         throw SchemaError(
             "Conflicting embedded resources with the same identifier");
@@ -903,9 +984,11 @@ auto hold_against_what_is_known(
   // anything about whether they are the same schema
   const auto &held_location{location.value().get()};
   auto held{get(root, to_pointer(held_location.pointer))};
-  say_what_it_says_of_itself(held, held_location.dialect);
+  say_what_it_says_of_itself(held, walker, resolver, held_location.dialect,
+                             identifier, remaining);
   auto candidate{value};
-  say_what_it_says_of_itself(candidate, remote_dialect_uri);
+  say_what_it_says_of_itself(candidate, walker, resolver, remote_dialect_uri,
+                             identifier, remaining);
 
   if (held != candidate) {
     throw SchemaError(
@@ -953,9 +1036,9 @@ auto elevate_embedded_resources(
   // `$schema`, which is the only way a dialect that reserves no keyword for
   // saying so can be carried, and what it says is where its definitions live
   const auto remote_dialect_uri{dialect(remote, default_dialect, true)};
-  const auto keyword{definitions_keyword(
-      walker, vocabularies_with_embedded(remote, resolver, remote_dialect,
-                                         remote_dialect_uri))};
+  const auto remote_vocabularies{vocabularies_with_embedded(
+      remote, resolver, remote_dialect, remote_dialect_uri)};
+  const auto keyword{definitions_keyword(walker, remote_vocabularies)};
   const JSON::String keyword_string{keyword};
   if (keyword.empty() || !remote.is_object() ||
       !remote.defines(keyword_string) ||
@@ -1101,7 +1184,9 @@ auto elevate_embedded_resources(
 
       to_remove.push_back({.key = key, .identifier = identifier_string});
     } else {
-      to_extract.emplace_back(key, !defines_dialect);
+      to_extract.emplace_back(
+          key, !defines_dialect &&
+                   dialect_defines(walker, remote_vocabularies, "$schema"sv));
       record(known, identifier_string, identifier_string);
       expect(known, identifier_string, value, remote_dialect_uri);
     }
@@ -1150,6 +1235,37 @@ auto impossible_dialect_of_fetched(const JSON::String &identifier,
   return {identifier, origin,
           "The referenced schema declares a dialect that does not define the "
           "keyword that declares it"};
+}
+
+// Whether what a reference named is something the resource it names holds. A
+// pointer fragment names a place of the document, and the document can answer
+// for that on its own without paying to frame it. An anchor is not a place of
+// the document, and the drafts that spell identifiers as `id` let one look
+// just like a pointer, so a miss still has to ask the frame. Only the anchors
+// of this resource matter, rather than every pointer of it
+auto names_something_within(const JSON &resource, const JSON::String &named,
+                            const SchemaWalker &walker,
+                            const SchemaResolver &resolver,
+                            const std::string_view default_dialect,
+                            const JSON::String &identifier,
+                            std::uint64_t &remaining) -> bool {
+  const auto within{fragment_to_pointer(URI{named})};
+  if (within.has_value() && try_get(resource, within.value()) != nullptr) {
+    return true;
+  }
+
+  const SchemaFrame frame{SchemaFrame::Mode::Locations,
+                          resource,
+                          walker,
+                          resolver,
+                          default_dialect,
+                          identifier,
+                          SchemaFrame::IdentifierMode::Additional,
+                          {EMPTY_WEAK_POINTER},
+                          "",
+                          remaining};
+  charge(remaining, frame);
+  return frame.traverse(named).has_value();
 }
 
 // What bundling fetched and has yet to put anywhere, alongside the name it
@@ -1272,6 +1388,19 @@ auto embed_references(
     const JSON::String identifier{reference.base};
 
     if (is_recorded(known, identifier)) {
+      // What a reference names within a resource is the resource's question
+      // however many references name it, and whichever one brought it in is
+      // done by now, so what it is waits among what has yet to be placed
+      const auto pending{known.pending.find(canonical_uri(identifier))};
+      if (pending != known.pending.cend() && reference.fragment.has_value() &&
+          !reference.fragment.value().empty() &&
+          !names_something_within(pending->second.schema, reference.destination,
+                                  walker, resolver, default_dialect, identifier,
+                                  remaining)) {
+        throw SchemaReferenceError(reference.destination, to_pointer(pointer),
+                                   "Could not resolve schema reference");
+      }
+
       // A target that went in without a name answers to nothing, so this
       // reference is settled against the finished document rather than here.
       // Spelling it out in full is what lets that pass recognise it, since a
@@ -1344,37 +1473,18 @@ auto embed_references(
     // If the reference has a fragment, verify it exists in the remote
     // schema
     if (reference.fragment.has_value()) {
-      // A pointer fragment names a place of the document, and the document can
-      // answer for that on its own without paying to frame it
       const auto fragment_pointer{
           fragment_to_pointer(URI{reference.destination})};
       const auto *named_value{fragment_pointer.has_value()
                                   ? try_get(remote, fragment_pointer.value())
                                   : nullptr};
-      bool exists{named_value != nullptr};
-
-      // An anchor is not a place of the document, and the drafts that spell
-      // identifiers as `id` let one look just like a pointer, so a miss above
-      // still has to ask the frame. Only the anchors of the remote matter
-      // here, rather than every pointer of it
-      if (!exists) {
-        try {
-          const SchemaFrame remote_frame{
-              SchemaFrame::Mode::Locations,
-              remote,
-              walker,
-              resolver,
-              default_dialect,
-              identifier,
-              SchemaFrame::IdentifierMode::Additional,
-              {EMPTY_WEAK_POINTER},
-              "",
-              remaining};
-          charge(remaining, remote_frame);
-          exists = remote_frame.traverse(reference.destination).has_value();
-        } catch (const SchemaDialectImpossibleError &) {
-          throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
-        }
+      bool exists{false};
+      try {
+        exists = names_something_within(remote, reference.destination, walker,
+                                        resolver, default_dialect, identifier,
+                                        remaining);
+      } catch (const SchemaDialectImpossibleError &) {
+        throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
       }
 
       if (!exists) {
@@ -1445,16 +1555,25 @@ auto embed_references(
     // mark, as no keyword of the schema carries it
     const JSON::String remote_dialect_uri{remote_root.dialect};
 
+    // Carrying a name and saying what it is read under are things a dialect
+    // reserves a keyword for one at a time, so which it can do is two
+    // questions. Writing a declaration its dialect gives no meaning would be
+    // saying something the schema never said, and nothing could read it back
+    const auto dialect_allows_declaring{
+        dialect_defines(walker, remote_vocabularies, "$schema"sv)};
+
     if (remote.is_object()) {
       if (dialect_allows_naming) {
+        schema_reidentify(remote, effective_id, remote_base_dialect);
+      }
+
+      if (dialect_allows_declaring) {
         // Otherwise the embedded resource would be re-interpreted under the
         // dialect of the schema it gets embedded into, which can differ from
         // the default dialect that the remote was resolved with
         if (!remote.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)) {
           remote.assign("$schema", JSON{remote_dialect_uri});
         }
-
-        schema_reidentify(remote, effective_id, remote_base_dialect);
       } else if (remote_dialect_uri != container_dialect) {
         // Marking is what carries a dialect that no keyword of the schema can
         // declare. Where whatever holds the container already reads under the
