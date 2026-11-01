@@ -287,30 +287,35 @@ auto placed(KnownResources &known, const std::string_view name) -> void {
 // Every meta-schema that anything within this schema pins. A schema that
 // looks for one of these has to go on finding it, so collecting only what the
 // top of the document declares would miss a resource further in that pins its
-// own
-auto collect_pinned_dialects(const JSON &schema,
+// own. Which places those are is the walk's answer rather than this
+// function's, as a declaration says what reads a schema only where a schema
+// is what it sits in, and a value a schema carries can look exactly like one
+auto collect_pinned_dialects(const JSON &schema, const SchemaWalker &walker,
+                             const SchemaResolver &resolver,
+                             const std::string_view dialect,
                              std::unordered_set<JSON::String> &result,
-                             const bool root = true) -> void {
-  if (schema.is_object()) {
-    // A declaration says what reads a schema only where it sits at the top of
-    // one, which below the document itself takes a name beside it. Anywhere
-    // else it is a member of some value the schema carries rather than
-    // anything the schema is read under
-    const auto *declared{schema.try_at("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
-    if ((declared != nullptr) && declared->is_string() &&
-        (root || schema.defines("$id"sv, JSONSCHEMA_HASH_ID) ||
-         schema.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID))) {
-      result.insert(canonical_uri(declared->to_string()));
-    }
+                             std::uint64_t &remaining) -> void {
+  const SchemaFrame frame{SchemaFrame::Mode::Locations,
+                          schema,
+                          walker,
+                          resolver,
+                          dialect,
+                          "",
+                          SchemaFrame::IdentifierMode::Additional,
+                          {EMPTY_WEAK_POINTER},
+                          "",
+                          remaining};
+  charge(remaining, frame);
 
-    for (const auto &entry : schema.as_object()) {
-      collect_pinned_dialects(entry.second, result, false);
+  // Below the document itself, what a schema is read under is something it
+  // says for itself only where it answers to a name, inheritance being what
+  // settles it everywhere else
+  frame.for_each_subschema([&result](const auto &location) -> void {
+    if (location.type == SchemaFrame::LocationType::Resource ||
+        location.pointer.empty()) {
+      result.insert(canonical_uri(location.dialect));
     }
-  } else if (schema.is_array()) {
-    for (const auto &item : schema.as_array()) {
-      collect_pinned_dialects(item, result, false);
-    }
-  }
+  });
 }
 
 constexpr auto NOT_AN_OBJECT{
@@ -911,6 +916,32 @@ auto hold_against_what_is_known(
   return true;
 }
 
+// Whether an entry where a remote's dialect reserves definitions is one that
+// elevation drops for agreeing with what its name already reaches. Everything
+// such an entry carries leaves the document along with it, so none of it
+// answers for a name of its own
+auto removable_entry(const JSON &root, const Pointer &container,
+                     const JSON &remote, const SchemaFrame &frame,
+                     const Pointer &entry_position, const KnownResources &known,
+                     const SchemaWalker &walker, const SchemaResolver &resolver,
+                     std::string_view default_dialect,
+                     std::string_view remote_dialect_uri,
+                     std::string_view container_dialect,
+                     std::uint64_t &remaining) -> bool {
+  const auto entry{frame.traverse(to_weak_pointer(entry_position),
+                                  SchemaFrame::LocationType::Resource)};
+  if (!entry.has_value()) {
+    return false;
+  }
+
+  const JSON::String identifier{entry.value().get().base};
+  return is_known(known, identifier) &&
+         hold_against_what_is_known(
+             root, container, get(remote, entry_position), known, walker,
+             resolver, default_dialect, remote_dialect_uri, container_dialect,
+             identifier, remaining);
+}
+
 auto elevate_embedded_resources(
     JSON &remote, JSON &root, const Pointer &container,
     const SchemaBaseDialect remote_dialect, const SchemaWalker &walker,
@@ -946,7 +977,8 @@ auto elevate_embedded_resources(
        container.back().to_property() == "definitions")};
   std::unordered_set<JSON::String> pinned;
   if (!container_is_searched) {
-    collect_pinned_dialects(remote, pinned);
+    collect_pinned_dialects(remote, walker, resolver, remote_dialect_uri,
+                            pinned, remaining);
   }
 
   // An entry can name a sibling as the dialect it is read under, and framing
@@ -1165,25 +1197,41 @@ auto embed_references(
             ? definitions_keyword(
                   walker, frame.vocabularies(carrier.value().get(), resolver))
             : std::string_view{}};
+    const auto carried_dialect{dialect(subschema, default_dialect, true)};
     frame.for_each_resource([&](const auto &, const auto &location) -> void {
       const auto position{to_pointer(location.pointer)};
-      if (position.empty() ||
-          (position.size() == 2 && position.at(0).is_property() &&
-           position.at(0).to_property() == carried_keyword)) {
+      const auto within_definitions{
+          position.size() >= 2 && position.at(0).is_property() &&
+          position.at(0).to_property() == carried_keyword};
+      if (position.empty() || (within_definitions && position.size() == 2)) {
         return;
       }
 
       const JSON::String carried{location.base};
+      if (!is_known(known, carried)) {
+        record(known, carried, carried);
+        // What carries this is still on its way in, so nothing holds it where
+        // a later claimant could be held against it. Saying what it is
+        // alongside its name is what leaves one arriving before it does
+        // something to answer to
+        expect(known, carried, get(subschema, position), location.dialect);
+        return;
+      }
+
+      if (within_definitions &&
+          removable_entry(root, container, subschema, frame,
+                          Pointer{carried_keyword, position.at(1)}, known,
+                          walker, resolver, default_dialect, carried_dialect,
+                          container_dialect, remaining)) {
+        return;
+      }
+
       // Where this one sits is what the schema says, so there is nothing
       // that can be taken out of it, and one name in two places is not a
       // document anything can read however well the two agree. Which of
       // them bundling met first is no reason to answer differently
-      if (is_known(known, carried)) {
-        throw SchemaError(
-            "Conflicting embedded resources with the same identifier");
-      }
-
-      record(known, carried, carried);
+      throw SchemaError(
+          "Conflicting embedded resources with the same identifier");
     });
   }
 

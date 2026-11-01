@@ -22,9 +22,16 @@
       "properties": {
         "label": {
           "$ref": "https://example.com/shared"
+        },
+        "tag": {
+          "default": {
+            "id": "https://example.com/legacy",
+            "$schema": "https://example.com/shared"
+          }
         }
       },
       "default": {
+        "$id": "https://example.com/data",
         "$schema": "https://example.com/shared"
       },
       "$defs": {
@@ -56,9 +63,16 @@
           "properties": {
             "label": {
               "$ref": "https://example.com/shared"
+            },
+            "tag": {
+              "default": {
+                "id": "https://example.com/legacy",
+                "$schema": "https://example.com/shared"
+              }
             }
           },
           "default": {
+            "$id": "https://example.com/data",
             "$schema": "https://example.com/shared"
           }
         }
@@ -83,9 +97,16 @@
           "properties": {
             "label": {
               "$ref": "https://example.com/shared"
+            },
+            "tag": {
+              "default": {
+                "id": "https://example.com/legacy",
+                "$schema": "https://example.com/shared"
+              }
             }
           },
           "default": {
+            "$id": "https://example.com/data",
             "$schema": "https://example.com/shared"
           }
         }

@@ -1,0 +1,46 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "properties": {
+      "pet": {
+        "$ref": "https://example.com/pet"
+      }
+    },
+    "$defs": {
+      "inner": {
+        "$id": "https://example.com/inner",
+        "type": "string"
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/pet": {
+      "$id": "https://example.com/pet",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$defs": {
+        "fresh": {
+          "$id": "https://example.com/fresh",
+          "properties": {
+            "x": {
+              "$id": "https://example.com/inner",
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  },
+  "result": {},
+  "inserted": {},
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaError",
+      "message": "Conflicting embedded resources with the same identifier"
+    },
+    "references": {
+      "type": "SchemaError",
+      "message": "Conflicting embedded resources with the same identifier"
+    }
+  }
+}
