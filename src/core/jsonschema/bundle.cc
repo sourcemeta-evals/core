@@ -1024,7 +1024,9 @@ auto elevate_embedded_resources(
     }
 
     // The remote's dialect is what an entry that declares none inherits, so
-    // hand it to the frame as the default rather than falling back after
+    // hand it to the frame as the default rather than falling back after. A
+    // name spelled relatively says whatever the resource around the entry
+    // resolves it against, so the remote's own name goes with it
     SchemaFrame entry_frame{SchemaFrame::Mode::Root,
                             value,
                             walker,
@@ -1033,7 +1035,7 @@ auto elevate_embedded_resources(
                             "",
                             SchemaFrame::IdentifierMode::Additional,
                             {EMPTY_WEAK_POINTER},
-                            "",
+                            remote_identifier,
                             remaining};
     charge(remaining, entry_frame);
     const auto &identifier{entry_frame.root()};
@@ -1064,8 +1066,11 @@ auto elevate_embedded_resources(
     // Only an entry whose key says what it identifies can be elevated, since
     // the key is where it would land. What a key says is no guide to what an
     // entry identifies, though, so one the document already holds under the
-    // name this one identifies is still held against what is there
-    if (identifier != key) {
+    // name this one identifies is still held against what is there. A name
+    // spelled relatively resolves against whatever resource ends up around it,
+    // so where such an entry already sits is the one place it says what it
+    // says, however well the key agrees
+    if (identifier != key || !URI{declared_id->to_string()}.is_absolute()) {
       if (is_known(known, identifier_string)) {
         // Dropping one that nothing was held against is how a schema that
         // disagrees goes missing, so it stays where it is unless something
@@ -1207,6 +1212,18 @@ auto embed_references(
         return;
       }
 
+      // What an entry where this dialect reserves definitions carries leaves
+      // the document along with the entry, so none of it answers for a name
+      // either way. Saying it does would hold a later copy against one that is
+      // on its way out, and dropping that copy too loses the schema entirely
+      if (within_definitions &&
+          removable_entry(root, container, subschema, frame,
+                          Pointer{carried_keyword, position.at(1)}, known,
+                          walker, resolver, default_dialect, carried_dialect,
+                          container_dialect, remaining)) {
+        return;
+      }
+
       const JSON::String carried{location.base};
       if (!is_known(known, carried)) {
         record(known, carried, carried);
@@ -1215,14 +1232,6 @@ auto embed_references(
         // alongside its name is what leaves one arriving before it does
         // something to answer to
         expect(known, carried, get(subschema, position), location.dialect);
-        return;
-      }
-
-      if (within_definitions &&
-          removable_entry(root, container, subschema, frame,
-                          Pointer{carried_keyword, position.at(1)}, known,
-                          walker, resolver, default_dialect, carried_dialect,
-                          container_dialect, remaining)) {
         return;
       }
 
