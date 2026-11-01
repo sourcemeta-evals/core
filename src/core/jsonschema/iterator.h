@@ -165,6 +165,9 @@ struct PendingSubschema {
   std::size_t level;
   bool orphan;
   bool property_name;
+  // The nearest schema above this one that holds the dialect in force among
+  // its own containers, which is where this one has to go on looking for it
+  const sourcemeta::core::JSON *pinned_within{nullptr};
 };
 
 inline auto enqueue(std::vector<PendingSubschema> &children,
@@ -207,7 +210,8 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
                      .base_dialect = root_base_dialect,
                      .level = root_level,
                      .orphan = root_orphan,
-                     .property_name = root_property_name});
+                     .property_name = root_property_name,
+                     .pinned_within = nullptr});
 
   std::vector<PendingSubschema> children;
   while (!pending.empty()) {
@@ -226,6 +230,17 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     if (!subschema.is_object() && !subschema.is_boolean()) {
       continue;
     }
+
+    // Inheriting a dialect without inheriting where it was found leaves this
+    // asking for a meta-schema the document already holds, so the schema that
+    // pinned it stays in scope for everything below it
+    std::optional<sourcemeta::core::SchemaResolver> scoped;
+    if (current.pinned_within != nullptr) {
+      scoped.emplace(sourcemeta::core::resolver_with_embedded(
+          *current.pinned_within, resolver));
+    }
+
+    const auto &effective{scoped.has_value() ? scoped.value() : resolver};
 
     // Recalculate the dialect and its vocabularies at every step.
     // This is needed for correctly traversing through schemas that
@@ -247,17 +262,32 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
         sourcemeta::core::ref_overrides_adjacent_keywords(base_dialect)};
 
     const auto entry{resolve_dialect_at(subschema, dialect, base_dialect,
-                                        resolver, walker, level,
+                                        effective, walker, level,
                                         !enclosing_ref_overrides)};
     const auto current_dialect{entry.dialect};
     const auto current_base_dialect{entry.base_dialect};
+
+    // Only the schema that went and said what it reads under can hold that
+    // meta-schema, as one that inherited the dialect carries whatever scope
+    // the one above it did. A dialect no base dialect answers for is the only
+    // kind a document can hold, and the schema the walk started from is the
+    // caller's own to answer for, which is why a scope of ours never stands in
+    // front of the caller's there
+    const auto *pinned_within{
+        current_dialect != dialect && &subschema != &root_subschema &&
+                !sourcemeta::core::to_base_dialect(current_dialect)
+                     .has_value() &&
+                sourcemeta::core::metaschema_try_embedded(
+                    subschema, current_dialect, effective) != nullptr
+            ? &subschema
+            : current.pinned_within};
 
     // A subschema may be an embedded resource that pins its own custom
     // meta-schema inside its own `$defs`/`definitions`. Probe for it here, the
     // same way we do at the document root, so that nested self-contained
     // meta-schemas resolve to their embedded definition before the resolver
     const auto vocabularies{sourcemeta::core::vocabularies_with_embedded(
-        subschema, resolver, current_base_dialect, current_dialect)};
+        subschema, effective, current_base_dialect, current_dialect)};
 
     // A schema that names its dialect through a keyword that very dialect
     // leaves undefined cannot be taken at its word, because honouring it would
@@ -267,7 +297,7 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
       const auto *declared{
           subschema.try_at("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
       if (declared != nullptr && declared->is_string() &&
-          !declaration_counts(subschema, declared->to_string(), resolver,
+          !declaration_counts(subschema, declared->to_string(), effective,
                               walker)) {
         throw sourcemeta::core::SchemaDialectImpossibleError(
             "$schema", declared->to_string(),
@@ -292,7 +322,7 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
 
     const auto child{entry.override_active
                          ? resolve_dialect_at(subschema, dialect, base_dialect,
-                                              resolver, walker, level, false)
+                                              effective, walker, level, false)
                          : entry};
     const auto child_dialect{child.dialect};
     const auto child_base_dialect{child.base_dialect};
@@ -549,6 +579,7 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     // Push in reverse so that the first child is popped first, which keeps the
     // resulting order identical to a depth-first recursive traversal
     while (!children.empty()) {
+      children.back().pinned_within = pinned_within;
       pending.push_back(std::move(children.back()));
       children.pop_back();
     }

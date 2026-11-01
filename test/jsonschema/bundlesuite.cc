@@ -538,6 +538,11 @@ auto run_bundle_test(const sourcemeta::core::JSON &test) -> void {
                                std::numeric_limits<std::uint64_t>::max(),
                                repeated),
                  document);
+
+    // An output that stands on its own has nothing left to go and get, which
+    // the comparison above cannot say on its own, as a pass that reports work
+    // it did not need to do leaves the document exactly as it found it
+    EXPECT_TRUE(repeated.empty());
   }
 }
 

@@ -3,7 +3,6 @@
 #include <sourcemeta/core/uri.h>
 
 #include "helpers.h"
-#include "iterator.h"
 
 #include <algorithm>     // std::ranges::any_of, std::ranges::none_of
 #include <cassert>       // assert
@@ -290,19 +289,26 @@ auto placed(KnownResources &known, const std::string_view name) -> void {
 // top of the document declares would miss a resource further in that pins its
 // own
 auto collect_pinned_dialects(const JSON &schema,
-                             std::unordered_set<JSON::String> &result) -> void {
+                             std::unordered_set<JSON::String> &result,
+                             const bool root = true) -> void {
   if (schema.is_object()) {
+    // A declaration says what reads a schema only where it sits at the top of
+    // one, which below the document itself takes a name beside it. Anywhere
+    // else it is a member of some value the schema carries rather than
+    // anything the schema is read under
     const auto *declared{schema.try_at("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
-    if ((declared != nullptr) && declared->is_string()) {
+    if ((declared != nullptr) && declared->is_string() &&
+        (root || schema.defines("$id"sv, JSONSCHEMA_HASH_ID) ||
+         schema.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID))) {
       result.insert(canonical_uri(declared->to_string()));
     }
 
     for (const auto &entry : schema.as_object()) {
-      collect_pinned_dialects(entry.second, result);
+      collect_pinned_dialects(entry.second, result, false);
     }
   } else if (schema.is_array()) {
     for (const auto &item : schema.as_array()) {
-      collect_pinned_dialects(item, result);
+      collect_pinned_dialects(item, result, false);
     }
   }
 }
@@ -777,8 +783,8 @@ auto say_what_it_is_read_under(JSON &schema, const std::string_view dialect)
     return;
   }
 
-  schema.assign("$schema",
-                JSON{canonical_uri(declared_dialect(schema, dialect))});
+  schema.assign("$schema", JSON{canonical_uri(
+                               sourcemeta::core::dialect(schema, dialect))});
   // Both sides are already known to claim the same name, and one of them may
   // spell it relatively where the other was resolved, so how each spells it
   // says nothing about whether they are the same schema
@@ -788,14 +794,12 @@ auto say_what_it_is_read_under(JSON &schema, const std::string_view dialect)
 // container alone cannot answer that, as a caller may hold a resource
 // anywhere, and holding the two against each other is what keeps a name
 // standing for one schema rather than for two that disagree
-auto hold_against_what_is_known(const JSON &root, const Pointer &container,
-                                const JSON &value, const KnownResources &known,
-                                const SchemaWalker &walker,
-                                const SchemaResolver &resolver,
-                                std::string_view default_dialect,
-                                std::string_view remote_dialect_uri,
-                                const JSON::String &identifier,
-                                std::uint64_t &remaining) -> bool {
+auto hold_against_what_is_known(
+    const JSON &root, const Pointer &container, const JSON &value,
+    const KnownResources &known, const SchemaWalker &walker,
+    const SchemaResolver &resolver, std::string_view default_dialect,
+    std::string_view remote_dialect_uri, std::string_view container_dialect,
+    const JSON::String &identifier, std::uint64_t &remaining) -> bool {
   // What a later pass will place is not in the document yet, so a candidate
   // arriving first would otherwise be dropped against nothing at all
   const auto pending{known.pending.find(canonical_uri(identifier))};
@@ -841,7 +845,7 @@ auto hold_against_what_is_known(const JSON &root, const Pointer &container,
                               entry.second,
                               walker,
                               resolver,
-                              remote_dialect_uri,
+                              container_dialect,
                               "",
                               SchemaFrame::IdentifierMode::Additional,
                               {EMPTY_WEAK_POINTER},
@@ -852,8 +856,12 @@ auto hold_against_what_is_known(const JSON &root, const Pointer &container,
         continue;
       }
 
+      // What sits here reads under whatever holds the container, which is not
+      // what the one claiming its name arrived reading under. Taking the
+      // incoming dialect for both is how two schemas that only look alike are
+      // taken for one
       auto expected{entry.second};
-      say_what_it_is_read_under(expected, remote_dialect_uri);
+      say_what_it_is_read_under(expected, container_dialect);
       auto candidate{value};
       say_what_it_is_read_under(candidate, remote_dialect_uri);
       if (expected != candidate) {
@@ -908,8 +916,9 @@ auto elevate_embedded_resources(
     const SchemaBaseDialect remote_dialect, const SchemaWalker &walker,
     const SchemaResolver &resolver, std::string_view default_dialect,
     std::string_view remote_identifier, KnownResources &known,
-    PositionalReferences &positional, std::uint64_t &remaining,
-    const SchemaBundleOptions::Callback &callback) -> void {
+    PositionalReferences &positional, std::string_view container_dialect,
+    std::uint64_t &remaining, const SchemaBundleOptions::Callback &callback)
+    -> void {
   // A remote can say what it is read under by a mark rather than by
   // `$schema`, which is the only way a dialect that reserves no keyword for
   // saying so can be carried, and what it says is where its definitions live
@@ -1001,27 +1010,9 @@ auto elevate_embedded_resources(
     }
 
     const JSON::String identifier_string{identifier};
-    // Only an entry whose key says what it identifies can be elevated, since
-    // the key is where it would land. What a key says is no guide to what an
-    // entry identifies, though, so one the document already holds under the
-    // name this one identifies is still held against what is there
-    if (identifier != key) {
-      if (is_known(known, identifier_string)) {
-        // Dropping one that nothing was held against is how a schema that
-        // disagrees goes missing, so it stays where it is unless something
-        // answered for it
-        if (hold_against_what_is_known(root, container, value, known, walker,
-                                       resolver, default_dialect,
-                                       remote_dialect_uri, identifier_string,
-                                       remaining)) {
-          to_remove.push_back({.key = key, .identifier = identifier_string});
-        }
-      }
-
-      record(known, identifier_string, identifier_string);
-      continue;
-    }
-
+    // What is looked for among the locations the specifications reserve is
+    // looked for by the name it carries rather than by the key it sits under,
+    // so what a key says is no reason to ask this later
     if (pinned.contains(canonical_uri(identifier))) {
       // Staying put is the only way this one goes on being found, so the
       // document cannot also hold it elsewhere: one identity in two places is
@@ -1038,15 +1029,37 @@ auto elevate_embedded_resources(
       continue;
     }
 
+    // Only an entry whose key says what it identifies can be elevated, since
+    // the key is where it would land. What a key says is no guide to what an
+    // entry identifies, though, so one the document already holds under the
+    // name this one identifies is still held against what is there
+    if (identifier != key) {
+      if (is_known(known, identifier_string)) {
+        // Dropping one that nothing was held against is how a schema that
+        // disagrees goes missing, so it stays where it is unless something
+        // answered for it
+        if (hold_against_what_is_known(root, container, value, known, walker,
+                                       resolver, default_dialect,
+                                       remote_dialect_uri, container_dialect,
+                                       identifier_string, remaining)) {
+          to_remove.push_back({.key = key, .identifier = identifier_string});
+        }
+      }
+
+      record(known, identifier_string, identifier_string);
+      continue;
+    }
+
     const auto defines_dialect{
         value.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
     if (is_known(known, identifier_string)) {
       // What the document holds under this name can be anywhere, including the
       // container bundling puts things in, so there is one question rather
       // than one per place
-      if (!hold_against_what_is_known(
-              root, container, value, known, walker, resolver, default_dialect,
-              remote_dialect_uri, identifier_string, remaining)) {
+      if (!hold_against_what_is_known(root, container, value, known, walker,
+                                      resolver, default_dialect,
+                                      remote_dialect_uri, container_dialect,
+                                      identifier_string, remaining)) {
         continue;
       }
 
@@ -1263,21 +1276,6 @@ auto embed_references(
     // Working these out can cost a meta-schema to resolve, so it happens once
     const auto &remote_vocabularies{
         remote_root_frame->vocabularies(remote_root, resolver)};
-
-    // Asking of the root here is what answers before anything is fetched on
-    // its behalf, where every other walk of the document answers as it goes.
-    // What a declaration leaves to read it by is a question of the dialect it
-    // names, which a document saying from outside what to read it under has
-    // settled for itself, so the dialect in force only says when to ask
-    if (remote.is_object() &&
-        !dialect_defines(walker, remote_vocabularies, "$schema"sv)) {
-      const auto *declared{remote.try_at("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
-      if (declared != nullptr && declared->is_string() &&
-          !declaration_counts(remote, declared->to_string(), resolver,
-                              walker)) {
-        throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
-      }
-    }
 
     const auto remote_base_dialect{remote_root.base_dialect};
     auto remote_id = remote_root_frame->root();
@@ -1498,10 +1496,10 @@ auto embed_references(
                        default_dialect, entry.identifier, paths, default_base,
                        known, positional, container_dialect, remaining,
                        callback, depth + 1);
-      elevate_embedded_resources(entry.schema, root, container,
-                                 entry.base_dialect, walker, resolver,
-                                 default_dialect, entry.identifier, known,
-                                 positional, remaining, callback);
+      elevate_embedded_resources(
+          entry.schema, root, container, entry.base_dialect, walker, resolver,
+          default_dialect, entry.identifier, known, positional,
+          container_dialect, remaining, callback);
     } catch (const SchemaDialectImpossibleError &) {
       throw impossible_dialect_of_fetched(entry.fetched_by, entry.origin);
     }
@@ -1647,13 +1645,17 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
         container_parent.has_value()
             ? initial_frame->traverse(container_parent.value().get().base)
             : std::nullopt};
-    // Where no resource holds the container, what it holds reads under
-    // whatever the caller said the document is. That came from the caller
+    // Where no resource holds the container, the frame still says what the
+    // subschema it hangs off is read under, which is what it holds reads under
+    // too. Only where nothing framed reaches that either is there nothing left
+    // but what the caller said the document is. That came from the caller
     // rather than from a frame, so it is held against a remote's dialect in
     // the one form both can be compared in
+    const auto container_location{
+        container_resource.has_value() ? container_resource : container_parent};
     const JSON::String container_dialect{
-        container_resource.has_value()
-            ? JSON::String{container_resource.value().get().dialect}
+        container_location.has_value()
+            ? JSON::String{container_location.value().get().dialect}
             : canonical_uri(default_dialect)};
     embed_references(schema, default_container.value(), schema, walker,
                      resolver, mode, default_dialect, default_id, paths,
