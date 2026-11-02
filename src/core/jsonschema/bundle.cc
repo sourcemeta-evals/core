@@ -330,6 +330,10 @@ struct KnownResources {
   // one off the other would let a name the document goes on answering to
   // elsewhere be claimed as an identity without anything noticing
   std::unordered_set<JSON::String> declared;
+  // Where the document ended up holding each name it was given. Nothing reads
+  // a resource by that place, but what a reference names within one is looked
+  // for there once it is no longer waiting to go in
+  std::unordered_map<JSON::String, Pointer> placements;
   // What a later pass will place. A name is answered from here first, as the
   // document does not hold it yet
   std::unordered_map<JSON::String, Pending> pending;
@@ -384,6 +388,11 @@ auto expect(KnownResources &known, const std::string_view name,
 
 auto placed(KnownResources &known, const std::string_view name) -> void {
   known.pending.erase(canonical_uri(name));
+}
+
+auto landed(KnownResources &known, const std::string_view name,
+            const Pointer &where) -> void {
+  known.placements.insert_or_assign(canonical_uri(name), where);
 }
 
 // Every meta-schema that anything within this schema pins. A schema that
@@ -1403,14 +1412,39 @@ auto embed_references(
       // What a reference names within a resource is the resource's question
       // however many references name it, and whichever one brought it in is
       // done by now, so what it is waits among what has yet to be placed
-      const auto pending{known.pending.find(canonical_uri(identifier))};
-      if (pending != known.pending.cend() && reference.fragment.has_value() &&
+      // A name the document was only fetched by is not the name whatever came
+      // back answers to, and what it is was recorded under the latter, so that
+      // is what this asks after
+      const auto &answering{answers_to(known, identifier)};
+      const auto pending{known.pending.find(canonical_uri(answering))};
+      const auto placement{known.placements.find(canonical_uri(answering))};
+      if (reference.fragment.has_value() &&
           !reference.fragment.value().empty() &&
-          !names_something_within(pending->second.schema, reference.destination,
-                                  walker, resolver, default_dialect, identifier,
-                                  remaining)) {
-        throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                   "Could not resolve schema reference");
+          (pending != known.pending.cend() ||
+           placement != known.placements.cend())) {
+        // What it was read under is what it was recorded with, as a resource
+        // that declares nothing of its own reads under whatever fetched it
+        // rather than under what the caller happened to pass in. Asking it
+        // under anything else frames it without the vocabulary an anchor of
+        // its own needs
+        const auto waiting{pending != known.pending.cend()};
+        const auto *within{waiting ? &pending->second.schema
+                                   : try_get(root, placement->second)};
+        bool reaches{within == nullptr};
+        try {
+          reaches = reaches ||
+                    names_something_within(
+                        *within, reference.destination, walker, resolver,
+                        waiting ? pending->second.dialect : default_dialect,
+                        answering, remaining);
+        } catch (const SchemaDialectImpossibleError &) {
+          throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
+        }
+
+        if (!reaches) {
+          throw SchemaReferenceError(reference.destination, to_pointer(pointer),
+                                     "Could not resolve schema reference");
+        }
       }
 
       // A target that went in without a name answers to nothing, so this
@@ -1695,6 +1729,7 @@ auto embed_references(
     const auto key{embed_schema(root, container, entry.identifier,
                                 std::move(entry.schema), callback)};
     auto landing{container.concat(key)};
+    landed(known, entry.identifier, landing);
     if (positional.unnamed.contains(entry.identifier)) {
       positional.landings.emplace(entry.identifier, landing);
     }
@@ -1744,6 +1779,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   // and any schemas already embedded within it
   KnownResources known{.names = {},
                        .declared = {},
+                       .placements = {},
                        .pending = {},
                        .paths = paths,
                        .default_id = JSON::String{default_id},
