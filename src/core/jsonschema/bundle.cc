@@ -231,6 +231,15 @@ struct Removed {
   JSON::String identifier;
 };
 
+// Where something bundling put in came from, and where it went. A document
+// fetched whole arrived as itself, so nothing of it sits above where a
+// reference inside it was written, while a resource lifted out of one sat
+// somewhere within the document that brought it
+struct Embedding {
+  Pointer source;
+  Pointer destination;
+};
+
 struct PositionalReferences {
   // Recorded while walking, as that is where the dialect of a remote is known
   std::unordered_set<JSON::String> unnamed;
@@ -243,7 +252,7 @@ struct PositionalReferences {
   // container that sits outside every schema the caller framed is reached by
   // nothing else, so a remote that carries its own name has to be framed here
   // too for the references it brought with it to be seen at all
-  std::vector<Pointer> embeddings;
+  std::vector<Embedding> embeddings;
   // Elevation lifts a resource that a remote carried out of the copy that
   // lands, so a place named inside one is no longer where the reference that
   // named it said. Such a resource answers to the name it declared, which is
@@ -312,15 +321,23 @@ auto mark_dialect_of_every_subschema(JSON &schema, const SchemaWalker &walker,
   }
 }
 
+// What a document bundling went and got is named by: the name it was asked
+// for under, and the reference that asked
+struct Fetch {
+  JSON::String name;
+  Pointer origin;
+};
+
 // A resource on its way into the document, kept so that one arriving before
 // it does can still be held against it. One bundling went and got also keeps
-// the reference that sent for it, as a refusal the fetched document brings on
-// names that one however many later references meet the same document. One
-// that was already inside something has no such reference
+// the name it was fetched by and the reference that sent for it, as those are
+// what a refusal the fetched document brings on has to name, however many
+// later references meet the same document and whatever they call it. One that
+// was already inside something was fetched by nothing
 struct Pending {
   JSON schema;
   JSON::String dialect;
-  std::optional<Pointer> origin;
+  std::optional<Fetch> fetch;
 };
 
 struct KnownResources {
@@ -385,11 +402,11 @@ auto record(KnownResources &known, const std::string_view name,
 
 auto expect(KnownResources &known, const std::string_view name,
             const JSON &schema, const std::string_view dialect,
-            std::optional<Pointer> origin) -> void {
+            std::optional<Fetch> fetch) -> void {
   known.pending.insert_or_assign(canonical_uri(name),
                                  Pending{.schema = schema,
                                          .dialect = JSON::String{dialect},
-                                         .origin = std::move(origin)});
+                                         .fetch = std::move(fetch)});
 }
 
 auto placed(KnownResources &known, const std::string_view name) -> void {
@@ -594,25 +611,53 @@ auto elevation_moved_what_it_named(const Pointer &named,
 // finished document, so what went in is what says which of those a place
 // belongs to. The innermost is the answer, and a reference the caller wrote
 // sits inside none of them
+// Where the caller wrote a reference that bundling moved to make room for a
+// container. A root that is nothing but a reference cannot hold one beside it,
+// since the reference overrides whatever sits there, so the reference goes
+// under a branch of its own. That is bundling making room rather than anything
+// the caller said, and a refusal names the place the caller wrote. Only the
+// one reference the root held can be under there, so this reaches nothing else
+auto where_the_caller_wrote(const Pointer &position, const Pointer &wrapper)
+    -> Pointer {
+  if (wrapper.empty() || position.size() != wrapper.size() + 1 ||
+      !position.starts_with(wrapper)) {
+    return position;
+  }
+
+  return position.resolve_from(wrapper);
+}
+
 auto where_it_was_written(const Pointer &position,
-                          const std::vector<Pointer> &embeddings) -> Pointer {
-  const Pointer *innermost{nullptr};
+                          const std::vector<Embedding> &embeddings,
+                          const Pointer &wrapper) -> Pointer {
+  const Embedding *innermost{nullptr};
   for (const auto &embedding : embeddings) {
-    if (position.starts_with(embedding) &&
-        (innermost == nullptr || embedding.size() > innermost->size())) {
+    if (position.starts_with(embedding.destination) &&
+        (innermost == nullptr ||
+         embedding.destination.size() > innermost->destination.size())) {
       innermost = &embedding;
     }
   }
 
-  return innermost == nullptr ? position : position.resolve_from(*innermost);
+  // Inside nothing that went in, so this is a place of the root the caller
+  // handed over, which bundling may have made to hold a branch
+  if (innermost == nullptr) {
+    return where_the_caller_wrote(position, wrapper);
+  }
+
+  // Where it sat in whatever brought it, and then where it sits in that
+  auto written{innermost->source};
+  written.push_back(position.resolve_from(innermost->destination));
+  return written;
 }
 
 auto settle_positional_references(
     JSON &schema, const SchemaWalker &walker, const SchemaResolver &resolver,
     std::string_view default_dialect, std::string_view default_id,
     const SchemaFrame::Paths &paths, std::string_view default_base,
-    const PositionalReferences &positional, std::uint64_t &remaining,
-    const SchemaBundleOptions::Callback &callback) -> void {
+    const PositionalReferences &positional, const Pointer &wrapper,
+    std::uint64_t &remaining, const SchemaBundleOptions::Callback &callback)
+    -> void {
   if (positional.unnamed.empty() && positional.elevations.empty()) {
     return;
   }
@@ -623,7 +668,7 @@ auto settle_positional_references(
   // it recurses into a remote
   SchemaFrame::Paths settling{paths};
   for (const auto &embedding : positional.embeddings) {
-    const auto pointer{to_weak_pointer(embedding)};
+    const auto pointer{to_weak_pointer(embedding.destination)};
     // Framing takes paths that do not sit inside one another, so a landing
     // that something already covers is left to the path that covers it. What
     // has been gathered so far is what each one is held against, as one
@@ -684,8 +729,8 @@ auto settle_positional_references(
                   to_pointer(pointer), rewrites) == Moved::Nowhere) {
             throw SchemaReferenceError(
                 reference.destination,
-                where_it_was_written(to_pointer(pointer),
-                                     positional.embeddings),
+                where_it_was_written(to_pointer(pointer), positional.embeddings,
+                                     wrapper),
                 "Could not resolve schema reference");
           }
         }
@@ -701,10 +746,11 @@ auto settle_positional_references(
           // Whatever the fragment names, it is not a place of the schema, and a
           // dialect that reserves no keyword for a name reserves none for an
           // anchor either, so there is nothing for it to have named
-          throw SchemaReferenceError(
-              reference.destination,
-              where_it_was_written(to_pointer(pointer), positional.embeddings),
-              "Could not resolve schema reference");
+          throw SchemaReferenceError(reference.destination,
+                                     where_it_was_written(to_pointer(pointer),
+                                                          positional.embeddings,
+                                                          wrapper),
+                                     "Could not resolve schema reference");
         }
       }
 
@@ -726,10 +772,11 @@ auto settle_positional_references(
           return;
         }
 
-        throw SchemaReferenceError(
-            reference.destination,
-            where_it_was_written(to_pointer(pointer), positional.embeddings),
-            "Could not resolve schema reference");
+        throw SchemaReferenceError(reference.destination,
+                                   where_it_was_written(to_pointer(pointer),
+                                                        positional.embeddings,
+                                                        wrapper),
+                                   "Could not resolve schema reference");
       }
 
       // What the reference reaches can be a resource that the remote carried,
@@ -793,8 +840,8 @@ auto settle_positional_references(
           if (keyword.empty()) {
             throw SchemaReferenceError(
                 reference.destination,
-                where_it_was_written(to_pointer(pointer),
-                                     positional.embeddings),
+                where_it_was_written(to_pointer(pointer), positional.embeddings,
+                                     wrapper),
                 "Could not reach a schema that this dialect embeds without an "
                 "identifier from a resource that reserves nowhere to put one");
           }
@@ -1274,7 +1321,9 @@ auto elevate_embedded_resources(
           embed_schema(root, container, key, std::move(value), callback)};
       placed(known, key);
       landed(known, key, container.concat(landing));
-      positional.embeddings.push_back(container.concat(landing));
+      positional.embeddings.push_back(
+          {.source = Pointer{keyword_string, key},
+           .destination = container.concat(landing)});
     }
 
     for (const auto &removed : to_remove) {
@@ -1355,8 +1404,13 @@ auto embed_references(
     std::string_view default_id, const SchemaFrame::Paths &paths,
     std::string_view default_base, KnownResources &known,
     PositionalReferences &positional, std::string_view container_dialect,
-    std::uint64_t &remaining, const SchemaBundleOptions::Callback &callback,
-    const std::size_t depth = 0) -> void {
+    const Pointer &wrapper, std::uint64_t &remaining,
+    const SchemaBundleOptions::Callback &callback, const std::size_t depth = 0)
+    -> void {
+  // Only the root the caller handed over was made to hold a branch, so a
+  // reference that arrived inside something fetched is named where it was
+  // written already
+  const auto &wrote{depth == 0 ? wrapper : EMPTY_POINTER};
   // Create a fresh frame for each schema we analyze to avoid key collisions
   // between different schemas that have references at the same pointer paths
   static const SchemaFrame::Paths NESTED_PATHS{EMPTY_WEAK_POINTER};
@@ -1447,13 +1501,17 @@ auto embed_references(
     // If we can't find the destination but there is a base and we can
     // find base, then we are facing an unresolved fragment
     if (!reference.base.empty() && frame.traverse(reference.base).has_value()) {
-      throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                 "Could not resolve schema reference");
+      throw SchemaReferenceError(
+          reference.destination,
+          where_the_caller_wrote(to_pointer(pointer), wrote),
+          "Could not resolve schema reference");
     }
 
     if (reference.base.empty()) {
-      throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                 "Could not resolve schema reference");
+      throw SchemaReferenceError(
+          reference.destination,
+          where_the_caller_wrote(to_pointer(pointer), wrote),
+          "Could not resolve schema reference");
     }
 
     assert(!reference.base.empty());
@@ -1513,15 +1571,21 @@ auto embed_references(
           // that sent for it, which is not this one, where this one found it
           // fetched already. Where nothing sent for it this is the only
           // reference there is to name
+          if (waiting && pending->second.fetch.has_value()) {
+            throw impossible_dialect_of_fetched(
+                pending->second.fetch.value().name,
+                pending->second.fetch.value().origin);
+          }
+
           throw impossible_dialect_of_fetched(
-              identifier, waiting && pending->second.origin.has_value()
-                              ? pending->second.origin.value()
-                              : to_pointer(pointer));
+              identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
         }
 
         if (!reaches) {
-          throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                     "Could not resolve schema reference");
+          throw SchemaReferenceError(
+              reference.destination,
+              where_the_caller_wrote(to_pointer(pointer), wrote),
+              "Could not resolve schema reference");
         }
       }
 
@@ -1551,8 +1615,10 @@ auto embed_references(
     auto resolved{resolver(identifier)};
     if (!resolved.has_value()) {
       if (frame.traverse(identifier).has_value()) {
-        throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                   "Could not resolve schema reference");
+        throw SchemaReferenceError(
+            reference.destination,
+            where_the_caller_wrote(to_pointer(pointer), wrote),
+            "Could not resolve schema reference");
       }
 
       throw SchemaResolutionError(
@@ -1563,9 +1629,10 @@ auto embed_references(
     // it owns rather than whatever the resolver chose to hand back
     auto remote{std::move(resolved).to_owned()};
     if (!remote.is_object() && !remote.is_boolean()) {
-      throw SchemaReferenceError(identifier, to_pointer(pointer),
-                                 "The JSON document is not a valid JSON "
-                                 "Schema");
+      throw SchemaReferenceError(
+          identifier, where_the_caller_wrote(to_pointer(pointer), wrote),
+          "The JSON document is not a valid JSON "
+          "Schema");
     }
 
     std::optional<SchemaFrame> remote_root_frame;
@@ -1576,9 +1643,10 @@ auto embed_references(
           SchemaFrame::Paths{EMPTY_WEAK_POINTER}, "", remaining);
       charge(remaining, remote_root_frame.value());
     } catch (const SchemaUnknownBaseDialectError &) {
-      throw SchemaReferenceError(identifier, to_pointer(pointer),
-                                 "The JSON document is not a valid JSON "
-                                 "Schema");
+      throw SchemaReferenceError(
+          identifier, where_the_caller_wrote(to_pointer(pointer), wrote),
+          "The JSON document is not a valid JSON "
+          "Schema");
     }
 
     const auto &remote_root{remote_root_frame->root_location().value().get()};
@@ -1608,12 +1676,15 @@ auto embed_references(
                                         resolver, default_dialect, identifier,
                                         remaining);
       } catch (const SchemaDialectImpossibleError &) {
-        throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
+        throw impossible_dialect_of_fetched(
+            identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
       }
 
       if (!exists) {
-        throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                   "Could not resolve schema reference");
+        throw SchemaReferenceError(
+            reference.destination,
+            where_the_caller_wrote(to_pointer(pointer), wrote),
+            "Could not resolve schema reference");
       }
 
       // Where what it named carries a name of its own, that name is what
@@ -1650,7 +1721,8 @@ auto embed_references(
             names_a_resource = true;
           }
         } catch (const SchemaDialectImpossibleError &) {
-          throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
+          throw impossible_dialect_of_fetched(
+              identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
         }
       }
     }
@@ -1707,7 +1779,8 @@ auto embed_references(
           mark_dialect_of_every_subschema(remote, walker, resolver,
                                           remote_dialect_uri, remaining);
         } catch (const SchemaDialectImpossibleError &) {
-          throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
+          throw impossible_dialect_of_fetched(
+              identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
         }
       }
     }
@@ -1748,12 +1821,14 @@ auto embed_references(
     record(known, identifier, effective_id);
     record(known, effective_id, effective_id);
     expect(known, effective_id, remote, remote_dialect_uri,
-           to_pointer(pointer));
-    deferred.push_back({.schema = std::move(remote),
-                        .identifier = std::move(effective_id),
-                        .fetched_by = identifier,
-                        .base_dialect = remote_base_dialect,
-                        .origin = to_pointer(pointer)});
+           Fetch{.name = identifier,
+                 .origin = where_the_caller_wrote(to_pointer(pointer), wrote)});
+    deferred.push_back(
+        {.schema = std::move(remote),
+         .identifier = std::move(effective_id),
+         .fetched_by = identifier,
+         .base_dialect = remote_base_dialect,
+         .origin = where_the_caller_wrote(to_pointer(pointer), wrote)});
   });
 
   // Whatever the walk above reaches is on its way into the document, so its
@@ -1794,7 +1869,7 @@ auto embed_references(
     try {
       embed_references(root, container, entry.schema, walker, resolver, mode,
                        default_dialect, entry.identifier, paths, default_base,
-                       known, positional, container_dialect, remaining,
+                       known, positional, container_dialect, wrapper, remaining,
                        callback, depth + 1);
       elevate_embedded_resources(
           entry.schema, root, container, entry.base_dialect, walker, resolver,
@@ -1812,7 +1887,8 @@ auto embed_references(
     if (positional.unnamed.contains(entry.identifier)) {
       positional.landings.emplace(entry.identifier, landing);
     }
-    positional.embeddings.push_back(std::move(landing));
+    positional.embeddings.push_back(
+        {.source = {}, .destination = std::move(landing)});
   }
 }
 
@@ -1820,11 +1896,11 @@ auto embed_references(
 // is read by nobody, so a root that is nothing but a reference becomes a branch
 // that can hold both. A root that holds more than the reference has nothing
 // that can be done with it. Says whether the document now reads differently
-auto prepare_root_reference(JSON &schema, const SchemaBaseDialect base_dialect)
-    -> bool {
+auto prepare_root_reference(JSON &schema, const SchemaBaseDialect base_dialect,
+                            Pointer wrapper) -> Pointer {
   if (!ref_overrides_adjacent_keywords(base_dialect) || !schema.is_object() ||
       !schema.defines("$ref"sv, JSONSCHEMA_HASH_REF)) {
-    return false;
+    return wrapper;
   }
 
   if (schema.size() != 1) {
@@ -1840,8 +1916,9 @@ auto prepare_root_reference(JSON &schema, const SchemaBaseDialect base_dialect)
   auto branches{JSON::make_array()};
   branches.push_back(schema);
   schema.at("$ref"sv, JSONSCHEMA_HASH_REF).into(std::move(branches));
-  schema.rename("$ref", is_draft3 ? "extends" : "allOf");
-  return true;
+  const auto *const branch{is_draft3 ? "extends" : "allOf"};
+  schema.rename("$ref", branch);
+  return {branch, 0};
 }
 
 auto bundle_internal(JSON &schema, const SchemaWalker &walker,
@@ -1864,6 +1941,9 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                        .default_id = JSON::String{default_id},
                        .default_base = JSON::String{default_base}};
   PositionalReferences positional;
+  // Where bundling put a reference the root held alone, so that a refusal can
+  // still name the place the caller wrote it
+  Pointer wrapper;
   std::optional<SchemaFrame> initial_frame;
   initial_frame.emplace(SchemaFrame::Mode::Locations, schema, walker, resolver,
                         default_dialect, default_id,
@@ -1924,10 +2004,13 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     // hold both. What the dialect chooses for itself gets the same treatment
     // further down, and asking after the container has been judged is what
     // keeps a container nobody reserves answered as such
-    if (initial_frame->root_location().has_value() &&
-        prepare_root_reference(
-            schema,
-            initial_frame->root_location().value().get().base_dialect)) {
+    if (initial_frame->root_location().has_value()) {
+      wrapper = prepare_root_reference(
+          schema, initial_frame->root_location().value().get().base_dialect,
+          std::move(wrapper));
+    }
+
+    if (!wrapper.empty()) {
       initial_frame.emplace(SchemaFrame::Mode::Locations, schema, walker,
                             resolver, default_dialect, default_id,
                             SchemaFrame::IdentifierMode::Additional, paths,
@@ -1962,10 +2045,10 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     embed_references(schema, default_container.value(), schema, walker,
                      resolver, mode, default_dialect, default_id, paths,
                      default_base, known, positional, container_dialect,
-                     remaining, callback);
+                     wrapper, remaining, callback);
     settle_positional_references(schema, walker, resolver, default_dialect,
                                  default_id, paths, default_base, positional,
-                                 remaining, callback);
+                                 wrapper, remaining, callback);
     return;
   }
 
@@ -2002,7 +2085,8 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
       // anything else beside its reference is answered further down, where
       // saying so does not depend on the caller having named it
       if (schema.is_object() && schema.size() == 1) {
-        prepare_root_reference(schema, root_location.base_dialect);
+        wrapper = prepare_root_reference(schema, root_location.base_dialect,
+                                         std::move(wrapper));
       }
 
       schema_reidentify(schema, default_id, walker, resolver, default_dialect);
@@ -2053,7 +2137,8 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                       "dialect");
   }
 
-  prepare_root_reference(schema, schema_base_dialect);
+  wrapper =
+      prepare_root_reference(schema, schema_base_dialect, std::move(wrapper));
 
   const Pointer container{JSON::String{container_keyword}};
   // A schema that is not an object reserves nowhere for anything, and nothing
@@ -2067,10 +2152,10 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                    default_dialect, default_id, paths, default_base, known,
                    positional,
                    schema_root_frame->root_location().value().get().dialect,
-                   remaining, callback);
+                   wrapper, remaining, callback);
   settle_positional_references(schema, walker, resolver, default_dialect,
                                default_id, paths, default_base, positional,
-                               remaining, callback);
+                               wrapper, remaining, callback);
 }
 
 } // namespace
