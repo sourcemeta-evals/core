@@ -418,6 +418,28 @@ auto landed(KnownResources &known, const std::string_view name,
   known.placements.insert_or_assign(canonical_uri(name), where);
 }
 
+// Every name the document the caller handed over answers to, and where each
+// of those sits within it, so that what a fetched schema names within one is
+// held against what is there. The top of a document answers to the base it
+// was retrieved from as well as to a name it declares, which framing says
+// without calling a retrieval address a resource, as such an address names a
+// document rather than saying where what sits within it is addressed from
+auto record_own_names(const SchemaFrame &frame, KnownResources &known) -> void {
+  frame.for_each_location([&known](const auto, const auto &uri,
+                                   const auto &location) -> void {
+    const auto names_the_top{location.pointer.empty() &&
+                             location.type ==
+                                 SchemaFrame::LocationType::Subschema};
+    if (uri.empty() || (location.type != SchemaFrame::LocationType::Resource &&
+                        !names_the_top)) {
+      return;
+    }
+
+    record(known, uri, JSON::String{uri});
+    landed(known, uri, to_pointer(location.pointer));
+  });
+}
+
 // Every meta-schema that anything within this schema pins. A schema that
 // looks for one of these has to go on finding it, so collecting only what the
 // top of the document declares would miss a resource further in that pins its
@@ -1957,15 +1979,10 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                         SchemaFrame::IdentifierMode::Additional, paths,
                         default_base, remaining);
   charge(remaining, initial_frame.value());
-  // Where the document already holds each of its own names, so that what a
-  // fetched schema names within one is held against what is there. Nothing
-  // reads a resource by that place, and the caller's own document is as much
-  // somewhere a reference can name nothing as anything bundling puts in
-  initial_frame->for_each_resource(
-      [&known](const auto &uri, const auto &location) -> void {
-        record(known, uri, JSON::String{uri});
-        landed(known, uri, to_pointer(location.pointer));
-      });
+  // Nothing reads a resource by where it sits, and the caller's own document
+  // is as much somewhere a reference can name nothing as anything bundling
+  // puts in
+  record_own_names(initial_frame.value(), known);
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());
@@ -2029,6 +2046,10 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                             SchemaFrame::IdentifierMode::Additional, paths,
                             default_base, remaining);
       charge(remaining, initial_frame.value());
+      // A root that was nothing but a reference could not hold a name it was
+      // handed until it was made to hold a branch, so what the document
+      // answers to is asked after again
+      record_own_names(initial_frame.value(), known);
     }
 
     check_container(schema, default_container.value());
@@ -2103,6 +2124,16 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
       }
 
       schema_reidentify(schema, default_id, walker, resolver, default_dialect);
+      if (!wrapper.empty()) {
+        // The name went in where the reference alone had left nowhere to keep
+        // it, so the document answers to it only from here on
+        initial_frame.emplace(SchemaFrame::Mode::Locations, schema, walker,
+                              resolver, default_dialect, default_id,
+                              SchemaFrame::IdentifierMode::Additional, paths,
+                              default_base, remaining);
+        charge(remaining, initial_frame.value());
+        record_own_names(initial_frame.value(), known);
+      }
     }
   }
 
