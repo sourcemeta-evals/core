@@ -121,6 +121,7 @@ auto say_what_it_says_of_itself(JSON &schema, const SchemaWalker &walker,
     Pointer position;
     JSON::String base;
     JSON::String dialect;
+    SchemaBaseDialect base_dialect;
     bool names_itself;
   };
 
@@ -142,6 +143,7 @@ auto say_what_it_says_of_itself(JSON &schema, const SchemaWalker &walker,
       places.push_back({.position = to_pointer(location.pointer),
                         .base = JSON::String{location.base},
                         .dialect = canonical_uri(location.dialect),
+                        .base_dialect = location.base_dialect,
                         .names_itself = location.type ==
                                         SchemaFrame::LocationType::Resource});
     });
@@ -174,31 +176,21 @@ auto say_what_it_says_of_itself(JSON &schema, const SchemaWalker &walker,
       continue;
     }
 
-    // Which keyword carries the name is the schema's own answer, as writing
-    // one it does not read by would be saying something it never said
-    if (target.defines("$id"sv, JSONSCHEMA_HASH_ID)) {
-      target.assign("$id", JSON{place.base});
-    }
-
-    if (target.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID)) {
-      target.assign("id", JSON{place.base});
+    // Which keyword carries a name is the dialect's answer, and the one it
+    // does not reserve is payload wherever it turns up, so saying that the one
+    // way would be rewriting what the schema is about. At the top the name is
+    // settled already, where a copy may spell it against whatever base it came
+    // from and the walk above has nothing to resolve against
+    const auto carries{id_keyword(place.base_dialect)};
+    if (target.defines(carries.name, carries.hash)) {
+      target.assign(JSON::String{carries.name},
+                    JSON{place.position.empty() ? canonical_uri(identifier)
+                                                : place.base});
     }
   }
 
   for (const auto &[position, destination] : reaches) {
     set(schema, position, JSON{destination});
-  }
-
-  // The name the comparison is being made under is settled already, and a copy
-  // may spell it against whatever base it came from, which the frame above has
-  // nothing to resolve against
-  const auto settled{canonical_uri(identifier)};
-  if (schema.defines("$id"sv, JSONSCHEMA_HASH_ID)) {
-    schema.assign("$id", JSON{settled});
-  }
-
-  if (schema.defines("id"sv, JSONSCHEMA_HASH_LEGACY_ID)) {
-    schema.assign("id", JSON{settled});
   }
 }
 
