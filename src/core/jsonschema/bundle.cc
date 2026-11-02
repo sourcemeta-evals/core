@@ -1066,19 +1066,30 @@ auto elevate_embedded_resources(
 
   // An entry can name a sibling as the dialect it is read under, and framing
   // one on its own reaches only what the caller handed over, so the entries
-  // beside it are offered alongside that. What a key says an entry is only
-  // counts where the entry says the same, which is what framing below settles
+  // beside it are offered alongside that. Which one that is goes by what each
+  // says it is rather than by the key it sits under, since the specifications
+  // leave that key to whoever bundled and nothing reads an entry by it
   const SchemaResolver entry_resolver{
       [&defs,
        &resolver](const std::string_view identifier) -> SchemaResolverResult {
-        const auto *sibling{defs.try_at(identifier)};
-        if (sibling != nullptr && sibling->is_object() &&
-            sibling->defines("$id"sv, JSONSCHEMA_HASH_ID) &&
-            sibling->at("$id"sv, JSONSCHEMA_HASH_ID).is_string() &&
-            canonical_uri(
-                sibling->at("$id"sv, JSONSCHEMA_HASH_ID).to_string()) ==
-                canonical_uri(identifier)) {
-          return *sibling;
+        std::optional<JSON::String> canonical;
+        try {
+          canonical = URI::canonicalize(identifier);
+        } catch (const URIParseError &) {
+          canonical = std::nullopt;
+        }
+
+        const auto *direct{defs.try_at(JSON::StringView{identifier})};
+        if (direct != nullptr &&
+            embedded_metaschema_matches(*direct, identifier, canonical)) {
+          return *direct;
+        }
+
+        for (const auto &sibling : defs.as_object()) {
+          if (embedded_metaschema_matches(sibling.second, identifier,
+                                          canonical)) {
+            return sibling.second;
+          }
         }
 
         return resolver(identifier);
