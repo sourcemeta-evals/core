@@ -577,6 +577,36 @@ auto rewrite_into_what_elevation_moved(
   return covered;
 }
 
+// Whether what a reference named inside a remote is somewhere elevation moved
+// it to. Where that went is settled once the document is finished, and the
+// pass that settles it refuses a reference that named nothing there, so asking
+// here would hold the reference against a place the remote no longer keeps
+auto elevation_moved_what_it_named(const Pointer &named,
+                                   const std::vector<Elevated> &elevated)
+    -> bool {
+  return std::ranges::any_of(elevated, [&named](const auto &moved) -> bool {
+    return named.starts_with(moved.at);
+  });
+}
+
+// Where a reference was written, which is the document it arrived in rather
+// than the one it ends up in. A refusal names it there, and this pass reads the
+// finished document, so what went in is what says which of those a place
+// belongs to. The innermost is the answer, and a reference the caller wrote
+// sits inside none of them
+auto where_it_was_written(const Pointer &position,
+                          const std::vector<Pointer> &embeddings) -> Pointer {
+  const Pointer *innermost{nullptr};
+  for (const auto &embedding : embeddings) {
+    if (position.starts_with(embedding) &&
+        (innermost == nullptr || embedding.size() > innermost->size())) {
+      innermost = &embedding;
+    }
+  }
+
+  return innermost == nullptr ? position : position.resolve_from(*innermost);
+}
+
 auto settle_positional_references(
     JSON &schema, const SchemaWalker &walker, const SchemaResolver &resolver,
     std::string_view default_dialect, std::string_view default_id,
@@ -652,9 +682,11 @@ auto settle_positional_references(
               rewrite_into_what_elevation_moved(
                   schema, frame, moved.value(), elevated->second,
                   to_pointer(pointer), rewrites) == Moved::Nowhere) {
-            throw SchemaReferenceError(reference.destination,
-                                       to_pointer(pointer),
-                                       "Could not resolve schema reference");
+            throw SchemaReferenceError(
+                reference.destination,
+                where_it_was_written(to_pointer(pointer),
+                                     positional.embeddings),
+                "Could not resolve schema reference");
           }
         }
 
@@ -669,8 +701,10 @@ auto settle_positional_references(
           // Whatever the fragment names, it is not a place of the schema, and a
           // dialect that reserves no keyword for a name reserves none for an
           // anchor either, so there is nothing for it to have named
-          throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                     "Could not resolve schema reference");
+          throw SchemaReferenceError(
+              reference.destination,
+              where_it_was_written(to_pointer(pointer), positional.embeddings),
+              "Could not resolve schema reference");
         }
       }
 
@@ -692,8 +726,10 @@ auto settle_positional_references(
           return;
         }
 
-        throw SchemaReferenceError(reference.destination, to_pointer(pointer),
-                                   "Could not resolve schema reference");
+        throw SchemaReferenceError(
+            reference.destination,
+            where_it_was_written(to_pointer(pointer), positional.embeddings),
+            "Could not resolve schema reference");
       }
 
       // What the reference reaches can be a resource that the remote carried,
@@ -756,7 +792,9 @@ auto settle_positional_references(
               frame.vocabularies(host_location.value().get(), resolver))};
           if (keyword.empty()) {
             throw SchemaReferenceError(
-                reference.destination, to_pointer(pointer),
+                reference.destination,
+                where_it_was_written(to_pointer(pointer),
+                                     positional.embeddings),
                 "Could not reach a schema that this dialect embeds without an "
                 "identifier from a resource that reserves nowhere to put one");
           }
@@ -1235,6 +1273,7 @@ auto elevate_embedded_resources(
       const auto landing{
           embed_schema(root, container, key, std::move(value), callback)};
       placed(known, key);
+      landed(known, key, container.concat(landing));
       positional.embeddings.push_back(container.concat(landing));
     }
 
@@ -1430,8 +1469,18 @@ auto embed_references(
       const auto &answering{answers_to(known, identifier)};
       const auto pending{known.pending.find(canonical_uri(answering))};
       const auto placement{known.placements.find(canonical_uri(answering))};
+      const auto elevated{positional.elevations.find(answering)};
+      auto moved_away{false};
+      if (elevated != positional.elevations.cend() &&
+          reference.fragment.has_value() &&
+          !reference.fragment.value().empty()) {
+        const auto named{fragment_to_pointer(URI{reference.destination})};
+        moved_away = named.has_value() && elevation_moved_what_it_named(
+                                              named.value(), elevated->second);
+      }
+
       if (reference.fragment.has_value() &&
-          !reference.fragment.value().empty() &&
+          !reference.fragment.value().empty() && !moved_away &&
           (pending != known.pending.cend() ||
            placement != known.placements.cend())) {
         // What it was read under is what it was recorded with, as a resource
