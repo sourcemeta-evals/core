@@ -424,11 +424,11 @@ auto landed(KnownResources &known, const std::string_view name,
 // own. Which places those are is the walk's answer rather than this
 // function's, as a declaration says what reads a schema only where a schema
 // is what it sits in, and a value a schema carries can look exactly like one
-auto collect_pinned_dialects(const JSON &schema, const SchemaWalker &walker,
-                             const SchemaResolver &resolver,
-                             const std::string_view dialect,
-                             std::unordered_set<JSON::String> &result,
-                             std::uint64_t &remaining) -> void {
+auto collect_pinned_dialects(
+    const JSON &schema, const SchemaWalker &walker,
+    const SchemaResolver &resolver, const std::string_view dialect,
+    std::unordered_map<JSON::String, std::vector<SchemaBaseDialect>> &result,
+    std::uint64_t &remaining) -> void {
   const SchemaFrame frame{SchemaFrame::Mode::Locations,
                           schema,
                           walker,
@@ -447,7 +447,7 @@ auto collect_pinned_dialects(const JSON &schema, const SchemaWalker &walker,
   frame.for_each_subschema([&result](const auto &location) -> void {
     if (location.type == SchemaFrame::LocationType::Resource ||
         location.pointer.empty()) {
-      result.insert(canonical_uri(location.dialect));
+      result[canonical_uri(location.dialect)].push_back(location.base_dialect);
     }
   });
 }
@@ -683,10 +683,13 @@ auto settle_positional_references(
   // A copy carries whatever references the schema it came from had, and what
   // those have to say depends on where the copy went rather than on where it
   // came from. So settling reads the document again after it has placed any,
-  // until a round places none. One copy per resource and identifier is what
-  // bounds this: elevation has already lifted every identified resource out of
-  // what lands, so a copy carries no identifier and adds no resource that
-  // could host copies of its own
+  // until a round places none. What bounds that is the copy saying the name of
+  // every resource the schema it came from carried, rather than carrying one
+  // itself: a copy answers to nothing and holds nothing another copy could be
+  // made for. A resource under an applicator is carried that way too, which is
+  // not something lifting out of the reserved location reaches. The map below
+  // keeps one per resource and identifier, so a round that has placed them all
+  // places none
   std::map<std::pair<Pointer, JSON::String>, JSON::String> placed;
   // Held back until every round is done, so that each copy is taken from a
   // schema that still spells its references the way it was resolved by. A
@@ -1144,19 +1147,13 @@ auto elevate_embedded_resources(
   }
 
   // A schema finds a meta-schema it pins by looking for it among the locations
-  // the specifications reserve, at the top of the document it is reading. A
-  // dialect whose own reserved location is neither of those takes its embedded
-  // resources somewhere that search does not go, so what is pinned has to stay
-  // where whatever pinned it can still find it
-  const auto container_is_searched{
-      container.size() == 1 && container.back().is_property() &&
-      (container.back().to_property() == "$defs" ||
-       container.back().to_property() == "definitions")};
-  std::unordered_set<JSON::String> pinned;
-  if (!container_is_searched) {
-    collect_pinned_dialects(remote, walker, resolver, remote_dialect_uri,
-                            pinned, remaining);
-  }
+  // the specifications reserve, at the top of the document it is reading, and
+  // which of those it reserves is its own dialect's answer. So what is pinned
+  // can only be moved where every dialect reading under it would look, and
+  // what reads under each pin goes with it
+  std::unordered_map<JSON::String, std::vector<SchemaBaseDialect>> pinned;
+  collect_pinned_dialects(remote, walker, resolver, remote_dialect_uri, pinned,
+                          remaining);
 
   // An entry can name a sibling as the dialect it is read under, and framing
   // one on its own reaches only what the caller handed over, so the entries
@@ -1240,7 +1237,17 @@ auto elevate_embedded_resources(
       // What is looked for among the locations the specifications reserve is
       // looked for by the name it carries rather than by the key it sits under,
       // so what a key says is no reason to ask this later
-      if (pinned.contains(canonical_uri(identifier))) {
+      const auto reads_under{pinned.find(canonical_uri(identifier))};
+      if (reads_under != pinned.cend() &&
+          !std::ranges::all_of(
+              reads_under->second,
+              [&container, &value, &identifier](const auto base) -> bool {
+                return container.size() == 1 &&
+                       container.back().is_property() &&
+                       embedded_metaschema_link_valid(
+                           value, identifier, container.back().to_property(),
+                           base);
+              })) {
         // Staying put is the only way this one goes on being found, so the
         // document cannot also hold it elsewhere: one identity in two places is
         // not a document anything can read
@@ -1950,9 +1957,15 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                         SchemaFrame::IdentifierMode::Additional, paths,
                         default_base, remaining);
   charge(remaining, initial_frame.value());
-  initial_frame->for_each_resource_uri([&known](const auto &uri) -> void {
-    record(known, uri, JSON::String{uri});
-  });
+  // Where the document already holds each of its own names, so that what a
+  // fetched schema names within one is held against what is there. Nothing
+  // reads a resource by that place, and the caller's own document is as much
+  // somewhere a reference can name nothing as anything bundling puts in
+  initial_frame->for_each_resource(
+      [&known](const auto &uri, const auto &location) -> void {
+        record(known, uri, JSON::String{uri});
+        landed(known, uri, to_pointer(location.pointer));
+      });
   if (default_container.has_value()) {
     // This is undefined behavior
     assert(!default_container.value().empty());

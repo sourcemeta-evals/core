@@ -10,7 +10,7 @@
       "type": "string"
     }
   },
-  "maxLocations": 5,
+  "maxLocations": 6,
   "result": {
     "nonOfficialMetaschemas": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
