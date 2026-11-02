@@ -186,6 +186,29 @@ inline auto definitions_keyword(const SchemaWalker &walker,
   return {};
 }
 
+using DefinitionsKeywords =
+    std::array<std::string_view, DEFINITIONS_KEYWORDS.size()>;
+
+// Every name the dialect in force reserves, in the order it prefers them. A
+// dialect that kept an older name for the location alongside the one it
+// introduced reserves both, and what sits under either is a definition, so a
+// question about where definitions live has more than one answer there. Unused
+// slots are left empty for a caller to pass over
+inline auto definitions_keywords(const SchemaWalker &walker,
+                                 const SchemaVocabularies &vocabularies)
+    -> DefinitionsKeywords {
+  DefinitionsKeywords result{};
+  auto *target{result.begin()};
+  for (const auto candidate : DEFINITIONS_KEYWORDS) {
+    if (walker(candidate, vocabularies).type ==
+        SchemaKeywordType::LocationMembers) {
+      *target++ = candidate;
+    }
+  }
+
+  return result;
+}
+
 inline auto definitions_keyword(const SchemaBaseDialect base_dialect)
     -> std::string_view {
   switch (base_dialect) {

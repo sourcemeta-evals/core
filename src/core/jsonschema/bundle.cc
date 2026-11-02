@@ -1048,15 +1048,9 @@ auto elevate_embedded_resources(
   const auto remote_dialect_uri{dialect(remote, default_dialect, true)};
   const auto remote_vocabularies{vocabularies_with_embedded(
       remote, resolver, remote_dialect, remote_dialect_uri)};
-  const auto keyword{definitions_keyword(walker, remote_vocabularies)};
-  const JSON::String keyword_string{keyword};
-  if (keyword.empty() || !remote.is_object() ||
-      !remote.defines(keyword_string) ||
-      !remote.at(keyword_string).is_object()) {
+  if (!remote.is_object()) {
     return;
   }
-
-  auto &defs{remote.at(keyword_string)};
 
   // A schema finds a meta-schema it pins by looking for it among the locations
   // the specifications reserve, at the top of the document it is reading. A
@@ -1079,168 +1073,174 @@ auto elevate_embedded_resources(
   // says it is rather than by the key it sits under, since the specifications
   // leave that key to whoever bundled and nothing reads an entry by it
   const SchemaResolver entry_resolver{
-      [&defs,
+      [&remote,
        &resolver](const std::string_view identifier) -> SchemaResolverResult {
-        std::optional<JSON::String> canonical;
-        try {
-          canonical = URI::canonicalize(identifier);
-        } catch (const URIParseError &) {
-          canonical = std::nullopt;
-        }
-
-        const auto *direct{defs.try_at(JSON::StringView{identifier})};
-        if (direct != nullptr &&
-            embedded_metaschema_matches(*direct, identifier, canonical)) {
-          return *direct;
-        }
-
-        for (const auto &sibling : defs.as_object()) {
-          if (embedded_metaschema_matches(sibling.second, identifier,
-                                          canonical)) {
-            return sibling.second;
-          }
+        const auto *sibling{
+            embedded_metaschema_candidate(remote, identifier).first};
+        if (sibling != nullptr) {
+          return *sibling;
         }
 
         return resolver(identifier);
       }};
 
-  std::vector<std::pair<JSON::String, bool>> to_extract;
-  std::vector<Removed> to_remove;
-  for (const auto &entry : defs.as_object()) {
-    const auto &key{entry.first};
-    const auto &value{entry.second};
-    // Framing says what an entry identifies, and which keyword carries that is
-    // the dialect's answer rather than this loop's, so the presence of either
-    // is only a reason to ask. Most entries identify nothing at all, which is
-    // what rules them out before paying for a frame
-    if (!value.is_object()) {
+  // What a dialect reserves for definitions can be more than one place, where
+  // the specifications say an older name it kept behaves as the one it
+  // introduced, so what sits in either is a definition and each of them is
+  // walked. A remote holding one identity in two of them is no document at
+  // all, and framing refuses it before any of this
+  for (const auto candidate :
+       definitions_keywords(walker, remote_vocabularies)) {
+    if (candidate.empty()) {
       continue;
     }
 
-    const auto *declared_id{value.try_at("$id"sv, JSONSCHEMA_HASH_ID)};
-    if (declared_id == nullptr) {
-      declared_id = value.try_at("id"sv, JSONSCHEMA_HASH_LEGACY_ID);
-    }
-
-    if (declared_id == nullptr || !declared_id->is_string()) {
+    const JSON::String keyword_string{candidate};
+    if (!remote.defines(keyword_string) ||
+        !remote.at(keyword_string).is_object()) {
       continue;
     }
 
-    // The remote's dialect is what an entry that declares none inherits, so
-    // hand it to the frame as the default rather than falling back after. A
-    // name spelled relatively says whatever the resource around the entry
-    // resolves it against, so the remote's own name goes with it
-    SchemaFrame entry_frame{SchemaFrame::Mode::Root,
-                            value,
-                            walker,
-                            entry_resolver,
-                            remote_dialect_uri,
-                            "",
-                            SchemaFrame::IdentifierMode::Additional,
-                            {EMPTY_WEAK_POINTER},
-                            remote_identifier,
-                            remaining};
-    charge(remaining, entry_frame);
-    const auto &identifier{entry_frame.root()};
-    if (identifier.empty() || !URI{identifier}.is_absolute()) {
-      continue;
-    }
+    auto &defs{remote.at(keyword_string)};
 
-    const JSON::String identifier_string{identifier};
-    // What is looked for among the locations the specifications reserve is
-    // looked for by the name it carries rather than by the key it sits under,
-    // so what a key says is no reason to ask this later
-    if (pinned.contains(canonical_uri(identifier))) {
-      // Staying put is the only way this one goes on being found, so the
-      // document cannot also hold it elsewhere: one identity in two places is
-      // not a document anything can read
-      if (is_known(known, identifier_string)) {
-        throw SchemaError("A meta-schema that has to stay within the schema "
-                          "that pins it cannot be embedded elsewhere too");
-      }
-
-      // What stays behind is still in the document under the identity it
-      // carries, so a reference to it from anywhere else is answered by what
-      // is already here rather than by asking the resolver for another copy
-      record(known, identifier_string, identifier_string);
-      continue;
-    }
-
-    // Only an entry whose key says what it identifies can be elevated, since
-    // the key is where it would land. What a key says is no guide to what an
-    // entry identifies, though, so one the document already holds under the
-    // name this one identifies is still held against what is there. A name
-    // spelled relatively resolves against whatever resource ends up around it,
-    // so where such an entry already sits is the one place it says what it
-    // says, however well the key agrees
-    if (identifier != key || !URI{declared_id->to_string()}.is_absolute()) {
-      if (is_known(known, identifier_string)) {
-        // Dropping one that nothing was held against is how a schema that
-        // disagrees goes missing, so it stays where it is unless something
-        // answered for it
-        if (hold_against_what_is_known(root, container, value, known, walker,
-                                       resolver, default_dialect,
-                                       remote_dialect_uri, container_dialect,
-                                       identifier_string, remaining)) {
-          to_remove.push_back({.key = key, .identifier = identifier_string});
-        }
-      }
-
-      record(known, identifier_string, identifier_string);
-      continue;
-    }
-
-    const auto defines_dialect{
-        value.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
-    if (is_known(known, identifier_string)) {
-      // What the document holds under this name can be anywhere, including the
-      // container bundling puts things in, so there is one question rather
-      // than one per place
-      if (!hold_against_what_is_known(root, container, value, known, walker,
-                                      resolver, default_dialect,
-                                      remote_dialect_uri, container_dialect,
-                                      identifier_string, remaining)) {
+    std::vector<std::pair<JSON::String, bool>> to_extract;
+    std::vector<Removed> to_remove;
+    for (const auto &entry : defs.as_object()) {
+      const auto &key{entry.first};
+      const auto &value{entry.second};
+      // Framing says what an entry identifies, and which keyword carries that
+      // is the dialect's answer rather than this loop's, so the presence of
+      // either is only a reason to ask. Most entries identify nothing at all,
+      // which is what rules them out before paying for a frame
+      if (!value.is_object()) {
         continue;
       }
 
-      to_remove.push_back({.key = key, .identifier = identifier_string});
-    } else {
-      to_extract.emplace_back(
-          key, !defines_dialect &&
-                   dialect_defines(walker, remote_vocabularies, "$schema"sv));
-      record(known, identifier_string, identifier_string);
-      expect(known, identifier_string, value, remote_dialect_uri);
+      const auto *declared_id{value.try_at("$id"sv, JSONSCHEMA_HASH_ID)};
+      if (declared_id == nullptr) {
+        declared_id = value.try_at("id"sv, JSONSCHEMA_HASH_LEGACY_ID);
+      }
+
+      if (declared_id == nullptr || !declared_id->is_string()) {
+        continue;
+      }
+
+      // The remote's dialect is what an entry that declares none inherits, so
+      // hand it to the frame as the default rather than falling back after. A
+      // name spelled relatively says whatever the resource around the entry
+      // resolves it against, so the remote's own name goes with it
+      SchemaFrame entry_frame{SchemaFrame::Mode::Root,
+                              value,
+                              walker,
+                              entry_resolver,
+                              remote_dialect_uri,
+                              "",
+                              SchemaFrame::IdentifierMode::Additional,
+                              {EMPTY_WEAK_POINTER},
+                              remote_identifier,
+                              remaining};
+      charge(remaining, entry_frame);
+      const auto &identifier{entry_frame.root()};
+      if (identifier.empty() || !URI{identifier}.is_absolute()) {
+        continue;
+      }
+
+      const JSON::String identifier_string{identifier};
+      // What is looked for among the locations the specifications reserve is
+      // looked for by the name it carries rather than by the key it sits under,
+      // so what a key says is no reason to ask this later
+      if (pinned.contains(canonical_uri(identifier))) {
+        // Staying put is the only way this one goes on being found, so the
+        // document cannot also hold it elsewhere: one identity in two places is
+        // not a document anything can read
+        if (is_known(known, identifier_string)) {
+          throw SchemaError("A meta-schema that has to stay within the schema "
+                            "that pins it cannot be embedded elsewhere too");
+        }
+
+        // What stays behind is still in the document under the identity it
+        // carries, so a reference to it from anywhere else is answered by what
+        // is already here rather than by asking the resolver for another copy
+        record(known, identifier_string, identifier_string);
+        continue;
+      }
+
+      // Only an entry whose key says what it identifies can be elevated, since
+      // the key is where it would land. What a key says is no guide to what an
+      // entry identifies, though, so one the document already holds under the
+      // name this one identifies is still held against what is there. A name
+      // spelled relatively resolves against whatever resource ends up around
+      // it, so where such an entry already sits is the one place it says what
+      // it says, however well the key agrees
+      if (identifier != key || !URI{declared_id->to_string()}.is_absolute()) {
+        if (is_known(known, identifier_string)) {
+          // Dropping one that nothing was held against is how a schema that
+          // disagrees goes missing, so it stays where it is unless something
+          // answered for it
+          if (hold_against_what_is_known(root, container, value, known, walker,
+                                         resolver, default_dialect,
+                                         remote_dialect_uri, container_dialect,
+                                         identifier_string, remaining)) {
+            to_remove.push_back({.key = key, .identifier = identifier_string});
+          }
+        }
+
+        record(known, identifier_string, identifier_string);
+        continue;
+      }
+
+      const auto defines_dialect{
+          value.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
+      if (is_known(known, identifier_string)) {
+        // What the document holds under this name can be anywhere, including
+        // the container bundling puts things in, so there is one question
+        // rather than one per place
+        if (!hold_against_what_is_known(root, container, value, known, walker,
+                                        resolver, default_dialect,
+                                        remote_dialect_uri, container_dialect,
+                                        identifier_string, remaining)) {
+          continue;
+        }
+
+        to_remove.push_back({.key = key, .identifier = identifier_string});
+      } else {
+        to_extract.emplace_back(
+            key, !defines_dialect &&
+                     dialect_defines(walker, remote_vocabularies, "$schema"sv));
+        record(known, identifier_string, identifier_string);
+        expect(known, identifier_string, value, remote_dialect_uri);
+      }
     }
-  }
 
-  for (const auto &[key, needs_dialect] : to_extract) {
-    positional.elevations[JSON::String{remote_identifier}].push_back(
-        {.at = Pointer{keyword_string, key}, .identifier = key});
-    auto value{std::move(defs.at(key))};
-    defs.erase(key);
-    // Otherwise the elevated resource would be re-interpreted under the
-    // dialect of the schema it gets embedded into, which can differ from
-    // the dialect it inherited from the remote it was elevated out of
-    if (needs_dialect) {
-      value.assign("$schema",
-                   JSON{declared_dialect(value, remote_dialect_uri)});
+    for (const auto &[key, needs_dialect] : to_extract) {
+      positional.elevations[JSON::String{remote_identifier}].push_back(
+          {.at = Pointer{keyword_string, key}, .identifier = key});
+      auto value{std::move(defs.at(key))};
+      defs.erase(key);
+      // Otherwise the elevated resource would be re-interpreted under the
+      // dialect of the schema it gets embedded into, which can differ from
+      // the dialect it inherited from the remote it was elevated out of
+      if (needs_dialect) {
+        value.assign("$schema",
+                     JSON{declared_dialect(value, remote_dialect_uri)});
+      }
+
+      const auto landing{
+          embed_schema(root, container, key, std::move(value), callback)};
+      placed(known, key);
+      positional.embeddings.push_back(container.concat(landing));
     }
 
-    const auto landing{
-        embed_schema(root, container, key, std::move(value), callback)};
-    placed(known, key);
-    positional.embeddings.push_back(container.concat(landing));
-  }
+    for (const auto &removed : to_remove) {
+      positional.elevations[JSON::String{remote_identifier}].push_back(
+          {.at = Pointer{keyword_string, removed.key},
+           .identifier = removed.identifier});
+      defs.erase(removed.key);
+    }
 
-  for (const auto &removed : to_remove) {
-    positional.elevations[JSON::String{remote_identifier}].push_back(
-        {.at = Pointer{keyword_string, removed.key},
-         .identifier = removed.identifier});
-    defs.erase(removed.key);
-  }
-
-  if (defs.empty()) {
-    remote.erase(JSON::String{keyword});
+    if (defs.empty()) {
+      remote.erase(keyword_string);
+    }
   }
 }
 
@@ -1333,17 +1333,20 @@ auto embed_references(
   // as nothing reads an entry there by where it sits
   if (depth > 0) {
     const auto &carrier{frame.root_location()};
-    const JSON::String carried_keyword{
+    const auto carried_keywords{
         carrier.has_value()
-            ? definitions_keyword(
+            ? definitions_keywords(
                   walker, frame.vocabularies(carrier.value().get(), resolver))
-            : std::string_view{}};
+            : DefinitionsKeywords{}};
     const auto carried_dialect{dialect(subschema, default_dialect, true)};
     frame.for_each_resource([&](const auto &, const auto &location) -> void {
       const auto position{to_pointer(location.pointer)};
       const auto within_definitions{
           position.size() >= 2 && position.at(0).is_property() &&
-          position.at(0).to_property() == carried_keyword};
+          std::ranges::any_of(carried_keywords,
+                              [&position](const auto reserved) -> bool {
+                                return reserved == position.at(0).to_property();
+                              })};
       if (position.empty() || (within_definitions && position.size() == 2)) {
         return;
       }
@@ -1354,9 +1357,10 @@ auto embed_references(
       // on its way out, and dropping that copy too loses the schema entirely
       if (within_definitions &&
           removable_entry(root, container, subschema, frame,
-                          Pointer{carried_keyword, position.at(1)}, known,
-                          walker, resolver, default_dialect, carried_dialect,
-                          container_dialect, remaining)) {
+                          Pointer{JSON::String{position.at(0).to_property()},
+                                  position.at(1)},
+                          known, walker, resolver, default_dialect,
+                          carried_dialect, container_dialect, remaining)) {
         return;
       }
 
