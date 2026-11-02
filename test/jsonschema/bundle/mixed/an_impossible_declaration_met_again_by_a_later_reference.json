@@ -29,13 +29,13 @@
       "type": "SchemaReferenceError",
       "message": "The referenced schema declares a dialect that does not define the keyword that declares it",
       "identifier": "https://www.sourcemeta.com/pet",
-      "location": "/allOf/1/$ref"
+      "location": "/allOf/0/$ref"
     },
     "references": {
       "type": "SchemaReferenceError",
       "message": "The referenced schema declares a dialect that does not define the keyword that declares it",
       "identifier": "https://www.sourcemeta.com/pet",
-      "location": "/allOf/1/$ref"
+      "location": "/allOf/0/$ref"
     }
   },
   "result": {},

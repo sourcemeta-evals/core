@@ -313,10 +313,14 @@ auto mark_dialect_of_every_subschema(JSON &schema, const SchemaWalker &walker,
 }
 
 // A resource on its way into the document, kept so that one arriving before
-// it does can still be held against it
+// it does can still be held against it. One bundling went and got also keeps
+// the reference that sent for it, as a refusal the fetched document brings on
+// names that one however many later references meet the same document. One
+// that was already inside something has no such reference
 struct Pending {
   JSON schema;
   JSON::String dialect;
+  std::optional<Pointer> origin;
 };
 
 struct KnownResources {
@@ -380,10 +384,12 @@ auto record(KnownResources &known, const std::string_view name,
 }
 
 auto expect(KnownResources &known, const std::string_view name,
-            const JSON &schema, const std::string_view dialect) -> void {
-  known.pending.insert_or_assign(
-      canonical_uri(name),
-      Pending{.schema = schema, .dialect = JSON::String{dialect}});
+            const JSON &schema, const std::string_view dialect,
+            std::optional<Pointer> origin) -> void {
+  known.pending.insert_or_assign(canonical_uri(name),
+                                 Pending{.schema = schema,
+                                         .dialect = JSON::String{dialect},
+                                         .origin = std::move(origin)});
 }
 
 auto placed(KnownResources &known, const std::string_view name) -> void {
@@ -1208,7 +1214,8 @@ auto elevate_embedded_resources(
             key, !defines_dialect &&
                      dialect_defines(walker, remote_vocabularies, "$schema"sv));
         record(known, identifier_string, identifier_string);
-        expect(known, identifier_string, value, remote_dialect_uri);
+        expect(known, identifier_string, value, remote_dialect_uri,
+               std::nullopt);
       }
     }
 
@@ -1371,7 +1378,8 @@ auto embed_references(
         // a later claimant could be held against it. Saying what it is
         // alongside its name is what leaves one arriving before it does
         // something to answer to
-        expect(known, carried, get(subschema, position), location.dialect);
+        expect(known, carried, get(subschema, position), location.dialect,
+               std::nullopt);
         return;
       }
 
@@ -1434,15 +1442,32 @@ auto embed_references(
         const auto waiting{pending != known.pending.cend()};
         const auto *within{waiting ? &pending->second.schema
                                    : try_get(root, placement->second)};
+        // A name the document was only fetched by is not what this reference
+        // says once it is settled, as what came back answers to a name of its
+        // own and the reference is restated onto that further down. What it
+        // names is asked after as it will read, since a resource keeps its
+        // anchors under the name it declares rather than under whatever was
+        // asked for
+        const auto settled{
+            answering == identifier
+                ? JSON::String{reference.destination}
+                : rebase_reference(answering, reference.fragment)};
         bool reaches{within == nullptr};
         try {
           reaches = reaches ||
-                    names_something_within(
-                        *within, reference.destination, walker, resolver,
-                        waiting ? pending->second.dialect : default_dialect,
-                        answering, remaining);
+                    names_something_within(*within, settled, walker, resolver,
+                                           waiting ? pending->second.dialect
+                                                   : default_dialect,
+                                           answering, remaining);
         } catch (const SchemaDialectImpossibleError &) {
-          throw impossible_dialect_of_fetched(identifier, to_pointer(pointer));
+          // What a fetched document brings on is the fault of the reference
+          // that sent for it, which is not this one, where this one found it
+          // fetched already. Where nothing sent for it this is the only
+          // reference there is to name
+          throw impossible_dialect_of_fetched(
+              identifier, waiting && pending->second.origin.has_value()
+                              ? pending->second.origin.value()
+                              : to_pointer(pointer));
         }
 
         if (!reaches) {
@@ -1673,7 +1698,8 @@ auto embed_references(
 
     record(known, identifier, effective_id);
     record(known, effective_id, effective_id);
-    expect(known, effective_id, remote, remote_dialect_uri);
+    expect(known, effective_id, remote, remote_dialect_uri,
+           to_pointer(pointer));
     deferred.push_back({.schema = std::move(remote),
                         .identifier = std::move(effective_id),
                         .fetched_by = identifier,
