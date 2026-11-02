@@ -1280,8 +1280,12 @@ auto elevate_embedded_resources(
 
         // What stays behind is still in the document under the identity it
         // carries, so a reference to it from anywhere else is answered by what
-        // is already here rather than by asking the resolver for another copy
+        // is already here rather than by asking the resolver for another copy.
+        // What it holds is what such a reference is held against, as where the
+        // document that carries it ends up is not settled here
         record(known, identifier_string, identifier_string);
+        expect(known, identifier_string, value, remote_dialect_uri,
+               std::nullopt);
         continue;
       }
 
@@ -1296,16 +1300,23 @@ auto elevate_embedded_resources(
         if (is_known(known, identifier_string)) {
           // Dropping one that nothing was held against is how a schema that
           // disagrees goes missing, so it stays where it is unless something
-          // answered for it
+          // answered for it, and whatever answered for it holds the name
+          // already
           if (hold_against_what_is_known(root, container, value, known, walker,
                                          resolver, default_dialect,
                                          remote_dialect_uri, container_dialect,
                                          identifier_string, remaining)) {
             to_remove.push_back({.key = key, .identifier = identifier_string});
+            continue;
           }
         }
 
         record(known, identifier_string, identifier_string);
+        // What stays goes in along with the document that carries it, so what
+        // it holds is what a reference naming a place within it is held
+        // against, as where the two of them end up is not settled here
+        expect(known, identifier_string, value, remote_dialect_uri,
+               std::nullopt);
         continue;
       }
 
