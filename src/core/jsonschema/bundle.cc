@@ -89,6 +89,50 @@ auto declared_dialect(const JSON &schema,
                                                       : default_dialect;
 }
 
+// What something newly placed under a position in the document reads under,
+// which is what the position reads under except where a mark is what said so.
+// Walked rather than recursed, as how far a mark reaches is a question of how
+// deep the document the caller handed over goes
+auto dialect_within(const SchemaFrame &frame, const JSON &document,
+                    const WeakPointer &position,
+                    const std::string_view default_dialect) -> JSON::String {
+  const auto *current{&position};
+  while (true) {
+    const auto location{frame.traverse(*current)};
+    if (!location.has_value()) {
+      // Nothing framed reaches here, which leaves what the caller said. That
+      // came from the caller rather than from a frame, so it is held against
+      // a remote's dialect in the one form both can be compared in
+      return canonical_uri(default_dialect);
+    }
+
+    const auto &reported{location.value().get().dialect};
+    const auto &value{get(document, *current)};
+    // What a place says of itself is what it holds reads under, whatever a
+    // mark beside it says of the place itself
+    const auto declared{declared_dialect(value, "")};
+    if (!declared.empty()) {
+      return JSON::String{declared};
+    }
+
+    const auto *const marked{
+        value.is_object() ? value.try_at(DIALECT_OVERRIDE_KEYWORD,
+                                         JSONSCHEMA_HASH_DIALECT_OVERRIDE)
+                          : nullptr};
+    const auto &enclosing{location.value().get().parent};
+    if (marked == nullptr || !marked->is_string() ||
+        marked->to_string() != reported || !enclosing.has_value()) {
+      return JSON::String{reported};
+    }
+
+    // A mark speaks for the place that carries it and says nothing about what
+    // sits below it, so what was in force around that place is what its
+    // contents read under. Nothing stands above the top of what was framed to
+    // say anything else, so a mark there speaks for what it holds too
+    current = &enclosing.value();
+  }
+}
+
 // Every frame that bundling constructs spends from the same limit, as how
 // many frames it ends up needing is a function of what the resolver hands
 // back rather than of the schema the caller passed in. A frame that ran past
@@ -2065,28 +2109,10 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
 
     check_container(schema, default_container.value());
 
-    // What the container holds reads under the dialect its resource is read
-    // under, which is not the one a local override gives the subschema the
-    // container sits in, as such an override says nothing about what sits
-    // below it
-    const auto container_parent{initial_frame->traverse(
-        to_weak_pointer(default_container.value().initial()))};
-    const auto container_resource{
-        container_parent.has_value()
-            ? initial_frame->traverse(container_parent.value().get().base)
-            : std::nullopt};
-    // Where no resource holds the container, the frame still says what the
-    // subschema it hangs off is read under, which is what it holds reads under
-    // too. Only where nothing framed reaches that either is there nothing left
-    // but what the caller said the document is. That came from the caller
-    // rather than from a frame, so it is held against a remote's dialect in
-    // the one form both can be compared in
-    const auto container_location{
-        container_resource.has_value() ? container_resource : container_parent};
-    const JSON::String container_dialect{
-        container_location.has_value()
-            ? JSON::String{container_location.value().get().dialect}
-            : canonical_uri(default_dialect)};
+    const auto container_parent_pointer{default_container.value().initial()};
+    const auto container_dialect{dialect_within(
+        initial_frame.value(), schema,
+        to_weak_pointer(container_parent_pointer), default_dialect)};
     embed_references(schema, default_container.value(), schema, walker,
                      resolver, mode, default_dialect, default_id, paths,
                      default_base, known, positional, container_dialect,
@@ -2153,6 +2179,13 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   const auto schema_base_dialect{
       schema_root_frame->root_location().value().get().base_dialect};
 
+  // Asked while this frame still says what the document is, as what the root
+  // is made to hold further down leaves the two of them speaking of different
+  // documents. What a root is read under is no different for having been made
+  // to hold a branch either way
+  const auto container_dialect{dialect_within(
+      schema_root_frame.value(), schema, EMPTY_WEAK_POINTER, default_dialect)};
+
   const auto container_keyword{definitions_keyword(
       walker, schema_root_frame->vocabularies(
                   schema_root_frame->root_location().value().get(), resolver))};
@@ -2211,9 +2244,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   }
   embed_references(schema, container, schema, walker, resolver, mode,
                    default_dialect, default_id, paths, default_base, known,
-                   positional,
-                   schema_root_frame->root_location().value().get().dialect,
-                   wrapper, remaining, callback);
+                   positional, container_dialect, wrapper, remaining, callback);
   settle_positional_references(schema, walker, resolver, default_dialect,
                                default_id, paths, default_base, positional,
                                wrapper, remaining, callback);
