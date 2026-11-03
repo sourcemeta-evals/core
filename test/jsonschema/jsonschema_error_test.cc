@@ -95,3 +95,19 @@ TEST(container_error_throw) {
               "/components/schemas");
   }
 }
+
+TEST(container_error_keeps_its_location) {
+  sourcemeta::core::Pointer location{"components", "schemas"};
+  const sourcemeta::core::SchemaContainerError error{location, "My error"};
+  location.push_back("Pet");
+
+  sourcemeta::core::SchemaContainerError copy{
+      sourcemeta::core::Pointer{"schemas"}, "Another error"};
+  copy = error;
+
+  EXPECT_EQ(sourcemeta::core::to_string(error.location()),
+            "/components/schemas");
+  EXPECT_STREQ(copy.what(), "My error");
+  EXPECT_EQ(sourcemeta::core::to_string(copy.location()),
+            "/components/schemas");
+}
