@@ -2135,16 +2135,6 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
       }
 
       schema_reidentify(schema, default_id, walker, resolver, default_dialect);
-      if (!wrapper.empty()) {
-        // The name went in where the reference alone had left nowhere to keep
-        // it, so the document answers to it only from here on
-        initial_frame.emplace(SchemaFrame::Mode::Locations, schema, walker,
-                              resolver, default_dialect, default_id,
-                              SchemaFrame::IdentifierMode::Additional, paths,
-                              default_base, remaining);
-        charge(remaining, initial_frame.value());
-        record_own_names(initial_frame.value(), known);
-      }
     }
   }
 
@@ -2194,6 +2184,22 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
 
   wrapper =
       prepare_root_reference(schema, schema_base_dialect, std::move(wrapper));
+  if (!wrapper.empty() && (!default_id.empty() || !default_base.empty())) {
+    // A root that was nothing but a reference could keep neither a name it
+    // declares nor one it was handed until it was made to hold a branch, and
+    // where the dialect reserves no keyword for one, the only place that name
+    // can be read off is the frame. So what the document answers to is asked
+    // after again once the branch is in and whatever name goes with it has
+    // been put where it belongs. Only a name the caller gave could have gone
+    // missing that way, as a root with nothing but a reference in it declares
+    // none of its own, and asking after nothing costs a frame
+    initial_frame.emplace(SchemaFrame::Mode::Locations, schema, walker,
+                          resolver, default_dialect, default_id,
+                          SchemaFrame::IdentifierMode::Additional, paths,
+                          default_base, remaining);
+    charge(remaining, initial_frame.value());
+    record_own_names(initial_frame.value(), known);
+  }
 
   const Pointer container{JSON::String{container_keyword}};
   // A schema that is not an object reserves nowhere for anything, and nothing
