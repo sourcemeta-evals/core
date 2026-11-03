@@ -317,9 +317,47 @@ struct PositionalReferences {
 // the keyword that names a dialect speaks for the one subschema it sits on.
 // Only the frame knows where those subschemas are, and taking its word for it
 // is what keeps a value that merely looks like a schema from being marked
+// Whether a place says what it reads under in the keyword its dialect reserves
+// for it, and goes on saying it wherever it ends up, which is what naming
+// itself buys: a declaration anywhere else is read by nobody once it sits
+// inside another document
+auto says_what_it_reads_under(const SchemaFrame &frame, const JSON &document,
+                              const WeakPointer &position) -> bool {
+  return frame.traverse(position, SchemaFrame::LocationType::Resource)
+             .has_value() &&
+         !declared_dialect(get(document, position), "").empty();
+}
+
+// What a place inside a fetched schema reads under once it is embedded. A mark
+// says nothing for what sits below it, so what carries any further is a
+// declaration kept by something that names itself, and where nothing above it
+// says anything there is only what the place it all goes to says
+auto inherited_once_embedded(const SchemaFrame &frame, const JSON &document,
+                             const SchemaFrame::Location &location,
+                             const std::string_view lands_under)
+    -> JSON::String {
+  auto enclosing{location.parent};
+  while (enclosing.has_value()) {
+    if (says_what_it_reads_under(frame, document, enclosing.value())) {
+      return JSON::String{
+          declared_dialect(get(document, enclosing.value()), "")};
+    }
+
+    const auto above{frame.traverse(enclosing.value())};
+    if (!above.has_value()) {
+      break;
+    }
+
+    enclosing = above.value().get().parent;
+  }
+
+  return JSON::String{lands_under};
+}
+
 auto mark_dialect_of_every_subschema(JSON &schema, const SchemaWalker &walker,
                                      const SchemaResolver &resolver,
                                      const std::string_view dialect,
+                                     const std::string_view lands_under,
                                      std::uint64_t &remaining) -> void {
   const SchemaFrame frame{SchemaFrame::Mode::Locations,
                           schema,
@@ -333,37 +371,51 @@ auto mark_dialect_of_every_subschema(JSON &schema, const SchemaWalker &walker,
                           remaining};
   charge(remaining, frame);
 
-  std::vector<Pointer> targets;
-  frame.for_each_location([&targets, dialect](const auto, const auto &,
-                                              const auto &location) -> void {
-    if (location.type != SchemaFrame::LocationType::Resource &&
-        location.type != SchemaFrame::LocationType::Subschema) {
-      return;
-    }
+  std::vector<std::pair<Pointer, JSON::String>> targets;
+  frame.for_each_location(
+      [&targets, lands_under, &frame, &document = std::as_const(schema)](
+          const auto, const auto &, const auto &location) -> void {
+        if (location.type != SchemaFrame::LocationType::Resource &&
+            location.type != SchemaFrame::LocationType::Subschema) {
+          return;
+        }
 
-    // Marking stands in for a declaration that this dialect has no keyword
-    // for, so it has nothing to say where a subschema already reads as
-    // something else. Going by the dialect in force rather than the one asked
-    // for is what leaves such a subschema, and everything under it, as
-    // whoever wrote it meant
-    if (location.dialect != dialect) {
-      return;
-    }
+        // One that names itself and says what it reads under keeps saying it
+        // wherever it goes, so there is nothing for a mark to carry and
+        // nothing to take that declaration's place
+        if (says_what_it_reads_under(frame, document, location.pointer)) {
+          return;
+        }
 
-    targets.push_back(to_pointer(location.pointer));
-  });
+        // Marking stands in for a declaration that this dialect has no keyword
+        // for, so what it has to say is said where being embedded would leave
+        // a subschema reading as something other than what it reads as here.
+        // One that would read the same way either side needs nothing said for
+        // it, whether that is because what it goes into reads that way or
+        // because something above it goes on saying so
+        if (canonical_uri(location.dialect) ==
+            canonical_uri(inherited_once_embedded(frame, document, location,
+                                                  lands_under))) {
+          return;
+        }
 
-  for (const auto &target : targets) {
+        targets.push_back(
+            {to_pointer(location.pointer), JSON::String{location.dialect}});
+      });
+
+  for (const auto &[target, reads_under] : targets) {
     auto &subschema{get(schema, target)};
     // A boolean carries no keyword whose meaning could have differed, so
     // leaving it to inherit costs nothing
     if (subschema.is_object()) {
       // A mark says what this is read under, so a declaration beside it is
       // read by nobody, and where this lands a declaration is not something
-      // a subschema is allowed to carry at all unless it names itself
+      // a subschema is allowed to carry at all unless it names itself. What a
+      // subschema was already marked with is what whoever wrote it said of it,
+      // which this has nothing to add to
       subschema.erase("$schema"sv, JSONSCHEMA_HASH_SCHEMA);
       subschema.assign(JSON::String{DIALECT_OVERRIDE_KEYWORD},
-                       JSON{canonical_uri(dialect)});
+                       JSON{canonical_uri(reads_under)});
     }
   }
 }
@@ -1029,8 +1081,11 @@ auto settle_positional_references(
           // Where it came from said what it was by sitting where it sat, and
           // the place it goes to says something else, so the copy has to say it
           if (copy.carries_its_dialect) {
-            mark_dialect_of_every_subschema(duplicate, walker, resolver,
-                                            copy.dialect, remaining);
+            mark_dialect_of_every_subschema(
+                duplicate, walker, resolver, copy.dialect,
+                dialect_within(frame, schema, to_weak_pointer(copy.host),
+                               default_dialect),
+                remaining);
           }
 
           placed.emplace(seen,
@@ -1857,14 +1912,20 @@ auto embed_references(
         if (!remote.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)) {
           remote.assign("$schema", JSON{remote_dialect_uri});
         }
-      } else if (remote_dialect_uri != container_dialect) {
+      } else if (remote_dialect_uri != container_dialect ||
+                 (!declared_dialect(remote, "").empty() &&
+                  canonical_uri(declared_dialect(remote, "")) !=
+                      canonical_uri(remote_dialect_uri))) {
         // Marking is what carries a dialect that no keyword of the schema can
         // declare. Where whatever holds the container already reads under the
         // dialect the remote was read under, inheritance says the same thing
-        // for free
+        // for free, unless what the remote declares is not what the remote
+        // itself reads under: that declaration speaks for what the remote
+        // holds, and where it lands nobody reads it
         try {
           mark_dialect_of_every_subschema(remote, walker, resolver,
-                                          remote_dialect_uri, remaining);
+                                          remote_dialect_uri, container_dialect,
+                                          remaining);
         } catch (const SchemaDialectImpossibleError &) {
           throw impossible_dialect_of_fetched(
               identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
