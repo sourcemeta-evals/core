@@ -120,8 +120,11 @@ auto dialect_within(const SchemaFrame &frame, const JSON &document,
                                          JSONSCHEMA_HASH_DIALECT_OVERRIDE)
                           : nullptr};
     const auto &enclosing{location.value().get().parent};
-    if (marked == nullptr || !marked->is_string() ||
-        marked->to_string() != reported || !enclosing.has_value()) {
+    // Whether the mark is what said so, which a reference overriding whatever
+    // sits beside it is enough to decide otherwise. Both are spellings
+    // something wrote, so what each of them names is what settles it
+    if (marked == nullptr || !marked->is_string() || !enclosing.has_value() ||
+        canonical_uri(marked->to_string()) != canonical_uri(reported)) {
       return JSON::String{reported};
     }
 
