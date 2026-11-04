@@ -241,20 +241,40 @@ auto say_what_it_says_of_itself(JSON &schema, const SchemaWalker &walker,
   }
 }
 
+// What one bundling reads from first to last: where it puts what it brings in
+// and what that place is read under, how it reads and fetches schemas, and
+// what the caller named for a document that declares nothing. Holding these
+// together is what keeps the dialects among them from being handed over in one
+// another's place
+struct Reading {
+  const Pointer &container;
+  std::string_view container_dialect;
+  const SchemaWalker &walker;
+  const SchemaResolver &resolver;
+  std::string_view default_dialect;
+};
+
+// What a subschema reads as where it sits, held against what it would read
+// under once it is embedded. Which of the two is which is the whole of the
+// question marking answers, so neither of them goes over on its own
+struct Marking {
+  std::string_view reads_as;
+  std::string_view lands_under;
+};
+
 // Whether two copies of one resource say the same thing, which is not the same
 // question as whether either was written the way the other was
-auto says_the_same(const JSON &held, const std::string_view held_dialect,
-                   const JSON &arriving,
+auto says_the_same(const Reading &reading, const JSON &held,
+                   const std::string_view held_dialect, const JSON &arriving,
                    const std::string_view arriving_dialect,
-                   const SchemaWalker &walker, const SchemaResolver &resolver,
                    const JSON::String &identifier, std::uint64_t &remaining)
     -> bool {
   auto expected{held};
-  say_what_it_says_of_itself(expected, walker, resolver, held_dialect,
-                             identifier, remaining);
+  say_what_it_says_of_itself(expected, reading.walker, reading.resolver,
+                             held_dialect, identifier, remaining);
   auto candidate{arriving};
-  say_what_it_says_of_itself(candidate, walker, resolver, arriving_dialect,
-                             identifier, remaining);
+  say_what_it_says_of_itself(candidate, reading.walker, reading.resolver,
+                             arriving_dialect, identifier, remaining);
   return expected == candidate;
 }
 
@@ -354,16 +374,14 @@ auto inherited_once_embedded(const SchemaFrame &frame, const JSON &document,
   return JSON::String{lands_under};
 }
 
-auto mark_dialect_of_every_subschema(JSON &schema, const SchemaWalker &walker,
-                                     const SchemaResolver &resolver,
-                                     const std::string_view dialect,
-                                     const std::string_view lands_under,
+auto mark_dialect_of_every_subschema(const Reading &reading, JSON &schema,
+                                     const Marking &marking,
                                      std::uint64_t &remaining) -> void {
   const SchemaFrame frame{SchemaFrame::Mode::Locations,
                           schema,
-                          walker,
-                          resolver,
-                          dialect,
+                          reading.walker,
+                          reading.resolver,
+                          marking.reads_as,
                           "",
                           SchemaFrame::IdentifierMode::Additional,
                           {EMPTY_WEAK_POINTER},
@@ -373,8 +391,9 @@ auto mark_dialect_of_every_subschema(JSON &schema, const SchemaWalker &walker,
 
   std::vector<std::pair<Pointer, JSON::String>> targets;
   frame.for_each_location(
-      [&targets, lands_under, &frame, &document = std::as_const(schema)](
-          const auto, const auto &, const auto &location) -> void {
+      [&targets, lands_under = marking.lands_under, &frame,
+       &document = std::as_const(schema)](const auto, const auto &,
+                                          const auto &location) -> void {
         if (location.type != SchemaFrame::LocationType::Resource &&
             location.type != SchemaFrame::LocationType::Subschema) {
           return;
@@ -781,22 +800,22 @@ auto where_it_was_written(const Pointer &position,
   return written;
 }
 
-auto settle_positional_references(
-    JSON &schema, const SchemaWalker &walker, const SchemaResolver &resolver,
-    std::string_view default_dialect, std::string_view default_id,
-    const SchemaFrame::Paths &paths, std::string_view default_base,
-    const PositionalReferences &positional, const Pointer &wrapper,
-    std::uint64_t &remaining, const SchemaBundleOptions::Callback &callback)
+auto settle_positional_references(const Reading &reading, JSON &schema,
+                                  const KnownResources &known,
+                                  const PositionalReferences &positional,
+                                  const Pointer &wrapper,
+                                  std::uint64_t &remaining,
+                                  const SchemaBundleOptions::Callback &callback)
     -> void {
   if (positional.unnamed.empty() && positional.elevations.empty()) {
     return;
   }
 
-  // What the caller asked to be framed does not have to reach the container,
-  // as a wrapper format keeps one outside every schema it frames. So each
-  // landing is framed in its own right, which is also what the walk does when
-  // it recurses into a remote
-  SchemaFrame::Paths settling{paths};
+  // What the caller asked to be framed does not have to reach the
+  // container, as a wrapper format keeps one outside every schema it
+  // frames. So each landing is framed in its own right, which is also what the
+  // walk does when it recurses into a remote
+  SchemaFrame::Paths settling{known.paths};
   for (const auto &embedding : positional.embeddings) {
     const auto pointer{to_weak_pointer(embedding.destination)};
     // Framing takes paths that do not sit inside one another, so a landing
@@ -831,13 +850,13 @@ auto settle_positional_references(
     settled = true;
     const SchemaFrame frame{SchemaFrame::Mode::References,
                             schema,
-                            walker,
-                            resolver,
-                            default_dialect,
-                            default_id,
+                            reading.walker,
+                            reading.resolver,
+                            reading.default_dialect,
+                            known.default_id,
                             SchemaFrame::IdentifierMode::Additional,
                             settling,
-                            default_base,
+                            known.default_base,
                             remaining};
     charge(remaining, frame);
 
@@ -968,8 +987,8 @@ auto settle_positional_references(
           assert(host_location.has_value());
           const auto host{to_pointer(host_location.value().get().pointer)};
           const auto keyword{definitions_keyword(
-              walker,
-              frame.vocabularies(host_location.value().get(), resolver))};
+              reading.walker, frame.vocabularies(host_location.value().get(),
+                                                 reading.resolver))};
           if (keyword.empty()) {
             throw SchemaReferenceError(
                 reference.destination,
@@ -1038,10 +1057,10 @@ auto settle_positional_references(
         const auto within{frame.traverse(to_weak_pointer(inside))};
         if (!resolved.has_value() || !within.has_value() ||
             !says_the_same(
+                reading,
                 get(schema, to_pointer(resolved.value().get().pointer)),
                 resolved.value().get().dialect, get(schema, inside),
-                within.value().get().dialect, walker, resolver, name,
-                remaining)) {
+                within.value().get().dialect, name, remaining)) {
           throw SchemaError(
               "Conflicting embedded resources with the same identifier");
         }
@@ -1091,9 +1110,11 @@ auto settle_positional_references(
           // the place it goes to says something else, so the copy has to say it
           if (copy.carries_its_dialect) {
             mark_dialect_of_every_subschema(
-                duplicate, walker, resolver, copy.dialect,
-                dialect_within(frame, schema, to_weak_pointer(copy.host),
-                               default_dialect),
+                reading, duplicate,
+                {.reads_as = copy.dialect,
+                 .lands_under =
+                     dialect_within(frame, schema, to_weak_pointer(copy.host),
+                                    reading.default_dialect)},
                 remaining);
           }
 
@@ -1125,19 +1146,17 @@ auto settle_positional_references(
 // container alone cannot answer that, as a caller may hold a resource
 // anywhere, and holding the two against each other is what keeps a name
 // standing for one schema rather than for two that disagree
-auto hold_against_what_is_known(
-    const JSON &root, const Pointer &container, const JSON &value,
-    const KnownResources &known, const SchemaWalker &walker,
-    const SchemaResolver &resolver, std::string_view default_dialect,
-    std::string_view remote_dialect_uri, std::string_view container_dialect,
-    const JSON::String &identifier, std::uint64_t &remaining) -> bool {
+auto hold_against_what_is_known(const Reading &reading, const JSON &root,
+                                const JSON &value, const KnownResources &known,
+                                std::string_view remote_dialect_uri,
+                                const JSON::String &identifier,
+                                std::uint64_t &remaining) -> bool {
   // What a later pass will place is not in the document yet, so a candidate
   // arriving first would otherwise be dropped against nothing at all
   const auto pending{known.pending.find(canonical_uri(identifier))};
   if (pending != known.pending.cend()) {
-    if (!says_the_same(pending->second.schema, pending->second.dialect, value,
-                       remote_dialect_uri, walker, resolver, identifier,
-                       remaining)) {
+    if (!says_the_same(reading, pending->second.schema, pending->second.dialect,
+                       value, remote_dialect_uri, identifier, remaining)) {
       throw SchemaError(
           "Conflicting embedded resources with the same identifier");
     }
@@ -1148,12 +1167,12 @@ auto hold_against_what_is_known(
   // Nothing the caller framed reaches the place bundling puts things, by
   // design for a wrapper format, so what is already there is asked of the
   // container itself rather than of the document around it
-  const auto *held_container{try_get(root, container)};
+  const auto *held_container{try_get(root, reading.container)};
   if (held_container != nullptr && held_container->is_object()) {
     for (const auto &entry : held_container->as_object()) {
       // Rule out what cannot match, and what framing would reject, before
-      // paying for a frame. What a container calls an entry is no guide to
-      // what that entry identifies, since a caller may hold one under a name
+      // paying for a frame. What a container calls an entry is no guide
+      // to what that entry identifies, since a caller may hold one under a name
       // of its own choosing
       if (!entry.second.is_object()) {
         continue;
@@ -1172,9 +1191,9 @@ auto hold_against_what_is_known(
 
       SchemaFrame entry_frame{SchemaFrame::Mode::Root,
                               entry.second,
-                              walker,
-                              resolver,
-                              container_dialect,
+                              reading.walker,
+                              reading.resolver,
+                              reading.container_dialect,
                               "",
                               SchemaFrame::IdentifierMode::Additional,
                               {EMPTY_WEAK_POINTER},
@@ -1185,13 +1204,12 @@ auto hold_against_what_is_known(
         continue;
       }
 
-      // What sits here reads under whatever holds the container, which is not
-      // what the one claiming its name arrived reading under. Taking the
+      // What sits here reads under whatever holds the container, which
+      // is not what the one claiming its name arrived reading under. Taking the
       // incoming dialect for both is how two schemas that only look alike are
       // taken for one
-      if (!says_the_same(entry.second, container_dialect, value,
-                         remote_dialect_uri, walker, resolver, identifier,
-                         remaining)) {
+      if (!says_the_same(reading, entry.second, reading.container_dialect,
+                         value, remote_dialect_uri, identifier, remaining)) {
         throw SchemaError(
             "Conflicting embedded resources with the same identifier");
       }
@@ -1202,9 +1220,9 @@ auto hold_against_what_is_known(
 
   const SchemaFrame frame{SchemaFrame::Mode::Locations,
                           root,
-                          walker,
-                          resolver,
-                          default_dialect,
+                          reading.walker,
+                          reading.resolver,
+                          reading.default_dialect,
                           known.default_id,
                           SchemaFrame::IdentifierMode::Additional,
                           known.paths,
@@ -1225,9 +1243,9 @@ auto hold_against_what_is_known(
   // inherits it, and either can spell it its own way, none of which says
   // anything about whether they are the same schema
   const auto &held_location{location.value().get()};
-  if (!says_the_same(get(root, to_pointer(held_location.pointer)),
-                     held_location.dialect, value, remote_dialect_uri, walker,
-                     resolver, identifier, remaining)) {
+  if (!says_the_same(reading, get(root, to_pointer(held_location.pointer)),
+                     held_location.dialect, value, remote_dialect_uri,
+                     identifier, remaining)) {
     throw SchemaError(
         "Conflicting embedded resources with the same identifier");
   }
@@ -1239,13 +1257,10 @@ auto hold_against_what_is_known(
 // elevation drops for agreeing with what its name already reaches. Everything
 // such an entry carries leaves the document along with it, so none of it
 // answers for a name of its own
-auto removable_entry(const JSON &root, const Pointer &container,
+auto removable_entry(const Reading &reading, const JSON &root,
                      const JSON &remote, const SchemaFrame &frame,
                      const Pointer &entry_position, const KnownResources &known,
-                     const SchemaWalker &walker, const SchemaResolver &resolver,
-                     std::string_view default_dialect,
                      std::string_view remote_dialect_uri,
-                     std::string_view container_dialect,
                      std::uint64_t &remaining) -> bool {
   const auto entry{frame.traverse(to_weak_pointer(entry_position),
                                   SchemaFrame::LocationType::Resource)};
@@ -1255,26 +1270,23 @@ auto removable_entry(const JSON &root, const Pointer &container,
 
   const JSON::String identifier{entry.value().get().base};
   return is_known(known, identifier) &&
-         hold_against_what_is_known(
-             root, container, get(remote, entry_position), known, walker,
-             resolver, default_dialect, remote_dialect_uri, container_dialect,
-             identifier, remaining);
+         hold_against_what_is_known(reading, root, get(remote, entry_position),
+                                    known, remote_dialect_uri, identifier,
+                                    remaining);
 }
 
 auto elevate_embedded_resources(
-    JSON &remote, JSON &root, const Pointer &container,
-    const SchemaBaseDialect remote_dialect, const SchemaWalker &walker,
-    const SchemaResolver &resolver, std::string_view default_dialect,
-    std::string_view remote_identifier, KnownResources &known,
-    PositionalReferences &positional, std::string_view container_dialect,
+    const Reading &reading, JSON &remote, JSON &root,
+    const SchemaBaseDialect remote_dialect, std::string_view remote_identifier,
+    KnownResources &known, PositionalReferences &positional,
     std::uint64_t &remaining, const SchemaBundleOptions::Callback &callback)
     -> void {
   // A remote can say what it is read under by a mark rather than by
   // `$schema`, which is the only way a dialect that reserves no keyword for
   // saying so can be carried, and what it says is where its definitions live
-  const auto remote_dialect_uri{dialect(remote, default_dialect, true)};
+  const auto remote_dialect_uri{dialect(remote, reading.default_dialect, true)};
   const auto remote_vocabularies{vocabularies_with_embedded(
-      remote, resolver, remote_dialect, remote_dialect_uri)};
+      remote, reading.resolver, remote_dialect, remote_dialect_uri)};
   if (!remote.is_object()) {
     return;
   }
@@ -1285,8 +1297,8 @@ auto elevate_embedded_resources(
   // can only be moved where every dialect reading under it would look, and
   // what reads under each pin goes with it
   std::unordered_map<JSON::String, std::vector<SchemaBaseDialect>> pinned;
-  collect_pinned_dialects(remote, walker, resolver, remote_dialect_uri, pinned,
-                          remaining);
+  collect_pinned_dialects(remote, reading.walker, reading.resolver,
+                          remote_dialect_uri, pinned, remaining);
 
   // An entry can name a sibling as the dialect it is read under, and framing
   // one on its own reaches only what the caller handed over, so the entries
@@ -1294,8 +1306,8 @@ auto elevate_embedded_resources(
   // says it is rather than by the key it sits under, since the specifications
   // leave that key to whoever bundled and nothing reads an entry by it
   const SchemaResolver entry_resolver{
-      [&remote,
-       &resolver](const std::string_view identifier) -> SchemaResolverResult {
+      [&remote, &resolver = reading.resolver](
+          const std::string_view identifier) -> SchemaResolverResult {
         const auto *sibling{
             embedded_metaschema_candidate(remote, identifier).first};
         if (sibling != nullptr) {
@@ -1311,7 +1323,7 @@ auto elevate_embedded_resources(
   // walked. A remote holding one identity in two of them is no document at
   // all, and framing refuses it before any of this
   for (const auto candidate :
-       definitions_keywords(walker, remote_vocabularies)) {
+       definitions_keywords(reading.walker, remote_vocabularies)) {
     if (candidate.empty()) {
       continue;
     }
@@ -1352,7 +1364,7 @@ auto elevate_embedded_resources(
       // resolves it against, so the remote's own name goes with it
       SchemaFrame entry_frame{SchemaFrame::Mode::Root,
                               value,
-                              walker,
+                              reading.walker,
                               entry_resolver,
                               remote_dialect_uri,
                               "",
@@ -1372,15 +1384,16 @@ auto elevate_embedded_resources(
       // so what a key says is no reason to ask this later
       const auto reads_under{pinned.find(canonical_uri(identifier))};
       if (reads_under != pinned.cend() &&
-          !std::ranges::all_of(
-              reads_under->second,
-              [&container, &value, &identifier](const auto base) -> bool {
-                return container.size() == 1 &&
-                       container.back().is_property() &&
-                       embedded_metaschema_link_valid(
-                           value, identifier, container.back().to_property(),
-                           base);
-              })) {
+          !std::ranges::all_of(reads_under->second,
+                               [&container = reading.container, &value,
+                                &identifier](const auto base) -> bool {
+                                 return container.size() == 1 &&
+                                        container.back().is_property() &&
+                                        embedded_metaschema_link_valid(
+                                            value, identifier,
+                                            container.back().to_property(),
+                                            base);
+                               })) {
         // Staying put is the only way this one goes on being found, so the
         // document cannot also hold it elsewhere: one identity in two places is
         // not a document anything can read
@@ -1391,9 +1404,9 @@ auto elevate_embedded_resources(
 
         // What stays behind is still in the document under the identity it
         // carries, so a reference to it from anywhere else is answered by what
-        // is already here rather than by asking the resolver for another copy.
-        // What it holds is what such a reference is held against, as where the
-        // document that carries it ends up is not settled here
+        // is already here rather than by asking the resolver for
+        // another copy. What it holds is what such a reference is held against,
+        // as where the document that carries it ends up is not settled here
         record(known, identifier_string, identifier_string);
         expect(known, identifier_string, value, remote_dialect_uri,
                std::nullopt);
@@ -1413,10 +1426,9 @@ auto elevate_embedded_resources(
           // disagrees goes missing, so it stays where it is unless something
           // answered for it, and whatever answered for it holds the name
           // already
-          if (hold_against_what_is_known(root, container, value, known, walker,
-                                         resolver, default_dialect,
-                                         remote_dialect_uri, container_dialect,
-                                         identifier_string, remaining)) {
+          if (hold_against_what_is_known(reading, root, value, known,
+                                         remote_dialect_uri, identifier_string,
+                                         remaining)) {
             to_remove.push_back({.key = key, .identifier = identifier_string});
             continue;
           }
@@ -1435,20 +1447,20 @@ auto elevate_embedded_resources(
           value.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
       if (is_known(known, identifier_string)) {
         // What the document holds under this name can be anywhere, including
-        // the container bundling puts things in, so there is one question
-        // rather than one per place
-        if (!hold_against_what_is_known(root, container, value, known, walker,
-                                        resolver, default_dialect,
-                                        remote_dialect_uri, container_dialect,
-                                        identifier_string, remaining)) {
+        // the container bundling puts things in, so there is one
+        // question rather than one per place
+        if (!hold_against_what_is_known(reading, root, value, known,
+                                        remote_dialect_uri, identifier_string,
+                                        remaining)) {
           continue;
         }
 
         to_remove.push_back({.key = key, .identifier = identifier_string});
       } else {
-        to_extract.emplace_back(
-            key, !defines_dialect &&
-                     dialect_defines(walker, remote_vocabularies, "$schema"sv));
+        to_extract.emplace_back(key, !defines_dialect &&
+                                         dialect_defines(reading.walker,
+                                                         remote_vocabularies,
+                                                         "$schema"sv));
         record(known, identifier_string, identifier_string);
         expect(known, identifier_string, value, remote_dialect_uri,
                std::nullopt);
@@ -1468,13 +1480,14 @@ auto elevate_embedded_resources(
                      JSON{declared_dialect(value, remote_dialect_uri)});
       }
 
-      const auto landing{
-          embed_schema(root, container, key, std::move(value), callback)};
+      const auto landing{embed_schema(root, reading.container, key,
+                                      std::move(value), callback)};
       placed(known, key);
-      landed(known, key, container.concat(landing), container_dialect);
+      landed(known, key, reading.container.concat(landing),
+             reading.container_dialect);
       positional.embeddings.push_back(
           {.source = Pointer{keyword_string, key},
-           .destination = container.concat(landing)});
+           .destination = reading.container.concat(landing)});
     }
 
     for (const auto &removed : to_remove) {
@@ -1574,16 +1587,13 @@ struct FetchedRemote {
   Pointer origin;
 };
 
-auto embed_references(
-    JSON &root, const Pointer &container, JSON &subschema,
-    const SchemaWalker &walker, const SchemaResolver &resolver,
-    const SchemaBundleOptions::Mode mode, std::string_view default_dialect,
-    std::string_view default_id, const SchemaFrame::Paths &paths,
-    std::string_view default_base, KnownResources &known,
-    PositionalReferences &positional, std::string_view container_dialect,
-    const Pointer &wrapper, std::uint64_t &remaining,
-    const SchemaBundleOptions::Callback &callback, const std::size_t depth = 0)
-    -> void {
+auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
+                      const SchemaBundleOptions::Mode mode,
+                      std::string_view default_id, KnownResources &known,
+                      PositionalReferences &positional, const Pointer &wrapper,
+                      std::uint64_t &remaining,
+                      const SchemaBundleOptions::Callback &callback,
+                      const std::size_t depth = 0) -> void {
   // Only the root the caller handed over was made to hold a branch, so a
   // reference that arrived inside something fetched is named where it was
   // written already
@@ -1592,14 +1602,16 @@ auto embed_references(
   // between different schemas that have references at the same pointer paths
   static const SchemaFrame::Paths NESTED_PATHS{EMPTY_WEAK_POINTER};
   const SchemaFrame frame{
-      SchemaFrame::Mode::References, subschema, walker, resolver,
-      default_dialect, default_id, SchemaFrame::IdentifierMode::Additional,
+      SchemaFrame::Mode::References, subschema, reading.walker,
+      reading.resolver, reading.default_dialect, default_id,
+      SchemaFrame::IdentifierMode::Additional,
       // We only want to frame in "wrapper" mode for the top
       // level object, which is also the only one that the
       // base the caller retrieved it from applies to, as
       // every remote carries the identity it was resolved by
-      depth == 0 ? paths : NESTED_PATHS,
-      depth == 0 ? default_base : std::string_view{}, remaining};
+      depth == 0 ? known.paths : NESTED_PATHS,
+      depth == 0 ? std::string_view{known.default_base} : std::string_view{},
+      remaining};
   charge(remaining, frame);
 
   // A fetched document answers to every name it declares, wherever that name
@@ -1613,9 +1625,11 @@ auto embed_references(
     const auto carried_keywords{
         carrier.has_value()
             ? definitions_keywords(
-                  walker, frame.vocabularies(carrier.value().get(), resolver))
+                  reading.walker,
+                  frame.vocabularies(carrier.value().get(), reading.resolver))
             : DefinitionsKeywords{}};
-    const auto carried_dialect{dialect(subschema, default_dialect, true)};
+    const auto carried_dialect{
+        dialect(subschema, reading.default_dialect, true)};
     frame.for_each_resource([&](const auto &, const auto &location) -> void {
       const auto position{to_pointer(location.pointer)};
       const auto within_definitions{
@@ -1633,11 +1647,10 @@ auto embed_references(
       // either way. Saying it does would hold a later copy against one that is
       // on its way out, and dropping that copy too loses the schema entirely
       if (within_definitions &&
-          removable_entry(root, container, subschema, frame,
+          removable_entry(reading, root, subschema, frame,
                           Pointer{JSON::String{position.at(0).to_property()},
                                   position.at(1)},
-                          known, walker, resolver, default_dialect,
-                          carried_dialect, container_dialect, remaining)) {
+                          known, carried_dialect, remaining)) {
         return;
       }
 
@@ -1730,7 +1743,7 @@ auto embed_references(
             waiting ? std::string_view{pending->second.dialect}
                     : std::string_view{placement->second.dialect}};
         const SchemaResolver as_the_document_does{
-            answers_within(root, known, resolver)};
+            answers_within(root, known, reading.resolver)};
         // A name the document was only fetched by is not what this reference
         // says once it is settled, as what came back answers to a name of its
         // own and the reference is restated onto that further down. What it
@@ -1744,7 +1757,7 @@ auto embed_references(
         bool reaches{within == nullptr};
         try {
           reaches = reaches ||
-                    names_something_within(*within, settled, walker,
+                    names_something_within(*within, settled, reading.walker,
                                            as_the_document_does, reads_under,
                                            answering, remaining);
         } catch (const SchemaDialectImpossibleError &) {
@@ -1793,7 +1806,7 @@ auto embed_references(
       return;
     }
 
-    auto resolved{resolver(identifier)};
+    auto resolved{reading.resolver(identifier)};
     if (!resolved.has_value()) {
       if (frame.traverse(identifier).has_value()) {
         throw SchemaReferenceError(
@@ -1819,8 +1832,8 @@ auto embed_references(
     std::optional<SchemaFrame> remote_root_frame;
     try {
       remote_root_frame.emplace(
-          SchemaFrame::Mode::Root, remote, walker, resolver, default_dialect,
-          "", SchemaFrame::IdentifierMode::Additional,
+          SchemaFrame::Mode::Root, remote, reading.walker, reading.resolver,
+          reading.default_dialect, "", SchemaFrame::IdentifierMode::Additional,
           SchemaFrame::Paths{EMPTY_WEAK_POINTER}, "", remaining);
       charge(remaining, remote_root_frame.value());
     } catch (const SchemaUnknownBaseDialectError &) {
@@ -1833,7 +1846,7 @@ auto embed_references(
     const auto &remote_root{remote_root_frame->root_location().value().get()};
     // Working these out can cost a meta-schema to resolve, so it happens once
     const auto &remote_vocabularies{
-        remote_root_frame->vocabularies(remote_root, resolver)};
+        remote_root_frame->vocabularies(remote_root, reading.resolver)};
 
     const auto remote_base_dialect{remote_root.base_dialect};
     auto remote_id = remote_root_frame->root();
@@ -1853,9 +1866,9 @@ auto embed_references(
                                   : nullptr};
       bool exists{false};
       try {
-        exists = names_something_within(remote, reference.destination, walker,
-                                        resolver, default_dialect, identifier,
-                                        remaining);
+        exists = names_something_within(
+            remote, reference.destination, reading.walker, reading.resolver,
+            reading.default_dialect, identifier, remaining);
       } catch (const SchemaDialectImpossibleError &) {
         throw impossible_dialect_of_fetched(
             identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
@@ -1881,9 +1894,9 @@ auto embed_references(
         try {
           const SchemaFrame located{SchemaFrame::Mode::Locations,
                                     remote,
-                                    walker,
-                                    resolver,
-                                    default_dialect,
+                                    reading.walker,
+                                    reading.resolver,
+                                    reading.default_dialect,
                                     identifier,
                                     SchemaFrame::IdentifierMode::Additional,
                                     {EMPTY_WEAK_POINTER},
@@ -1924,7 +1937,7 @@ auto embed_references(
     // Whether the dialect of the remote has a way to name it at all, which
     // decides between giving it a name and pointing at wherever it lands
     const auto dialect_allows_naming{dialect_defines_identifier(
-        walker, remote_vocabularies, remote_base_dialect)};
+        reading.walker, remote_vocabularies, remote_base_dialect)};
 
     // What the remote is read under is what framing made of it, which takes in
     // a mark that a previous bundling left on it as well as what it declares
@@ -1937,7 +1950,7 @@ auto embed_references(
     // questions. Writing a declaration its dialect gives no meaning would be
     // saying something the schema never said, and nothing could read it back
     const auto dialect_allows_declaring{
-        dialect_defines(walker, remote_vocabularies, "$schema"sv)};
+        dialect_defines(reading.walker, remote_vocabularies, "$schema"sv)};
 
     if (remote.is_object()) {
       if (dialect_allows_naming) {
@@ -1951,20 +1964,22 @@ auto embed_references(
         if (!remote.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)) {
           remote.assign("$schema", JSON{remote_dialect_uri});
         }
-      } else if (remote_dialect_uri != container_dialect ||
+      } else if (remote_dialect_uri != reading.container_dialect ||
                  (!declared_dialect(remote, "").empty() &&
                   canonical_uri(declared_dialect(remote, "")) !=
                       canonical_uri(remote_dialect_uri))) {
         // Marking is what carries a dialect that no keyword of the schema can
-        // declare. Where whatever holds the container already reads under the
-        // dialect the remote was read under, inheritance says the same thing
-        // for free, unless what the remote declares is not what the remote
-        // itself reads under: that declaration speaks for what the remote
-        // holds, and where it lands nobody reads it
+        // declare. Where whatever holds the container already reads
+        // under the dialect the remote was read under, inheritance says the
+        // same thing for free, unless what the remote declares is not what the
+        // remote itself reads under: that declaration speaks for what the
+        // remote holds, and where it lands nobody reads it
         try {
-          mark_dialect_of_every_subschema(remote, walker, resolver,
-                                          remote_dialect_uri, container_dialect,
-                                          remaining);
+          mark_dialect_of_every_subschema(
+              reading, remote,
+              {.reads_as = remote_dialect_uri,
+               .lands_under = reading.container_dialect},
+              remaining);
         } catch (const SchemaDialectImpossibleError &) {
           throw impossible_dialect_of_fetched(
               identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
@@ -2054,23 +2069,21 @@ auto embed_references(
     // Whatever the walks below meet, they meet inside a document that was
     // fetched rather than given
     try {
-      embed_references(root, container, entry.schema, walker, resolver, mode,
-                       default_dialect, entry.identifier, paths, default_base,
-                       known, positional, container_dialect, wrapper, remaining,
-                       callback, depth + 1);
-      elevate_embedded_resources(
-          entry.schema, root, container, entry.base_dialect, walker, resolver,
-          default_dialect, entry.identifier, known, positional,
-          container_dialect, remaining, callback);
+      embed_references(reading, root, entry.schema, mode, entry.identifier,
+                       known, positional, wrapper, remaining, callback,
+                       depth + 1);
+      elevate_embedded_resources(reading, entry.schema, root,
+                                 entry.base_dialect, entry.identifier, known,
+                                 positional, remaining, callback);
     } catch (const SchemaDialectImpossibleError &) {
       throw impossible_dialect_of_fetched(entry.fetched_by, entry.origin);
     }
 
     placed(known, entry.identifier);
-    const auto key{embed_schema(root, container, entry.identifier,
+    const auto key{embed_schema(root, reading.container, entry.identifier,
                                 std::move(entry.schema), callback)};
-    auto landing{container.concat(key)};
-    landed(known, entry.identifier, landing, container_dialect);
+    auto landing{reading.container.concat(key)};
+    landed(known, entry.identifier, landing, reading.container_dialect);
     if (positional.unnamed.contains(entry.identifier)) {
       positional.landings.emplace(entry.identifier, landing);
     }
@@ -2216,13 +2229,15 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     const auto container_dialect{dialect_within(
         initial_frame.value(), schema,
         to_weak_pointer(container_parent_pointer), default_dialect)};
-    embed_references(schema, default_container.value(), schema, walker,
-                     resolver, mode, default_dialect, default_id, paths,
-                     default_base, known, positional, container_dialect,
-                     wrapper, remaining, callback);
-    settle_positional_references(schema, walker, resolver, default_dialect,
-                                 default_id, paths, default_base, positional,
-                                 wrapper, remaining, callback);
+    const Reading reading{.container = default_container.value(),
+                          .container_dialect = container_dialect,
+                          .walker = walker,
+                          .resolver = resolver,
+                          .default_dialect = default_dialect};
+    embed_references(reading, schema, schema, mode, default_id, known,
+                     positional, wrapper, remaining, callback);
+    settle_positional_references(reading, schema, known, positional, wrapper,
+                                 remaining, callback);
     return;
   }
 
@@ -2345,12 +2360,15 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   if (schema.is_object()) {
     check_container(schema, container);
   }
-  embed_references(schema, container, schema, walker, resolver, mode,
-                   default_dialect, default_id, paths, default_base, known,
-                   positional, container_dialect, wrapper, remaining, callback);
-  settle_positional_references(schema, walker, resolver, default_dialect,
-                               default_id, paths, default_base, positional,
-                               wrapper, remaining, callback);
+  const Reading reading{.container = container,
+                        .container_dialect = container_dialect,
+                        .walker = walker,
+                        .resolver = resolver,
+                        .default_dialect = default_dialect};
+  embed_references(reading, schema, schema, mode, default_id, known, positional,
+                   wrapper, remaining, callback);
+  settle_positional_references(reading, schema, known, positional, wrapper,
+                               remaining, callback);
 }
 
 } // namespace
