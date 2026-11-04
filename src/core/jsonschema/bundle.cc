@@ -439,6 +439,13 @@ struct Pending {
   std::optional<Fetch> fetch;
 };
 
+// Where the document holds a resource, and what reading it there reads it
+// under, as one that declares nothing of its own reads under whatever holds it
+struct Placement {
+  Pointer where;
+  JSON::String dialect;
+};
+
 struct KnownResources {
   // What the document already answers to, and what the name it answers to is
   // spelled as where a reference has to say it. A name is held canonically, as
@@ -453,7 +460,7 @@ struct KnownResources {
   // Where the document ended up holding each name it was given. Nothing reads
   // a resource by that place, but what a reference names within one is looked
   // for there once it is no longer waiting to go in
-  std::unordered_map<JSON::String, Pointer> placements;
+  std::unordered_map<JSON::String, Placement> placements;
   // What a later pass will place. A name is answered from here first, as the
   // document does not hold it yet
   std::unordered_map<JSON::String, Pending> pending;
@@ -513,8 +520,10 @@ auto placed(KnownResources &known, const std::string_view name) -> void {
 }
 
 auto landed(KnownResources &known, const std::string_view name,
-            const Pointer &where) -> void {
-  known.placements.insert_or_assign(canonical_uri(name), where);
+            const Pointer &where, const std::string_view dialect) -> void {
+  known.placements.insert_or_assign(
+      canonical_uri(name),
+      Placement{.where = where, .dialect = JSON::String{dialect}});
 }
 
 // Every name the document the caller handed over answers to, and where each
@@ -535,7 +544,7 @@ auto record_own_names(const SchemaFrame &frame, KnownResources &known) -> void {
     }
 
     record(known, uri, JSON::String{uri});
-    landed(known, uri, to_pointer(location.pointer));
+    landed(known, uri, to_pointer(location.pointer), location.dialect);
   });
 }
 
@@ -1462,7 +1471,7 @@ auto elevate_embedded_resources(
       const auto landing{
           embed_schema(root, container, key, std::move(value), callback)};
       placed(known, key);
-      landed(known, key, container.concat(landing));
+      landed(known, key, container.concat(landing), container_dialect);
       positional.embeddings.push_back(
           {.source = Pointer{keyword_string, key},
            .destination = container.concat(landing)});
@@ -1493,6 +1502,32 @@ auto impossible_dialect_of_fetched(const JSON::String &identifier,
   return {identifier, origin,
           "The referenced schema declares a dialect that does not define the "
           "keyword that declares it"};
+}
+
+// A resource read on its own is read without the document that holds it, so a
+// dialect the document carries for itself goes looking outside it and is not
+// found. What the document answers to a name is what it holds under that name,
+// wherever that is, including what a later pass has yet to put in
+auto answers_within(const JSON &root, const KnownResources &known,
+                    const SchemaResolver &resolver) -> SchemaResolver {
+  return [&root, &known,
+          &resolver](const std::string_view target) -> SchemaResolverResult {
+    const auto canonical{canonical_uri(target)};
+    const auto placement{known.placements.find(canonical)};
+    if (placement != known.placements.cend()) {
+      const auto *held{try_get(root, placement->second.where)};
+      if (held != nullptr) {
+        return *held;
+      }
+    }
+
+    const auto waiting{known.pending.find(canonical)};
+    if (waiting != known.pending.cend()) {
+      return waiting->second.schema;
+    }
+
+    return resolver(target);
+  };
 }
 
 // Whether what a reference named is something the resource it names holds. A
@@ -1690,7 +1725,12 @@ auto embed_references(
         // its own needs
         const auto waiting{pending != known.pending.cend()};
         const auto *within{waiting ? &pending->second.schema
-                                   : try_get(root, placement->second)};
+                                   : try_get(root, placement->second.where)};
+        const auto reads_under{
+            waiting ? std::string_view{pending->second.dialect}
+                    : std::string_view{placement->second.dialect}};
+        const SchemaResolver as_the_document_does{
+            answers_within(root, known, resolver)};
         // A name the document was only fetched by is not what this reference
         // says once it is settled, as what came back answers to a name of its
         // own and the reference is restated onto that further down. What it
@@ -1704,9 +1744,8 @@ auto embed_references(
         bool reaches{within == nullptr};
         try {
           reaches = reaches ||
-                    names_something_within(*within, settled, walker, resolver,
-                                           waiting ? pending->second.dialect
-                                                   : default_dialect,
+                    names_something_within(*within, settled, walker,
+                                           as_the_document_does, reads_under,
                                            answering, remaining);
         } catch (const SchemaDialectImpossibleError &) {
           // What a fetched document brings on is the fault of the reference
@@ -2031,7 +2070,7 @@ auto embed_references(
     const auto key{embed_schema(root, container, entry.identifier,
                                 std::move(entry.schema), callback)};
     auto landing{container.concat(key)};
-    landed(known, entry.identifier, landing);
+    landed(known, entry.identifier, landing, container_dialect);
     if (positional.unnamed.contains(entry.identifier)) {
       positional.landings.emplace(entry.identifier, landing);
     }
