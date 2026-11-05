@@ -128,30 +128,41 @@ auto dialect_within(const SchemaFrame &frame, const JSON &document,
 
     const auto &reported{location.value().get().dialect};
     const auto &value{get(document, *current)};
-    // What a place says of itself is what it holds reads under, whatever a
-    // mark beside it says of the place itself
-    const auto declared{declared_dialect(value, "")};
-    if (!declared.empty()) {
-      return JSON::String{declared};
-    }
-
     const auto *const marked{
         value.is_object() ? value.try_at(DIALECT_OVERRIDE_KEYWORD,
                                          JSONSCHEMA_HASH_DIALECT_OVERRIDE)
                           : nullptr};
-    const auto &enclosing{location.value().get().parent};
     // Whether the mark is what said so, which a reference overriding whatever
     // sits beside it is enough to decide otherwise. Both are spellings
-    // something wrote, so what each of them names is what settles it
-    if (marked == nullptr || !marked->is_string() || !enclosing.has_value() ||
+    // something wrote, so what each of them names is what settles it.
+    // Everywhere else framing has already read past a declaration that says
+    // nothing where it stands, so what it reported is what anything put here
+    // reads under
+    if (marked == nullptr || !marked->is_string() ||
         canonical_uri(marked->to_string()) != canonical_uri(reported)) {
       return JSON::String{reported};
     }
 
     // A mark speaks for the place that carries it and says nothing about what
-    // sits below it, so what was in force around that place is what its
-    // contents read under. Nothing stands above the top of what was framed to
-    // say anything else, so a mark there speaks for what it holds too
+    // sits below it, so its contents read under whatever the place would have
+    // read under with no mark on it. Saying anything of itself takes a place
+    // that answers to a name, or the top of what was framed, since framing
+    // reads straight past a declaration anywhere else, and so does whatever
+    // reads the document afterwards
+    const auto declared{declared_dialect(value, "")};
+    if (!declared.empty() &&
+        (current->empty() ||
+         location.value().get().type == SchemaFrame::LocationType::Resource)) {
+      return JSON::String{declared};
+    }
+
+    // Nothing stands above the top of what was framed to say that, so a mark
+    // there speaks for what it holds too
+    const auto &enclosing{location.value().get().parent};
+    if (!enclosing.has_value()) {
+      return JSON::String{reported};
+    }
+
     current = &enclosing.value();
   }
 }
