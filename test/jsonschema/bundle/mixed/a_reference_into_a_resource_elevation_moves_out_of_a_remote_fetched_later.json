@@ -1,14 +1,14 @@
 {
   "schema": {
     "type": "object",
-    "properties": {
-      "b": {
+    "allOf": [
+      {
         "$ref": "https://example.com/b"
       },
-      "a": {
+      {
         "$ref": "https://example.com/a"
       }
-    }
+    ]
   },
   "resolver": {
     "https://example.com/a": {
@@ -41,15 +41,24 @@
   "result": {
     "nonOfficialMetaschemas": {
       "type": "object",
-      "properties": {
-        "b": {
+      "allOf": [
+        {
           "$ref": "https://example.com/b"
         },
-        "a": {
+        {
           "$ref": "https://example.com/a"
         }
-      },
+      ],
       "x-definitions": {
+        "https://example.com/b": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/b",
+          "properties": {
+            "borrowed": {
+              "$ref": "https://example.com/child#/properties/name"
+            }
+          }
+        },
         "https://example.com/child": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/child",
@@ -63,29 +72,29 @@
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/a",
           "type": "object"
-        },
-        "https://example.com/b": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "$id": "https://example.com/b",
-          "properties": {
-            "borrowed": {
-              "$ref": "https://example.com/child#/properties/name"
-            }
-          }
         }
       }
     },
     "references": {
       "type": "object",
-      "properties": {
-        "b": {
+      "allOf": [
+        {
           "$ref": "https://example.com/b"
         },
-        "a": {
+        {
           "$ref": "https://example.com/a"
         }
-      },
+      ],
       "x-definitions": {
+        "https://example.com/b": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/b",
+          "properties": {
+            "borrowed": {
+              "$ref": "https://example.com/child#/properties/name"
+            }
+          }
+        },
         "https://example.com/child": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/child",
@@ -99,15 +108,6 @@
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/a",
           "type": "object"
-        },
-        "https://example.com/b": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "$id": "https://example.com/b",
-          "properties": {
-            "borrowed": {
-              "$ref": "https://example.com/child#/properties/name"
-            }
-          }
         }
       }
     }
@@ -115,12 +115,12 @@
   "inserted": {
     "nonOfficialMetaschemas": [
       {
-        "from": "https://example.com/a",
-        "at": "/x-definitions/https:~1~1example.com~1a"
-      },
-      {
         "from": "https://example.com/b",
         "at": "/x-definitions/https:~1~1example.com~1b"
+      },
+      {
+        "from": "https://example.com/a",
+        "at": "/x-definitions/https:~1~1example.com~1a"
       },
       {
         "from": "https://example.com/child",
@@ -129,12 +129,12 @@
     ],
     "references": [
       {
-        "from": "https://example.com/a",
-        "at": "/x-definitions/https:~1~1example.com~1a"
-      },
-      {
         "from": "https://example.com/b",
         "at": "/x-definitions/https:~1~1example.com~1b"
+      },
+      {
+        "from": "https://example.com/a",
+        "at": "/x-definitions/https:~1~1example.com~1a"
       },
       {
         "from": "https://example.com/child",
