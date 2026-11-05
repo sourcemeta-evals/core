@@ -34,6 +34,7 @@ struct DialectInfo {
   std::string_view dialect;
   sourcemeta::core::SchemaBaseDialect base_dialect;
   bool override_active;
+  bool names_itself;
 };
 
 // An identifier only counts where the dialect in force gives the keyword that
@@ -143,7 +144,8 @@ resolve_dialect_at(const sourcemeta::core::JSON &subschema,
   if (!override_active && level > 0 && identifier.empty()) {
     return {.dialect = inherited_dialect,
             .base_dialect = inherited_base,
-            .override_active = false};
+            .override_active = false,
+            .names_itself = false};
   }
   const auto resolved_base{
       local != inherited_dialect
@@ -151,9 +153,13 @@ resolve_dialect_at(const sourcemeta::core::JSON &subschema,
                                            allow_dialect_override)
                 .value_or(inherited_base)
           : inherited_base};
+  // A name that is nothing but a fragment leaves the place within whatever
+  // resource encloses it rather than making one of its own, where a dialect
+  // spells such names this way at all, and says nothing anywhere else
   return {.dialect = local,
           .base_dialect = resolved_base,
-          .override_active = override_active};
+          .override_active = override_active,
+          .names_itself = !identifier.empty() && !identifier.starts_with('#')};
 }
 
 // A schema that holds the dialect it reads under among its own containers,
@@ -301,24 +307,6 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     const auto current_dialect{entry.dialect};
     const auto current_base_dialect{entry.base_dialect};
 
-    // Only the schema that went and said what it reads under can hold that
-    // meta-schema, as one that inherited the dialect carries whatever scope
-    // the one above it did. A dialect no base dialect answers for is the only
-    // kind a document can hold, and the schema the walk started from is the
-    // caller's own to answer for, which is why a scope of ours never stands in
-    // front of the caller's there
-    const auto *pinned_within{current.pinned_within};
-    if (current_dialect != dialect && &subschema != &root_subschema &&
-        !sourcemeta::core::to_base_dialect(current_dialect).has_value() &&
-        sourcemeta::core::metaschema_try_embedded(subschema, current_dialect,
-                                                  effective) != nullptr &&
-        sourcemeta::core::canonical_uri(current_dialect) !=
-            sourcemeta::core::canonical_uri(dialect)) {
-      scopes.push_front(
-          {.holder = &subschema, .enclosing = current.pinned_within});
-      pinned_within = &scopes.front();
-    }
-
     // A subschema may be an embedded resource that pins its own custom
     // meta-schema inside its own `$defs`/`definitions`. Probe for it here, the
     // same way we do at the document root, so that nested self-contained
@@ -363,6 +351,28 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
                          : entry};
     const auto child_dialect{child.dialect};
     const auto child_base_dialect{child.base_dialect};
+
+    // Only a schema that answers to a name and said for itself what sits
+    // within it reads under can hold that meta-schema, as one that inherited
+    // the dialect carries whatever scope the one above it did, and a
+    // declaration anywhere else says nothing at all. Saying what it would have
+    // read anyway is still saying it, so the copy such a schema carries is what
+    // everything below it goes on finding. A dialect no base dialect answers
+    // for is the only kind a document can hold, and the schema the walk started
+    // from is the caller's own to answer for, which is why a scope of ours
+    // never stands in front of the caller's there
+    const auto *pinned_within{current.pinned_within};
+    if (child.names_itself && &subschema != &root_subschema &&
+        !sourcemeta::core::to_base_dialect(child_dialect).has_value() &&
+        sourcemeta::core::canonical_uri(
+            sourcemeta::core::dialect(subschema, "", false)) ==
+            sourcemeta::core::canonical_uri(child_dialect) &&
+        sourcemeta::core::metaschema_try_embedded(subschema, child_dialect,
+                                                  effective) != nullptr) {
+      scopes.push_front(
+          {.holder = &subschema, .enclosing = current.pinned_within});
+      pinned_within = &scopes.front();
+    }
 
     const auto has_overriding_ref{
         subschema.defines("$ref"sv, JSONSCHEMA_HASH_REF) &&
