@@ -5,6 +5,7 @@
 #include "helpers.h"
 
 #include <algorithm>     // std::ranges::any_of, std::ranges::none_of
+#include <array>         // std::array
 #include <cassert>       // assert
 #include <cstddef>       // std::size_t
 #include <cstdint>       // std::uint64_t
@@ -74,6 +75,25 @@ auto rebase_reference(const JSON::String &base,
   }
 
   return result.recompose();
+}
+
+// Whether a schema spells a name under either of the keywords that identify
+// one. Which of the two a dialect reserves is a question a frame answers, and
+// the one it does not reserve is payload beside it, so asking both is what
+// rules an entry out without guessing which it would have been
+auto says_the_name(const JSON &candidate, const JSON::String &identifier)
+    -> bool {
+  static constexpr std::array<SchemaKeyword, 2> KEYWORDS{
+      {{.name = "$id"sv, .hash = JSONSCHEMA_HASH_ID},
+       {.name = "id"sv, .hash = JSONSCHEMA_HASH_LEGACY_ID}}};
+  const auto canonical{canonical_uri(identifier)};
+  return std::ranges::any_of(
+      KEYWORDS, [&canonical, &candidate](const auto keyword) -> bool {
+        const auto *declared{candidate.try_at(keyword.name, keyword.hash)};
+        return declared != nullptr && declared->is_string() &&
+               canonical_uri(declared->to_string()) == canonical &&
+               URI{declared->to_string()}.is_absolute();
+      });
 }
 
 // The dialect a schema declares, falling back to the given default
@@ -1178,14 +1198,7 @@ auto hold_against_what_is_known(const Reading &reading, const JSON &root,
         continue;
       }
 
-      const auto *declared{entry.second.try_at("$id"sv, JSONSCHEMA_HASH_ID)};
-      if (declared == nullptr) {
-        declared = entry.second.try_at("id"sv, JSONSCHEMA_HASH_LEGACY_ID);
-      }
-
-      if (declared == nullptr || !declared->is_string() ||
-          canonical_uri(declared->to_string()) != canonical_uri(identifier) ||
-          !URI{declared->to_string()}.is_absolute()) {
+      if (!says_the_name(entry.second, identifier)) {
         continue;
       }
 
@@ -1343,14 +1356,16 @@ auto elevate_embedded_resources(
       const auto &value{entry.second};
       // Framing says what an entry identifies, and which keyword carries that
       // is the dialect's answer rather than this loop's, so the presence of
-      // either is only a reason to ask. Most entries identify nothing at all,
-      // which is what rules them out before paying for a frame
+      // either is only a reason to ask. The one a dialect does not reserve is
+      // payload wherever it turns up, so one of them holding what is no name
+      // at all leaves the other to be looked at. Most entries identify nothing
+      // at all, which is what rules them out before paying for a frame
       if (!value.is_object()) {
         continue;
       }
 
       const auto *declared_id{value.try_at("$id"sv, JSONSCHEMA_HASH_ID)};
-      if (declared_id == nullptr) {
+      if (declared_id == nullptr || !declared_id->is_string()) {
         declared_id = value.try_at("id"sv, JSONSCHEMA_HASH_LEGACY_ID);
       }
 
@@ -1420,7 +1435,14 @@ auto elevate_embedded_resources(
       // spelled relatively resolves against whatever resource ends up around
       // it, so where such an entry already sits is the one place it says what
       // it says, however well the key agrees
-      if (identifier != key || !URI{declared_id->to_string()}.is_absolute()) {
+      // Which keyword carries the name is the dialect's answer, and the other
+      // spelling is payload wherever it turns up, so whether the name was
+      // spelled against something is read from the one the frame went by
+      const auto carries{
+          id_keyword(entry_frame.root_location().value().get().base_dialect)};
+      const auto *spelled{value.try_at(carries.name, carries.hash)};
+      if (identifier != key || spelled == nullptr || !spelled->is_string() ||
+          !URI{spelled->to_string()}.is_absolute()) {
         if (is_known(known, identifier_string)) {
           // Dropping one that nothing was held against is how a schema that
           // disagrees goes missing, so it stays where it is unless something
