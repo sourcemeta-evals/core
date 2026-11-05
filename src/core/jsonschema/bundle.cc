@@ -514,6 +514,10 @@ struct KnownResources {
   // What a later pass will place. A name is answered from here first, as the
   // document does not hold it yet
   std::unordered_map<JSON::String, Pending> pending;
+  // Which of these names came back as a boolean. One holds nothing at all, so
+  // a reference naming a place within it names nothing, and writing it out as
+  // the object saying the same thing does not put anything there to name
+  std::unordered_set<JSON::String> says_nothing_within;
   // What it takes to read the caller's document the same way it was read when
   // these names were collected. Reading it any other way looks for a name
   // somewhere it was never recorded from
@@ -1789,10 +1793,12 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
                 : rebase_reference(answering, reference.fragment)};
         bool reaches{within == nullptr};
         try {
-          reaches = reaches ||
-                    names_something_within(*within, settled, reading.walker,
-                                           as_the_document_does, reads_under,
-                                           answering, remaining);
+          reaches =
+              reaches ||
+              (!known.says_nothing_within.contains(canonical_uri(answering)) &&
+               names_something_within(*within, settled, reading.walker,
+                                      as_the_document_does, reads_under,
+                                      answering, remaining));
         } catch (const SchemaDialectImpossibleError &) {
           // What a fetched document brings on is the fault of the reference
           // that sent for it, which is not this one, where this one found it
@@ -1985,6 +1991,27 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
     const auto dialect_allows_declaring{
         dialect_defines(reading.walker, remote_vocabularies, "$schema"sv)};
 
+    // A boolean says exactly what an object says, which JSON Schema 2020-12
+    // Section 4.3.2 spells out for each of the two, and only the object can
+    // carry a name. Where the dialect has no name to give, the place the
+    // boolean lands is what a reference reads instead, so writing it out would
+    // add nothing. Where the one that refuses everything takes a keyword the
+    // dialect does not reserve, writing it out would say something else, which
+    // is no better than leaving it as it is
+    if (remote.is_boolean()) {
+      known.says_nothing_within.emplace(canonical_uri(effective_id));
+    }
+
+    if (remote.is_boolean() && dialect_allows_naming &&
+        (remote.to_boolean() ||
+         dialect_defines(reading.walker, remote_vocabularies, "not"sv))) {
+      const auto permissive{remote.to_boolean()};
+      remote = JSON::make_object();
+      if (!permissive) {
+        remote.assign("not", JSON::make_object());
+      }
+    }
+
     if (remote.is_object()) {
       if (dialect_allows_naming) {
         schema_reidentify(remote, effective_id, remote_base_dialect);
@@ -2170,6 +2197,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                        .declared = {},
                        .placements = {},
                        .pending = {},
+                       .says_nothing_within = {},
                        .paths = paths,
                        .default_id = JSON::String{default_id},
                        .default_base = JSON::String{default_base}};
