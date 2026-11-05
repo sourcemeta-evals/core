@@ -1325,8 +1325,24 @@ auto elevate_embedded_resources(
   // can only be moved where every dialect reading under it would look, and
   // what reads under each pin goes with it
   std::unordered_map<JSON::String, std::vector<SchemaBaseDialect>> pinned;
-  collect_pinned_dialects(remote, reading.walker, reading.resolver,
-                          remote_dialect_uri, pinned, remaining);
+  // What is pinned only bears on what might be lifted out, and nothing is
+  // where the remote holds none of the places its dialect reserves for
+  // definitions, so those are looked at before paying for a walk of it
+  if (std::ranges::any_of(
+          definitions_keywords(reading.walker, remote_vocabularies),
+          [&remote](const auto candidate) -> bool {
+            if (candidate.empty()) {
+              return false;
+            }
+
+            const JSON::String keyword_string{candidate};
+            return remote.defines(keyword_string) &&
+                   remote.at(keyword_string).is_object() &&
+                   !remote.at(keyword_string).empty();
+          })) {
+    collect_pinned_dialects(remote, reading.walker, reading.resolver,
+                            remote_dialect_uri, pinned, remaining);
+  }
 
   // An entry can name a sibling as the dialect it is read under, and framing
   // one on its own reaches only what the caller handed over, so the entries
