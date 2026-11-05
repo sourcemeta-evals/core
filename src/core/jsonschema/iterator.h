@@ -7,13 +7,14 @@
 
 #include "helpers.h"
 
-#include <cassert>     // assert
-#include <cstddef>     // std::size_t
-#include <functional>  // std::cref, std::reference_wrapper
-#include <optional>    // std::optional, std::nullopt
-#include <string_view> // std::string_view
-#include <utility>     // std::move
-#include <vector>      // std::vector
+#include <cassert>      // assert
+#include <cstddef>      // std::size_t
+#include <forward_list> // std::forward_list
+#include <functional>   // std::cref, std::reference_wrapper
+#include <optional>     // std::optional, std::nullopt
+#include <string_view>  // std::string_view
+#include <utility>      // std::move
+#include <vector>       // std::vector
 
 namespace sourcemeta::core {
 
@@ -155,6 +156,37 @@ resolve_dialect_at(const sourcemeta::core::JSON &subschema,
           .override_active = override_active};
 }
 
+// A schema that holds the dialect it reads under among its own containers,
+// together with whatever held the dialect of the schema enclosing it. A
+// meta-schema speaks for everything below the schema carrying it, so entering
+// one of these never takes the reader out of the ones around it
+struct PinnedScope {
+  const sourcemeta::core::JSON *holder;
+  const PinnedScope *enclosing;
+};
+
+// A meta-schema is looked for in the nearest schema that pinned one, then in
+// each schema enclosing that, before anything outside the document is asked.
+// The result borrows the chain and the resolver, so it must not outlive either
+inline auto
+resolver_within_scopes(const PinnedScope &innermost,
+                       const sourcemeta::core::SchemaResolver &resolver)
+    -> sourcemeta::core::SchemaResolver {
+  return [&innermost, &resolver](const std::string_view target)
+             -> sourcemeta::core::SchemaResolverResult {
+    for (const auto *scope{&innermost}; scope != nullptr;
+         scope = scope->enclosing) {
+      const auto *embedded{sourcemeta::core::metaschema_try_embedded(
+          *scope->holder, target, resolver)};
+      if (embedded != nullptr) {
+        return *embedded;
+      }
+    }
+
+    return resolver(target);
+  };
+}
+
 // A subschema that the traversal has discovered but not visited yet
 struct PendingSubschema {
   std::optional<sourcemeta::core::WeakPointer> parent;
@@ -165,9 +197,9 @@ struct PendingSubschema {
   std::size_t level;
   bool orphan;
   bool property_name;
-  // The nearest schema above this one that holds the dialect in force among
-  // its own containers, which is where this one has to go on looking for it
-  const sourcemeta::core::JSON *pinned_within{nullptr};
+  // Where this one has to go on looking for the dialect in force, which is
+  // every schema above it that pinned one, nearest first
+  const PinnedScope *pinned_within{nullptr};
 };
 
 inline auto enqueue(std::vector<PendingSubschema> &children,
@@ -202,6 +234,9 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
      const sourcemeta::core::SchemaBaseDialect root_base_dialect,
      const std::size_t root_level, const bool root_orphan,
      const bool root_property_name) -> void {
+  // Every scope the walk has entered, in a container that never relocates
+  // what it holds, as the subschemas below each of them keep pointers into it
+  std::forward_list<PinnedScope> scopes;
   std::vector<PendingSubschema> pending;
   pending.push_back({.parent = root_parent,
                      .pointer = root_pointer,
@@ -232,12 +267,11 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     }
 
     // Inheriting a dialect without inheriting where it was found leaves this
-    // asking for a meta-schema the document already holds, so the schema that
-    // pinned it stays in scope for everything below it
+    // asking for a meta-schema the document already holds, so every schema
+    // that pinned one stays in scope for everything below it
     std::optional<sourcemeta::core::SchemaResolver> scoped;
     if (current.pinned_within != nullptr) {
-      scoped.emplace(sourcemeta::core::resolver_with_embedded(
-          *current.pinned_within, resolver));
+      scoped.emplace(resolver_within_scopes(*current.pinned_within, resolver));
     }
 
     const auto &effective{scoped.has_value() ? scoped.value() : resolver};
@@ -273,16 +307,17 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     // kind a document can hold, and the schema the walk started from is the
     // caller's own to answer for, which is why a scope of ours never stands in
     // front of the caller's there
-    const auto *pinned_within{
-        current_dialect != dialect && &subschema != &root_subschema &&
-                !sourcemeta::core::to_base_dialect(current_dialect)
-                     .has_value() &&
-                sourcemeta::core::metaschema_try_embedded(
-                    subschema, current_dialect, effective) != nullptr &&
-                sourcemeta::core::canonical_uri(current_dialect) !=
-                    sourcemeta::core::canonical_uri(dialect)
-            ? &subschema
-            : current.pinned_within};
+    const auto *pinned_within{current.pinned_within};
+    if (current_dialect != dialect && &subschema != &root_subschema &&
+        !sourcemeta::core::to_base_dialect(current_dialect).has_value() &&
+        sourcemeta::core::metaschema_try_embedded(subschema, current_dialect,
+                                                  effective) != nullptr &&
+        sourcemeta::core::canonical_uri(current_dialect) !=
+            sourcemeta::core::canonical_uri(dialect)) {
+      scopes.push_front(
+          {.holder = &subschema, .enclosing = current.pinned_within});
+      pinned_within = &scopes.front();
+    }
 
     // A subschema may be an embedded resource that pins its own custom
     // meta-schema inside its own `$defs`/`definitions`. Probe for it here, the

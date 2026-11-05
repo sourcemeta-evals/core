@@ -1,0 +1,140 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {
+      "outer": {
+        "$id": "https://example.com/outer",
+        "$schema": "https://example.com/meta-a",
+        "$defs": {
+          "a": {
+            "$id": "https://example.com/meta-a",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$vocabulary": {
+              "https://json-schema.org/draft/2020-12/vocab/core": true,
+              "https://json-schema.org/draft/2020-12/vocab/applicator": true
+            },
+            "type": "object"
+          },
+          "middle": {
+            "$id": "https://example.com/middle",
+            "$schema": "https://example.com/meta-b",
+            "$defs": {
+              "b": {
+                "$id": "https://example.com/meta-b",
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$vocabulary": {
+                  "https://json-schema.org/draft/2020-12/vocab/core": true,
+                  "https://json-schema.org/draft/2020-12/vocab/applicator": true
+                },
+                "type": "object"
+              },
+              "inner": {
+                "$id": "https://example.com/inner",
+                "$schema": "https://example.com/meta-a",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$defs": {
+        "outer": {
+          "$id": "https://example.com/outer",
+          "$schema": "https://example.com/meta-a",
+          "$defs": {
+            "a": {
+              "$id": "https://example.com/meta-a",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$vocabulary": {
+                "https://json-schema.org/draft/2020-12/vocab/core": true,
+                "https://json-schema.org/draft/2020-12/vocab/applicator": true
+              },
+              "type": "object"
+            },
+            "middle": {
+              "$id": "https://example.com/middle",
+              "$schema": "https://example.com/meta-b",
+              "$defs": {
+                "b": {
+                  "$id": "https://example.com/meta-b",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$vocabulary": {
+                    "https://json-schema.org/draft/2020-12/vocab/core": true,
+                    "https://json-schema.org/draft/2020-12/vocab/applicator": true
+                  },
+                  "type": "object"
+                },
+                "inner": {
+                  "$id": "https://example.com/inner",
+                  "$schema": "https://example.com/meta-a",
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$defs": {
+        "outer": {
+          "$id": "https://example.com/outer",
+          "$schema": "https://example.com/meta-a",
+          "$defs": {
+            "a": {
+              "$id": "https://example.com/meta-a",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$vocabulary": {
+                "https://json-schema.org/draft/2020-12/vocab/core": true,
+                "https://json-schema.org/draft/2020-12/vocab/applicator": true
+              },
+              "type": "object"
+            },
+            "middle": {
+              "$id": "https://example.com/middle",
+              "$schema": "https://example.com/meta-b",
+              "$defs": {
+                "b": {
+                  "$id": "https://example.com/meta-b",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$vocabulary": {
+                    "https://json-schema.org/draft/2020-12/vocab/core": true,
+                    "https://json-schema.org/draft/2020-12/vocab/applicator": true
+                  },
+                  "type": "object"
+                },
+                "inner": {
+                  "$id": "https://example.com/inner",
+                  "$schema": "https://example.com/meta-a",
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [],
+    "references": []
+  }
+}
