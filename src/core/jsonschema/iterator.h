@@ -5,6 +5,8 @@
 
 #include <sourcemeta/core/jsonschema.h>
 
+#include <sourcemeta/core/uri.h>
+
 #include "helpers.h"
 
 #include <cassert>      // assert
@@ -101,6 +103,24 @@ inline auto declaration_counts(const sourcemeta::core::JSON &subschema,
       "$schema"sv);
 }
 
+// Whether a name a place wrote for itself makes a resource of that place. One
+// that is nothing but a fragment leaves the place within whatever resource
+// encloses it instead, where a dialect spells such names that way at all.
+// Input that is no name at all is nobody's to turn down here, as whatever goes
+// on to read the identifier refuses it in terms that say which keyword carried
+// it, so it is passed on rather than quietly held to say nothing
+inline auto names_a_resource(const std::string_view identifier) -> bool {
+  if (identifier.empty()) {
+    return false;
+  }
+
+  try {
+    return !sourcemeta::core::URI{identifier}.is_fragment_only();
+  } catch (const sourcemeta::core::URIParseError &) {
+    return true;
+  }
+}
+
 inline auto
 resolve_dialect_at(const sourcemeta::core::JSON &subschema,
                    const std::string_view inherited_dialect,
@@ -159,7 +179,7 @@ resolve_dialect_at(const sourcemeta::core::JSON &subschema,
   return {.dialect = local,
           .base_dialect = resolved_base,
           .override_active = override_active,
-          .names_itself = !identifier.empty() && !identifier.starts_with('#')};
+          .names_itself = names_a_resource(identifier)};
 }
 
 // A schema that holds the dialect it reads under among its own containers,
