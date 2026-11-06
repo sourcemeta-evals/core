@@ -338,6 +338,13 @@ struct Embedding {
   Pointer destination;
 };
 
+// A reference held over for want of anything answering to the name it asks by
+struct Asked {
+  JSON::String identifier;
+  JSON::String destination;
+  Pointer origin;
+};
+
 struct PositionalReferences {
   // Recorded while walking, as that is where the dialect of a remote is known
   std::unordered_set<JSON::String> unnamed;
@@ -356,12 +363,12 @@ struct PositionalReferences {
   // named it said. Such a resource answers to the name it declared, which is
   // what says where it went, and which is not always the key it sat under
   std::unordered_map<JSON::String, std::vector<Elevated>> elevations;
-  // Names nothing answered to when a reference asked for them. A document
-  // bundling fetched for some other reference can carry one of these, and
-  // what it carries is only known once it has been walked, which happens
-  // after the reference that asked. So the asking is remembered rather than
-  // refused, and whether anything answers is settled once everything is in
-  std::vector<JSON::String> unresolved;
+  // What a reference asked for where nothing answered to the name it asked by.
+  // A document bundling fetched for some other reference can carry such a
+  // name, and what it carries is only known once it has been walked, which
+  // happens after the reference that asked. So the asking is remembered rather
+  // than refused, and settled once everything is in
+  std::vector<Asked> unresolved;
 };
 
 // Reading the finished document is what makes this independent of how the
@@ -848,15 +855,6 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
                                   std::uint64_t &remaining,
                                   const SchemaBundleOptions::Callback &callback)
     -> void {
-  // Everything bundling went for is in by now, so a name still answered by
-  // nothing is answered by nothing at all
-  for (const auto &identifier : positional.unresolved) {
-    if (!is_recorded(known, identifier)) {
-      throw SchemaResolutionError(
-          identifier, "Could not resolve the reference to an external schema");
-    }
-  }
-
   if (positional.unnamed.empty() && positional.elevations.empty()) {
     return;
   }
@@ -1655,6 +1653,53 @@ struct FetchedRemote {
   Pointer origin;
 };
 
+// Everything bundling went for is in by now, so a name still answered by
+// nothing is answered by nothing at all, and what a reference asked for within
+// one that is answered is asked of the resource answering to it. The resource
+// is asked rather than the finished document, as a container the caller framed
+// nothing around is reached by nothing that frames it
+auto refuse_what_nothing_answers(const Reading &reading, const JSON &schema,
+                                 const KnownResources &known,
+                                 const PositionalReferences &positional,
+                                 std::uint64_t &remaining) -> void {
+  for (const auto &asked : positional.unresolved) {
+    if (!is_recorded(known, asked.identifier)) {
+      throw SchemaResolutionError(
+          asked.identifier,
+          "Could not resolve the reference to an external schema");
+    }
+
+    const auto fragment{URI{asked.destination}.fragment()};
+    if (!fragment.has_value() || fragment.value().empty()) {
+      continue;
+    }
+
+    const auto &answering{answers_to(known, asked.identifier)};
+    const auto canonical{canonical_uri(answering)};
+    const auto waiting{known.pending.find(canonical)};
+    const auto settled{known.placements.find(canonical)};
+    const auto holds{waiting != known.pending.cend()};
+    const auto *within{holds ? &waiting->second.schema
+                             : (settled != known.placements.cend()
+                                    ? try_get(schema, settled->second.where)
+                                    : nullptr)};
+    if (within == nullptr) {
+      continue;
+    }
+
+    const auto reads_under{holds ? std::string_view{waiting->second.dialect}
+                                 : std::string_view{settled->second.dialect}};
+    const SchemaResolver as_the_document_does{
+        answers_within(schema, known, reading.resolver)};
+    if (!names_something_within(*within, asked.destination, reading.walker,
+                                as_the_document_does, reads_under, answering,
+                                remaining)) {
+      throw SchemaReferenceError(asked.destination, asked.origin,
+                                 "Could not resolve schema reference");
+    }
+  }
+}
+
 auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
                       const SchemaBundleOptions::Mode mode,
                       std::string_view default_id, KnownResources &known,
@@ -1886,8 +1931,18 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
       }
 
       // Nothing outside answers to this, and what is already on its way in
-      // may carry it, which is not known until each of those has been walked
-      positional.unresolved.emplace_back(identifier);
+      // may carry it, which is not known until each of those has been walked.
+      // How it is spelled is settled here all the same, as a relative
+      // spelling reads against wherever the schema ends up
+      if (spells_another_document_relatively(reference)) {
+        ref_rewrites.emplace_back(to_pointer(pointer),
+                                  JSON::String{reference.destination});
+      }
+
+      positional.unresolved.push_back(
+          {.identifier = JSON::String{identifier},
+           .destination = JSON::String{reference.destination},
+           .origin = where_the_caller_wrote(to_pointer(pointer), wrote)});
       return;
     }
 
@@ -2333,6 +2388,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                      positional, wrapper, remaining, callback);
     settle_positional_references(reading, schema, known, positional, wrapper,
                                  remaining, callback);
+    refuse_what_nothing_answers(reading, schema, known, positional, remaining);
     return;
   }
 
@@ -2464,6 +2520,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                    wrapper, remaining, callback);
   settle_positional_references(reading, schema, known, positional, wrapper,
                                remaining, callback);
+  refuse_what_nothing_answers(reading, schema, known, positional, remaining);
 }
 
 } // namespace
