@@ -356,6 +356,12 @@ struct PositionalReferences {
   // named it said. Such a resource answers to the name it declared, which is
   // what says where it went, and which is not always the key it sat under
   std::unordered_map<JSON::String, std::vector<Elevated>> elevations;
+  // Names nothing answered to when a reference asked for them. A document
+  // bundling fetched for some other reference can carry one of these, and
+  // what it carries is only known once it has been walked, which happens
+  // after the reference that asked. So the asking is remembered rather than
+  // refused, and whether anything answers is settled once everything is in
+  std::vector<JSON::String> unresolved;
 };
 
 // Reading the finished document is what makes this independent of how the
@@ -842,6 +848,15 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
                                   std::uint64_t &remaining,
                                   const SchemaBundleOptions::Callback &callback)
     -> void {
+  // Everything bundling went for is in by now, so a name still answered by
+  // nothing is answered by nothing at all
+  for (const auto &identifier : positional.unresolved) {
+    if (!is_recorded(known, identifier)) {
+      throw SchemaResolutionError(
+          identifier, "Could not resolve the reference to an external schema");
+    }
+  }
+
   if (positional.unnamed.empty() && positional.elevations.empty()) {
     return;
   }
@@ -1870,8 +1885,10 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
             "Could not resolve schema reference");
       }
 
-      throw SchemaResolutionError(
-          identifier, "Could not resolve the reference to an external schema");
+      // Nothing outside answers to this, and what is already on its way in
+      // may carry it, which is not known until each of those has been walked
+      positional.unresolved.emplace_back(identifier);
+      return;
     }
 
     // Bundling rewrites the schema before embedding it, so it needs a copy
