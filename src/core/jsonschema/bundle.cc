@@ -183,9 +183,9 @@ auto charge(std::uint64_t &remaining, const SchemaFrame &frame) -> void {
 // fragment the specifications say names the same resource, and a dialect
 // spelled either way all read as something else otherwise, at any depth. Which
 // places say anything of themselves is the frame's answer, since a value a
-// schema carries can spell the same members and be none of it. A copy the
-// frame cannot take on its own is left as written, which is the stricter
-// answer rather than a wrong one
+// schema carries can spell the same members and be none of it. A copy read
+// under a dialect whose meta-schema keeps no core vocabulary is left as
+// written, which is the stricter answer rather than a wrong one
 auto say_what_it_says_of_itself(JSON &schema, const SchemaWalker &walker,
                                 const SchemaResolver &resolver,
                                 const std::string_view dialect,
@@ -234,6 +234,10 @@ auto say_what_it_says_of_itself(JSON &schema, const SchemaWalker &walker,
                            JSON::String{reference.destination});
     });
   } catch (const SchemaError &) {
+    // Each copy is settled on its own, so this one is held as it was read
+    // against whatever the other came to. Anything short of the two agreeing
+    // value for value is a disagreement, which errs toward two schemas of one
+    // name rather than toward taking two for one
     return;
   }
 
