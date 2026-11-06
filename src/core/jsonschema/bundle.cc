@@ -2040,7 +2040,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
         if (!remote.defines("$schema"sv, JSONSCHEMA_HASH_SCHEMA)) {
           remote.assign("$schema", JSON{remote_dialect_uri});
         }
-      } else if (remote_dialect_uri != reading.container_dialect ||
+      } else if (canonical_uri(remote_dialect_uri) !=
+                     canonical_uri(reading.container_dialect) ||
                  (!declared_dialect(remote, "").empty() &&
                   canonical_uri(declared_dialect(remote, "")) !=
                       canonical_uri(remote_dialect_uri))) {
