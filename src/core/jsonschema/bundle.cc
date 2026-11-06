@@ -1669,12 +1669,27 @@ auto refuse_what_nothing_answers(const Reading &reading, const JSON &schema,
           "Could not resolve the reference to an external schema");
     }
 
-    const auto fragment{URI{asked.destination}.fragment()};
+    const URI destination{asked.destination};
+    const auto fragment{destination.fragment()};
     if (!fragment.has_value() || fragment.value().empty()) {
       continue;
     }
 
     const auto &answering{answers_to(known, asked.identifier)};
+
+    // Elevation lifts a resource out of the copy that landed, so a place named
+    // inside one is no longer where the reference that named it said. Settling
+    // has already put that reference onto where it went, which leaves nothing
+    // here to ask after
+    const auto elevated{positional.elevations.find(answering)};
+    if (elevated != positional.elevations.cend()) {
+      const auto named{fragment_to_pointer(destination)};
+      if (named.has_value() &&
+          elevation_moved_what_it_named(named.value(), elevated->second)) {
+        continue;
+      }
+    }
+
     const auto canonical{canonical_uri(answering)};
     const auto waiting{known.pending.find(canonical)};
     const auto settled{known.placements.find(canonical)};
