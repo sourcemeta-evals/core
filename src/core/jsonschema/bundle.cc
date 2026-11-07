@@ -297,19 +297,28 @@ struct Marking {
   std::string_view lands_under;
 };
 
+// One of the two copies a name reaches, along with what it is read under and
+// what reads it. A copy is taken out of the document holding it to be read on
+// its own, which no longer reaches a dialect that document carries, so what
+// answers for that document travels with the copy rather than being shared
+// between the two: each may have come out of a different one
+struct Copy {
+  const JSON &schema;
+  std::string_view dialect;
+  const SchemaResolver &reads_with;
+};
+
 // Whether two copies of one resource say the same thing, which is not the same
 // question as whether either was written the way the other was
-auto says_the_same(const Reading &reading, const JSON &held,
-                   const std::string_view held_dialect, const JSON &arriving,
-                   const std::string_view arriving_dialect,
-                   const JSON::String &identifier, std::uint64_t &remaining)
-    -> bool {
-  auto expected{held};
-  say_what_it_says_of_itself(expected, reading.walker, reading.resolver,
-                             held_dialect, identifier, remaining);
-  auto candidate{arriving};
-  say_what_it_says_of_itself(candidate, reading.walker, reading.resolver,
-                             arriving_dialect, identifier, remaining);
+auto says_the_same(const Reading &reading, const Copy &held,
+                   const Copy &arriving, const JSON::String &identifier,
+                   std::uint64_t &remaining) -> bool {
+  auto expected{held.schema};
+  say_what_it_says_of_itself(expected, reading.walker, held.reads_with,
+                             held.dialect, identifier, remaining);
+  auto candidate{arriving.schema};
+  say_what_it_says_of_itself(candidate, reading.walker, arriving.reads_with,
+                             arriving.dialect, identifier, remaining);
   return expected == candidate;
 }
 
@@ -597,6 +606,32 @@ auto landed(KnownResources &known, const std::string_view name,
       Placement{.where = where, .dialect = JSON::String{dialect}});
 }
 
+// A resource read on its own is read without the document that holds it, so a
+// dialect the document carries for itself goes looking outside it and is not
+// found. What the document answers to a name is what it holds under that name,
+// wherever that is, including what a later pass has yet to put in
+auto answers_within(const JSON &root, const KnownResources &known,
+                    const SchemaResolver &resolver) -> SchemaResolver {
+  return [&root, &known,
+          &resolver](const std::string_view target) -> SchemaResolverResult {
+    const auto canonical{canonical_uri(target)};
+    const auto placement{known.placements.find(canonical)};
+    if (placement != known.placements.cend()) {
+      const auto *held{try_get(root, placement->second.where)};
+      if (held != nullptr) {
+        return *held;
+      }
+    }
+
+    const auto waiting{known.pending.find(canonical)};
+    if (waiting != known.pending.cend()) {
+      return waiting->second.schema;
+    }
+
+    return resolver(target);
+  };
+}
+
 // Every name the document the caller handed over answers to, and where each
 // of those sits within it, so that what a fetched schema names within one is
 // held against what is there. The top of a document answers to the base it
@@ -863,6 +898,9 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
     return;
   }
 
+  const SchemaResolver as_the_document_does{
+      answers_within(schema, known, reading.resolver)};
+
   // What the caller asked to be framed does not have to reach the
   // container, as a wrapper format keeps one outside every schema it
   // frames. So each landing is framed in its own right, which is also what the
@@ -1110,9 +1148,14 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
         if (!resolved.has_value() || !within.has_value() ||
             !says_the_same(
                 reading,
-                get(schema, to_pointer(resolved.value().get().pointer)),
-                resolved.value().get().dialect, get(schema, inside),
-                within.value().get().dialect, name, remaining)) {
+                {.schema =
+                     get(schema, to_pointer(resolved.value().get().pointer)),
+                 .dialect = resolved.value().get().dialect,
+                 .reads_with = as_the_document_does},
+                {.schema = get(schema, inside),
+                 .dialect = within.value().get().dialect,
+                 .reads_with = as_the_document_does},
+                name, remaining)) {
           throw SchemaError(
               "Conflicting embedded resources with the same identifier");
         }
@@ -1199,16 +1242,22 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
 // anywhere, and holding the two against each other is what keeps a name
 // standing for one schema rather than for two that disagree
 auto hold_against_what_is_known(const Reading &reading, const JSON &root,
-                                const JSON &value, const KnownResources &known,
-                                std::string_view remote_dialect_uri,
+                                const Copy &arriving,
+                                const KnownResources &known,
                                 const JSON::String &identifier,
                                 std::uint64_t &remaining) -> bool {
+  const SchemaResolver as_the_document_does{
+      answers_within(root, known, reading.resolver)};
+
   // What a later pass will place is not in the document yet, so a candidate
   // arriving first would otherwise be dropped against nothing at all
   const auto pending{known.pending.find(canonical_uri(identifier))};
   if (pending != known.pending.cend()) {
-    if (!says_the_same(reading, pending->second.schema, pending->second.dialect,
-                       value, remote_dialect_uri, identifier, remaining)) {
+    if (!says_the_same(reading,
+                       {.schema = pending->second.schema,
+                        .dialect = pending->second.dialect,
+                        .reads_with = as_the_document_does},
+                       arriving, identifier, remaining)) {
       throw SchemaError(
           "Conflicting embedded resources with the same identifier");
     }
@@ -1237,7 +1286,7 @@ auto hold_against_what_is_known(const Reading &reading, const JSON &root,
       SchemaFrame entry_frame{SchemaFrame::Mode::Root,
                               entry.second,
                               reading.walker,
-                              reading.resolver,
+                              as_the_document_does,
                               reading.container_dialect,
                               "",
                               SchemaFrame::IdentifierMode::Additional,
@@ -1253,8 +1302,11 @@ auto hold_against_what_is_known(const Reading &reading, const JSON &root,
       // is not what the one claiming its name arrived reading under. Taking the
       // incoming dialect for both is how two schemas that only look alike are
       // taken for one
-      if (!says_the_same(reading, entry.second, reading.container_dialect,
-                         value, remote_dialect_uri, identifier, remaining)) {
+      if (!says_the_same(reading,
+                         {.schema = entry.second,
+                          .dialect = reading.container_dialect,
+                          .reads_with = as_the_document_does},
+                         arriving, identifier, remaining)) {
         throw SchemaError(
             "Conflicting embedded resources with the same identifier");
       }
@@ -1288,9 +1340,11 @@ auto hold_against_what_is_known(const Reading &reading, const JSON &root,
   // inherits it, and either can spell it its own way, none of which says
   // anything about whether they are the same schema
   const auto &held_location{location.value().get()};
-  if (!says_the_same(reading, get(root, to_pointer(held_location.pointer)),
-                     held_location.dialect, value, remote_dialect_uri,
-                     identifier, remaining)) {
+  if (!says_the_same(reading,
+                     {.schema = get(root, to_pointer(held_location.pointer)),
+                      .dialect = held_location.dialect,
+                      .reads_with = as_the_document_does},
+                     arriving, identifier, remaining)) {
     throw SchemaError(
         "Conflicting embedded resources with the same identifier");
   }
@@ -1314,10 +1368,14 @@ auto removable_entry(const Reading &reading, const JSON &root,
   }
 
   const JSON::String identifier{entry.value().get().base};
+  const SchemaResolver as_the_remote_does{
+      resolver_with_embedded(remote, reading.resolver)};
   return is_known(known, identifier) &&
-         hold_against_what_is_known(reading, root, get(remote, entry_position),
-                                    known, remote_dialect_uri, identifier,
-                                    remaining);
+         hold_against_what_is_known(reading, root,
+                                    {.schema = get(remote, entry_position),
+                                     .dialect = remote_dialect_uri,
+                                     .reads_with = as_the_remote_does},
+                                    known, identifier, remaining);
 }
 
 auto elevate_embedded_resources(
@@ -1496,9 +1554,11 @@ auto elevate_embedded_resources(
           // disagrees goes missing, so it stays where it is unless something
           // answered for it, and whatever answered for it holds the name
           // already
-          if (hold_against_what_is_known(reading, root, value, known,
-                                         remote_dialect_uri, identifier_string,
-                                         remaining)) {
+          if (hold_against_what_is_known(reading, root,
+                                         {.schema = value,
+                                          .dialect = remote_dialect_uri,
+                                          .reads_with = entry_resolver},
+                                         known, identifier_string, remaining)) {
             to_remove.push_back({.key = key, .identifier = identifier_string});
             continue;
           }
@@ -1519,9 +1579,11 @@ auto elevate_embedded_resources(
         // What the document holds under this name can be anywhere, including
         // the container bundling puts things in, so there is one
         // question rather than one per place
-        if (!hold_against_what_is_known(reading, root, value, known,
-                                        remote_dialect_uri, identifier_string,
-                                        remaining)) {
+        if (!hold_against_what_is_known(reading, root,
+                                        {.schema = value,
+                                         .dialect = remote_dialect_uri,
+                                         .reads_with = entry_resolver},
+                                        known, identifier_string, remaining)) {
           continue;
         }
 
@@ -1585,32 +1647,6 @@ auto impossible_dialect_of_fetched(const JSON::String &identifier,
   return {identifier, origin,
           "The referenced schema declares a dialect that does not define the "
           "keyword that declares it"};
-}
-
-// A resource read on its own is read without the document that holds it, so a
-// dialect the document carries for itself goes looking outside it and is not
-// found. What the document answers to a name is what it holds under that name,
-// wherever that is, including what a later pass has yet to put in
-auto answers_within(const JSON &root, const KnownResources &known,
-                    const SchemaResolver &resolver) -> SchemaResolver {
-  return [&root, &known,
-          &resolver](const std::string_view target) -> SchemaResolverResult {
-    const auto canonical{canonical_uri(target)};
-    const auto placement{known.placements.find(canonical)};
-    if (placement != known.placements.cend()) {
-      const auto *held{try_get(root, placement->second.where)};
-      if (held != nullptr) {
-        return *held;
-      }
-    }
-
-    const auto waiting{known.pending.find(canonical)};
-    if (waiting != known.pending.cend()) {
-      return waiting->second.schema;
-    }
-
-    return resolver(target);
-  };
 }
 
 // Whether what a reference named is something the resource it names holds. A

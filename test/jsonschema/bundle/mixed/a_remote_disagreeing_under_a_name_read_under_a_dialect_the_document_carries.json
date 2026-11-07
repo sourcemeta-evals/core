@@ -1,0 +1,44 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "$ref": "https://www.sourcemeta.com/remote",
+    "$defs": {
+      "dialect": {
+        "$id": "https://example.com/dialect",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$vocabulary": {
+          "https://json-schema.org/draft/2020-12/vocab/core": true,
+          "https://json-schema.org/draft/2020-12/vocab/applicator": true
+        }
+      },
+      "shared": {
+        "$id": "https://example.com/shared",
+        "$schema": "https://example.com/dialect"
+      }
+    }
+  },
+  "resolver": {
+    "https://www.sourcemeta.com/remote": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://www.sourcemeta.com/remote",
+      "$defs": {
+        "https://example.com/shared": {
+          "$id": "https://example.com/shared"
+        }
+      }
+    }
+  },
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaError",
+      "message": "Conflicting embedded resources with the same identifier"
+    },
+    "references": {
+      "type": "SchemaError",
+      "message": "Conflicting embedded resources with the same identifier"
+    }
+  },
+  "result": {},
+  "inserted": {}
+}
