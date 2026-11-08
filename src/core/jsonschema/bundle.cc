@@ -18,6 +18,7 @@
 #include <unordered_map> // std::unordered_map
 #include <unordered_set> // std::unordered_set
 #include <utility>       // std::move, std::pair
+#include <variant>       // std::holds_alternative, std::get
 #include <vector>        // std::vector
 
 namespace sourcemeta::core {
@@ -431,6 +432,61 @@ auto inherited_once_embedded(const SchemaFrame &frame, const JSON &document,
   return JSON::String{lands_under};
 }
 
+// Whether two dialects put the same reading in force, which is not the same
+// question as whether they are spelled alike, as one dialect can answer to
+// more than one name. A mark stands in for a reading rather than for a name,
+// so what each puts in force is what it has to go by
+auto read_the_same_way(const SchemaVocabularies &one,
+                       const SchemaVocabularies &other) -> bool {
+  if (one.size() != other.size()) {
+    return false;
+  }
+
+  auto same{true};
+  one.for_each(
+      [&other, &same](const auto &vocabulary, const auto required) -> void {
+        if (!same) {
+          return;
+        }
+
+        const auto status{
+            std::holds_alternative<SchemaVocabularies::Known>(vocabulary)
+                ? other.get(std::get<SchemaVocabularies::Known>(vocabulary))
+                : other.get(std::get<JSON::String>(vocabulary))};
+        same = status.has_value() && status.value() == required;
+      });
+
+  return same;
+}
+
+// What a dialect puts in force, worked out from the name alone. A name nothing
+// can say a base for, and one that cannot be read for what it declares, each
+// leave nothing to work it out from, so both are left to be compared the only
+// other way there is
+auto reading_named_by(const std::string_view dialect,
+                      const SchemaResolver &resolver)
+    -> std::optional<SchemaVocabularies> {
+  try {
+    // Asked of a schema that declares nothing, so that what comes back is what
+    // the name alone puts in force rather than anything a document said
+    const auto base{
+        base_dialect(JSON::make_object(), resolver, dialect, false)};
+    if (!base.has_value()) {
+      return std::nullopt;
+    }
+
+    return vocabularies(resolver, base.value(), dialect);
+  } catch (const SchemaResolutionError &) {
+    return std::nullopt;
+  } catch (const SchemaUnknownBaseDialectError &) {
+    return std::nullopt;
+  } catch (const SchemaKeywordError &) {
+    return std::nullopt;
+  } catch (const SchemaError &) {
+    return std::nullopt;
+  }
+}
+
 auto mark_dialect_of_every_subschema(const Reading &reading, JSON &schema,
                                      const Marking &marking,
                                      std::uint64_t &remaining) -> void {
@@ -446,9 +502,16 @@ auto mark_dialect_of_every_subschema(const Reading &reading, JSON &schema,
                           remaining};
   charge(remaining, frame);
 
+  // What the document carries answers for a dialect before anything outside it
+  // does, which is what framing went by, so reading a name any other way would
+  // hold what the frame said against something it never said
+  const SchemaResolver as_the_document_does{
+      resolver_with_embedded(schema, reading.resolver)};
+
   std::vector<std::pair<Pointer, JSON::String>> targets;
   frame.for_each_location(
       [&targets, lands_under = marking.lands_under, &frame,
+       &resolver = reading.resolver, &as_the_document_does,
        &document = std::as_const(schema)](const auto, const auto &,
                                           const auto &location) -> void {
         if (location.type != SchemaFrame::LocationType::Resource &&
@@ -469,9 +532,19 @@ auto mark_dialect_of_every_subschema(const Reading &reading, JSON &schema,
         // One that would read the same way either side needs nothing said for
         // it, whether that is because what it goes into reads that way or
         // because something above it goes on saying so
-        if (canonical_uri(location.dialect) ==
-            canonical_uri(inherited_once_embedded(frame, document, location,
-                                                  lands_under))) {
+        const auto inherited{
+            inherited_once_embedded(frame, document, location, lands_under)};
+        if (canonical_uri(location.dialect) == canonical_uri(inherited)) {
+          return;
+        }
+
+        // Spelled differently, which says nothing on its own about what either
+        // one puts in force, so what they come to is what settles it. What this
+        // place reads under the frame has worked out already
+        const auto lands_as{reading_named_by(inherited, as_the_document_does)};
+        if (lands_as.has_value() &&
+            read_the_same_way(frame.vocabularies(location, resolver),
+                              lands_as.value())) {
           return;
         }
 
