@@ -5,6 +5,7 @@
 
 #include <sourcemeta/core/uri.h>
 
+#include <algorithm>     // std::ranges::any_of
 #include <array>         // std::array
 #include <cassert>       // assert
 #include <deque>         // std::deque
@@ -259,6 +260,29 @@ ref_overrides_adjacent_keywords(const SchemaBaseDialect base_dialect) -> bool {
   }
 }
 
+// Where a reader looks for a meta-schema a schema carries, in the order it
+// looks
+constexpr std::array<SchemaKeyword, 2> EMBEDDED_METASCHEMA_CONTAINERS{
+    {{.name = "$defs"sv, .hash = JSONSCHEMA_HASH_DEFS},
+     {.name = "definitions"sv, .hash = JSONSCHEMA_HASH_DEFINITIONS}}};
+
+// Whether a schema holds anything at all where a reader looks, which is what
+// makes it worth asking what it carries rather than paying to ask every schema
+// that answers to a name
+inline auto holds_embedded_candidates(const sourcemeta::core::JSON &document)
+    -> bool {
+  if (!document.is_object()) {
+    return false;
+  }
+
+  return std::ranges::any_of(
+      EMBEDDED_METASCHEMA_CONTAINERS,
+      [&document](const auto container) -> bool {
+        const auto *entries{document.try_at(container.name, container.hash)};
+        return entries != nullptr && entries->is_object();
+      });
+}
+
 inline auto embedded_metaschema_identifier_matches(
     const sourcemeta::core::JSON &candidate, const SchemaKeyword keyword,
     const std::string_view identifier,
@@ -319,10 +343,7 @@ embedded_metaschema_candidate(const sourcemeta::core::JSON &document,
     canonical = std::nullopt;
   }
 
-  constexpr std::array<SchemaKeyword, 2> CONTAINERS{
-      {{.name = "$defs"sv, .hash = JSONSCHEMA_HASH_DEFS},
-       {.name = "definitions"sv, .hash = JSONSCHEMA_HASH_DEFINITIONS}}};
-  for (const auto container : CONTAINERS) {
+  for (const auto container : EMBEDDED_METASCHEMA_CONTAINERS) {
     const auto *entries{document.try_at(container.name, container.hash)};
     if ((entries == nullptr) || !entries->is_object()) {
       continue;

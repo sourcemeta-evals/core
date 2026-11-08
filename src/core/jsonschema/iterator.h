@@ -200,12 +200,16 @@ resolver_within_scopes(const PinnedScope &innermost,
     -> sourcemeta::core::SchemaResolver {
   return [&innermost, &resolver](const std::string_view target)
              -> sourcemeta::core::SchemaResolverResult {
-    for (const auto *scope{&innermost}; scope != nullptr;
-         scope = scope->enclosing) {
-      const auto *embedded{sourcemeta::core::metaschema_try_embedded(
-          *scope->holder, target, resolver)};
-      if (embedded != nullptr) {
-        return *embedded;
+    // A dialect a base dialect answers for is published rather than carried,
+    // so nothing a document holds stands in front of one
+    if (!sourcemeta::core::to_base_dialect(target).has_value()) {
+      for (const auto *scope{&innermost}; scope != nullptr;
+           scope = scope->enclosing) {
+        const auto *embedded{sourcemeta::core::metaschema_try_embedded(
+            *scope->holder, target, resolver)};
+        if (embedded != nullptr) {
+          return *embedded;
+        }
       }
     }
 
@@ -372,23 +376,17 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     const auto child_dialect{child.dialect};
     const auto child_base_dialect{child.base_dialect};
 
-    // Only a schema that answers to a name and said for itself what sits
-    // within it reads under can hold that meta-schema, as one that inherited
-    // the dialect carries whatever scope the one above it did, and a
-    // declaration anywhere else says nothing at all. Saying what it would have
-    // read anyway is still saying it, so the copy such a schema carries is what
-    // everything below it goes on finding. A dialect no base dialect answers
-    // for is the only kind a document can hold, and the schema the walk started
-    // from is the caller's own to answer for, which is why a scope of ours
-    // never stands in front of the caller's there
+    // A meta-schema a schema carries speaks for whatever sits within that
+    // schema, which is a question of where the copy sits rather than of what
+    // the schema holding it reads under: one that carries a dialect for a
+    // resource below it reads under whatever it likes, and a copy that answers
+    // for nothing below it is asked and hands nothing back. Only a schema that
+    // answers to a name encloses anything in its own right, and the schema the
+    // walk started from is the caller's own to answer for, which is why a scope
+    // of ours never stands in front of the caller's there
     const auto *pinned_within{current.pinned_within};
     if (child.names_itself && &subschema != &root_subschema &&
-        !sourcemeta::core::to_base_dialect(child_dialect).has_value() &&
-        sourcemeta::core::canonical_uri(
-            sourcemeta::core::dialect(subschema, "", false)) ==
-            sourcemeta::core::canonical_uri(child_dialect) &&
-        sourcemeta::core::metaschema_try_embedded(subschema, child_dialect,
-                                                  effective) != nullptr) {
+        sourcemeta::core::holds_embedded_candidates(subschema)) {
       scopes.push_front(
           {.holder = &subschema, .enclosing = current.pinned_within});
       pinned_within = &scopes.front();
