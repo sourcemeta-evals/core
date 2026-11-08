@@ -2155,8 +2155,16 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
       }
     }
 
+    // Whether what went in can answer to the name it was resolved by, which
+    // takes a dialect that reserves a keyword for naming and something that
+    // can carry one. A boolean carries nothing, and it is only written out as
+    // something that can where the dialect it is read under reserves a way to
+    // refuse everything, so what is left of it is reached by where it lands
+    // however freely that dialect names what can be named
+    const auto answers_to_its_name{dialect_allows_naming && remote.is_object()};
+
     if (remote.is_object()) {
-      if (dialect_allows_naming) {
+      if (answers_to_its_name) {
         schema_reidentify(remote, effective_id, remote_base_dialect);
       }
 
@@ -2196,7 +2204,7 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
     // in. A reference that names a resource the remote carries is settled by
     // that name, which says nothing about the remote around it, and a later
     // reference to the remote itself still has to be settled by place
-    if (!dialect_allows_naming) {
+    if (!answers_to_its_name) {
       assert(effective_id == identifier);
       positional.unnamed.insert(identifier);
     }
@@ -2212,7 +2220,7 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
       ref_rewrites.emplace_back(
           to_pointer(pointer),
           rebase_reference(effective_id, reference.fragment));
-    } else if (!dialect_allows_naming ||
+    } else if (!answers_to_its_name ||
                spells_another_document_relatively(reference)) {
       // Either the remote cannot declare the name it was resolved by, so what
       // this reference points at is settled against the finished document
