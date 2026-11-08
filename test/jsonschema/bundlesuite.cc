@@ -268,8 +268,12 @@ auto with_insertions(const Inputs &inputs, const Insertions &insertions)
   result.default_id = inputs.default_id;
   result.default_base = inputs.default_base;
   result.container = inputs.container;
+  // Where a fixture named no pointers of its own, this pass frames what the
+  // one before it framed, as naming none and naming nothing but the root ask
+  // for different documents to be framed. Neither selection points into what
+  // the fixture owns, so there is nothing to carry
   if (inputs.path_storage.empty()) {
-    result.paths.push_back(sourcemeta::core::EMPTY_WEAK_POINTER);
+    result.paths = inputs.paths;
     return result;
   }
 
