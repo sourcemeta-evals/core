@@ -151,15 +151,16 @@ auto dialect_within(const SchemaFrame &frame, const JSON &document,
     // reads straight past a declaration anywhere else, and so does whatever
     // reads the document afterwards
     const auto declared{declared_dialect(value, "")};
+    const auto &enclosing{location.value().get().parent};
     if (!declared.empty() &&
-        (current->empty() ||
-         location.value().get().type == SchemaFrame::LocationType::Resource)) {
+        (!enclosing.has_value() ||
+         frame.traverse(*current, SchemaFrame::LocationType::Resource)
+             .has_value())) {
       return JSON::String{declared};
     }
 
     // Nothing stands above the top of what was framed to say that, so a mark
     // there speaks for what it holds too
-    const auto &enclosing{location.value().get().parent};
     if (!enclosing.has_value()) {
       return JSON::String{reported};
     }
