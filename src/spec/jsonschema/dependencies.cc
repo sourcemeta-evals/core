@@ -69,6 +69,16 @@ auto account(Walk &walk, const JSON::StringView identifier) -> void {
   }
 }
 
+// An official schema is never read, but the identifier it declares at its top
+// still answers for it, whichever spelling a reference used to get here
+auto account_declared_identifier(Walk &walk, const JSON &document) -> void {
+  const auto identifier{
+      identify(document, walk.resolver, walk.default_dialect)};
+  if (!identifier.empty()) {
+    account(walk, URI::canonicalize(identifier));
+  }
+}
+
 // Every frame that the walk constructs spends from the same allowance, as how
 // many of them it ends up needing is a function of what the resolver hands
 // back rather than of the schema the caller passed in. A frame that ran past
@@ -190,8 +200,14 @@ auto examine(Walk &walk, const SchemaFrame &frame,
     account(walk, reference.base);
 
     // Official schemas can only reference other official schemas, so reading
-    // them can never surface further dependencies
+    // them can never surface further dependencies. The identifier one declares
+    // still answers for it, so a reference through another spelling of it
+    // settles here rather than reporting the same document again
     if (standalone || schema_is_official(reference.base)) {
+      if (!standalone) {
+        account_declared_identifier(walk, remote.value());
+      }
+
       return;
     }
 
