@@ -6,7 +6,8 @@
 #include <format> // std::format
 
 #include <sstream>       // std::ostringstream
-#include <string>        // std::string
+#include <stdexcept>     // std::logic_error
+#include <string>        // std::string, std::stoull
 #include <unordered_set> // std::unordered_set
 #include <utility>       // std::move, std::pair
 #include <variant>       // std::variant
@@ -71,6 +72,28 @@ static auto vocabularies(const sourcemeta::core::JSON &document,
                                       document, sourcemeta::core::schema_walker,
                                       resolver, default_dialect};
   return frame.vocabularies(frame.root_location().value().get(), resolver);
+}
+
+static auto endless_metaschema_resolver(std::string_view identifier)
+    -> sourcemeta::core::SchemaResolverResult {
+  constexpr std::string_view prefix{"https://www.sourcemeta.com/endless/"};
+  if (!identifier.starts_with(prefix)) {
+    return sourcemeta::core::schema_resolver(identifier);
+  }
+
+  // A resolver that never runs out of links would otherwise keep an unbounded
+  // chain lookup going until the process runs out of memory
+  const auto link{std::stoull(std::string{identifier.substr(prefix.size())})};
+  if (link > 200) {
+    throw std::logic_error{"The chain lookup was never cut short"};
+  }
+
+  return sourcemeta::core::parse_json(std::format(R"JSON({{
+    "$id": "{}{}",
+    "$schema": "{}{}"
+  }})JSON",
+                                                  prefix, link, prefix,
+                                                  link + 1));
 }
 
 TEST(core_vocabularies_boolean_without_default) {
@@ -1158,6 +1181,29 @@ TEST(base_dialect_unresolved_where_the_chain_leaves_the_known) {
     FAIL();
   } catch (const sourcemeta::core::SchemaResolutionError &error) {
     EXPECT_EQ(error.identifier(), "https://example.com/meta-1");
+  }
+}
+
+// An embedded meta-schema may hand its chain over to the resolver, which can
+// answer every link with a fresh one, so walking the chain is held to the
+// same depth as the dialect lookup that started it
+TEST(base_dialect_an_embedded_chain_the_resolver_extends_for_ever) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/endless/1",
+    "$defs": {
+      "endless-1": {
+        "$id": "https://www.sourcemeta.com/endless/1",
+        "$schema": "https://www.sourcemeta.com/endless/2"
+      }
+    }
+  })JSON")};
+
+  try {
+    vocabularies(document, endless_metaschema_resolver);
+    FAIL();
+  } catch (const sourcemeta::core::SchemaUnknownBaseDialectError &error) {
+    EXPECT_STREQ(error.what(),
+                 "Could not determine the base dialect of the schema");
   }
 }
 

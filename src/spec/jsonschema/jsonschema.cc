@@ -353,8 +353,11 @@ auto sourcemeta::core::metaschema_try_embedded(
   while (true) {
     // The meta-schema is present, but its chain can never terminate at an
     // official base dialect, just like a self-descriptive or cyclic
-    // meta-schema that the resolver knows about
-    if (!visited.emplace(current_identifier).second) {
+    // meta-schema that the resolver knows about. A chain that goes deeper
+    // than any document means is refused here too, as the resolver could
+    // otherwise extend this walk with fresh links for ever
+    if (visited.size() >= BASE_DIALECT_CHAIN_LIMIT ||
+        !visited.emplace(current_identifier).second) {
       throw sourcemeta::core::SchemaUnknownBaseDialectError();
     }
 
