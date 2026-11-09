@@ -18,6 +18,7 @@ sourcemeta_test(NAMESPACE sourcemeta PROJECT core NAME jsonschema
     jsonschema_frame_test.cc
     jsonschema_frame_error_test.cc
     jsonschema_frame_limit_test.cc
+    jsonschema_frame_scope_test.cc
     jsonschema_identifier_keyword_test.cc)
 
 target_link_libraries(sourcemeta_core_jsonschema_unit
