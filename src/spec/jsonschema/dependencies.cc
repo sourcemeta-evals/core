@@ -195,13 +195,10 @@ auto examine(Walk &walk, const SchemaFrame &frame,
       return;
     }
 
-    // What the walk takes over it also releases once it is done with, so the
-    // cache hands the document over rather than keeping a copy of the closure
-    // alive behind it. Nothing asks for this one again, as it is accounted for
-    auto taken{walk.cache.extract(JSON::String{reference.base})};
-    walk.pending.emplace_back(taken.empty() ? std::move(remote)
-                                            : std::move(taken.mapped()),
-                              JSON::String{reference.base});
+    // The cache keeps the answer, as framing may yet name this document as
+    // the dialect of one the walk has not read, and the queue borrows it from
+    // there rather than taking it out and making the resolver answer twice
+    walk.pending.emplace_back(std::move(remote), JSON::String{reference.base});
   });
 }
 
