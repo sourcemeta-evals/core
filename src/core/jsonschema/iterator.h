@@ -182,15 +182,6 @@ resolve_dialect_at(const sourcemeta::core::JSON &subschema,
           .names_itself = names_a_resource(identifier)};
 }
 
-// A schema that holds the dialect it reads under among its own containers,
-// together with whatever held the dialect of the schema enclosing it. A
-// meta-schema speaks for everything below the schema carrying it, so entering
-// one of these never takes the reader out of the ones around it
-struct PinnedScope {
-  const sourcemeta::core::JSON *holder;
-  const PinnedScope *enclosing;
-};
-
 // A meta-schema is looked for in the nearest schema that pinned one, then in
 // each schema enclosing that, before anything outside the document is asked.
 // The result borrows the chain and the resolver, so it must not outlive either
@@ -206,7 +197,7 @@ resolver_within_scopes(const PinnedScope &innermost,
       for (const auto *scope{&innermost}; scope != nullptr;
            scope = scope->enclosing) {
         const auto *embedded{sourcemeta::core::metaschema_try_embedded(
-            *scope->holder, target, resolver)};
+            *scope->holder, target, resolver, &innermost)};
         if (embedded != nullptr) {
           return *embedded;
         }

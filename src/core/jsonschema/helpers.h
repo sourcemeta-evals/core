@@ -73,9 +73,19 @@ auto vocabularies(const SchemaResolver &resolver,
                   std::string_view dialect) -> SchemaVocabularies;
 auto to_base_dialect(const std::string_view base_dialect)
     -> std::optional<SchemaBaseDialect>;
+// A schema that holds the dialect it reads under among its own containers,
+// together with whatever held the dialect of the schema enclosing it. A
+// meta-schema speaks for everything below the schema carrying it, so entering
+// one of these never takes the reader out of the ones around it
+struct PinnedScope {
+  const sourcemeta::core::JSON *holder;
+  const PinnedScope *enclosing;
+};
+
 auto metaschema_try_embedded(const sourcemeta::core::JSON &schema,
                              std::string_view identifier,
-                             const SchemaResolver &resolver)
+                             const SchemaResolver &resolver,
+                             const PinnedScope *scopes = nullptr)
     -> const sourcemeta::core::JSON *;
 auto vocabulary_uri(SchemaVocabularies::Known vocabulary) -> std::string_view;
 auto vocabulary_uri(const SchemaVocabularies::URI &vocabulary)
