@@ -349,9 +349,10 @@ auto sourcemeta::core::metaschema_try_embedded(
     }
 
     if (sourcemeta::core::URI::is_uri(dialect_uri)) {
-      // A link further along the chain may sit in one of the schemas enclosing
-      // the one that carries the link before it, as a meta-schema speaks for
-      // everything below whatever holds it
+      // A link further along the chain may sit in any of the schemas enclosing
+      // the place being read rather than in the one that carries the link
+      // before it, as a meta-schema speaks for everything below whatever
+      // holds it
       auto next{
           sourcemeta::core::embedded_metaschema_candidate(schema, dialect_uri)};
       for (const auto *scope{scopes}; next.first == nullptr && scope != nullptr;

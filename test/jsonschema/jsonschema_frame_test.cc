@@ -765,6 +765,60 @@ TEST(accessors_vocabularies_of_a_resource_that_carries_its_own_dialect) {
                              JSON_SCHEMA_2020_12_APPLICATOR);
 }
 
+TEST(
+    accessors_vocabularies_of_a_dialect_whose_chain_a_resource_above_it_holds) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schema",
+    "$defs": {
+      "outer": {
+        "$id": "https://example.com/outer",
+        "$schema": "https://example.com/mid",
+        "$defs": {
+          "https://example.com/mid": {
+            "$id": "https://example.com/mid",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$vocabulary": {
+              "https://json-schema.org/draft/2020-12/vocab/core": true,
+              "https://json-schema.org/draft/2020-12/vocab/applicator": true
+            }
+          },
+          "inner": {
+            "$id": "https://example.com/inner",
+            "$schema": "https://example.com/deep",
+            "$defs": {
+              "https://example.com/deep": {
+                "$id": "https://example.com/deep",
+                "$schema": "https://example.com/mid",
+                "$vocabulary": {
+                  "https://json-schema.org/draft/2020-12/vocab/core": true,
+                  "https://json-schema.org/draft/2020-12/vocab/applicator": true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  })JSON");
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::References, document,
+      sourcemeta::core::schema_walker, sourcemeta::core::schema_resolver};
+
+  // The dialect this one reads under is carried where it sits, while the one
+  // that dialect reads under is carried by the resource above it, so what
+  // answers for the place has to look through both
+  const auto inner{frame.traverse("https://example.com/inner")};
+  EXPECT_TRUE(inner.has_value());
+  const auto &inner_vocabularies{
+      frame.vocabularies(inner->get(), sourcemeta::core::schema_resolver)};
+  EXPECT_EQ(inner_vocabularies.size(), 2);
+  EXPECT_VOCABULARY_REQUIRED(inner_vocabularies, JSON_SCHEMA_2020_12_CORE);
+  EXPECT_VOCABULARY_REQUIRED(inner_vocabularies,
+                             JSON_SCHEMA_2020_12_APPLICATOR);
+}
+
 TEST(accessors_location_count) {
   const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "$id": "https://example.com/schema",

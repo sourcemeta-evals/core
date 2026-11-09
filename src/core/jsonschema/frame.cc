@@ -1113,21 +1113,20 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
                             .base_dialect = entry.base_dialect.value()}});
 
       // A nested resource may pin a custom meta-schema inside its own
-      // containers. Cache it here, just like we do for the root, so that later
-      // vocabulary lookups (which consult this cache) can resolve it. If the
-      // same meta-schema identifier is embedded in more than one place with a
+      // containers. Cache what the walk settled on, just like we do for the
+      // root, so that later vocabulary lookups (which consult this cache) can
+      // resolve it. Settling it again here would be without the scopes the
+      // walk had, losing a name whose chain reaches across them. If the same
+      // meta-schema identifier is embedded in more than one place with a
       // different definition, that is an ambiguity we refuse to resolve
-      if (!sourcemeta::core::to_base_dialect(entry.dialect).has_value()) {
+      if (entry.embedded_metaschema != nullptr) {
         const sourcemeta::core::JSON::String dialect_key{entry.dialect};
-        const auto *embedded{sourcemeta::core::metaschema_try_embedded(
-            entry.subschema.get(), entry.dialect, resolver)};
-        if (embedded != nullptr) {
-          const auto match{this->cache_->probed_metaschemas.find(dialect_key)};
-          if (match == this->cache_->probed_metaschemas.cend()) {
-            this->cache_->probed_metaschemas.emplace(dialect_key, embedded);
-          } else if (*(match->second) != *embedded) {
-            throw_already_exists(dialect_key);
-          }
+        const auto match{this->cache_->probed_metaschemas.find(dialect_key)};
+        if (match == this->cache_->probed_metaschemas.cend()) {
+          this->cache_->probed_metaschemas.emplace(dialect_key,
+                                                   entry.embedded_metaschema);
+        } else if (*(match->second) != *(entry.embedded_metaschema)) {
+          throw_already_exists(dialect_key);
         }
       }
 

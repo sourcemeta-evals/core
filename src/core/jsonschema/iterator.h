@@ -30,6 +30,11 @@ struct SubschemaEntry {
   std::reference_wrapper<const sourcemeta::core::JSON> subschema;
   bool orphan;
   bool property_name;
+  // What answered for the dialect in force, where the document carries it
+  // rather than anything outside answering for it. Whoever holds this walk's
+  // result would otherwise have to settle that name again without the scopes
+  // the walk had, and a name whose chain reaches across them would be lost
+  const sourcemeta::core::JSON *embedded_metaschema{nullptr};
 };
 
 struct DialectInfo {
@@ -329,6 +334,13 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     const auto vocabularies{sourcemeta::core::vocabularies_with_embedded(
         subschema, effective, current_base_dialect, current_dialect)};
 
+    const auto *embedded_metaschema{
+        sourcemeta::core::to_base_dialect(current_dialect).has_value()
+            ? nullptr
+            : sourcemeta::core::metaschema_try_embedded(
+                  subschema, current_dialect, effective,
+                  current.pinned_within)};
+
     // A schema that names its dialect through a keyword that very dialect
     // leaves undefined cannot be taken at its word, because honouring it would
     // make the keyword mean something the dialect says it does not. The caller
@@ -352,7 +364,8 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
                                   .base_dialect = current_base_dialect,
                                   .subschema = subschema,
                                   .orphan = orphan,
-                                  .property_name = property_name};
+                                  .property_name = property_name,
+                                  .embedded_metaschema = embedded_metaschema};
     subschemas.push_back(std::move(iterator_entry));
 
     // We can't recurse any further
