@@ -2229,6 +2229,14 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
       }
     }
 
+    // What a reference names within this remote is a question about what was
+    // fetched, not about what bundling goes on to write into it. Holding it
+    // here, before a name, a declaration or a mark is written, is what keeps a
+    // reference from reaching a place only bundling put there
+    expect(known, effective_id, remote, remote_dialect_uri,
+           Fetch{.name = identifier,
+                 .origin = where_the_caller_wrote(to_pointer(pointer), wrote)});
+
     // Whether what went in can answer to the name it was resolved by, which
     // takes a dialect that reserves a keyword for naming and something that
     // can carry one. A boolean carries nothing, and it is only written out as
@@ -2308,9 +2316,6 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
 
     record(known, identifier, effective_id);
     record(known, effective_id, effective_id);
-    expect(known, effective_id, remote, remote_dialect_uri,
-           Fetch{.name = identifier,
-                 .origin = where_the_caller_wrote(to_pointer(pointer), wrote)});
     deferred.push_back(
         {.schema = std::move(remote),
          .identifier = std::move(effective_id),
