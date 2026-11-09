@@ -918,7 +918,7 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
     const SchemaResolver effective_resolver{
         [&schema, &resolver, &probed_within_path,
          this](const std::string_view identifier) -> SchemaResolverResult {
-          const sourcemeta::core::JSON::String key{identifier};
+          const sourcemeta::core::JSON::String key{canonical_uri(identifier)};
           const auto hit{probed_within_path.find(key)};
           if (hit != probed_within_path.cend()) {
             return *(hit->second);
@@ -1058,7 +1058,8 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
       // Cache it, as the vocabulary lookups that this mode exists to serve
       // consult that cache
       if (!sourcemeta::core::to_base_dialect(root_dialect).has_value()) {
-        const sourcemeta::core::JSON::String dialect_key{root_dialect};
+        const sourcemeta::core::JSON::String dialect_key{
+            canonical_uri(root_dialect)};
         const auto *embedded{sourcemeta::core::metaschema_try_embedded(
             schema, root_dialect, resolver)};
         if (embedded != nullptr) {
@@ -1120,7 +1121,8 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
       // meta-schema identifier is embedded in more than one place with a
       // different definition, that is an ambiguity we refuse to resolve
       if (entry.embedded_metaschema != nullptr) {
-        const sourcemeta::core::JSON::String dialect_key{entry.dialect};
+        const sourcemeta::core::JSON::String dialect_key{
+            canonical_uri(entry.dialect)};
         const auto match{this->cache_->probed_metaschemas.find(dialect_key)};
         if (match == this->cache_->probed_metaschemas.cend()) {
           this->cache_->probed_metaschemas.emplace(dialect_key,
@@ -1931,8 +1933,8 @@ auto SchemaFrame::metaschema(const SchemaResolver &resolver) const
     throw SchemaUnknownDialectError();
   }
 
-  const auto embedded{this->cache_->probed_metaschemas.find(
-      sourcemeta::core::JSON::String{dialect})};
+  const auto embedded{
+      this->cache_->probed_metaschemas.find(canonical_uri(dialect))};
   if (embedded != this->cache_->probed_metaschemas.cend()) {
     return *(embedded->second);
   }
@@ -2028,7 +2030,7 @@ auto SchemaFrame::vocabularies(const Location &location,
           [this, &resolver](
               const std::string_view identifier) -> SchemaResolverResult {
             const auto hit{this->cache_->probed_metaschemas.find(
-                sourcemeta::core::JSON::String{identifier})};
+                canonical_uri(identifier))};
             if (hit != this->cache_->probed_metaschemas.cend()) {
               return *(hit->second);
             }

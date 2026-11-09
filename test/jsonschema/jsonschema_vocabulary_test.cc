@@ -1068,3 +1068,50 @@ TEST(vocabularies_of_a_dialect_whose_chain_a_resource_above_it_holds) {
   EXPECT_TRUE(vocabularies.contains(sourcemeta::core::SchemaVocabularies::
                                         Known::JSON_SCHEMA_2020_12_APPLICATOR));
 }
+
+// A meta-schema a schema carries speaks for whatever sits within it, and what
+// a place names it by is the spelling that place wrote. Two spellings that
+// come to the same name are the same meta-schema, so what answers for one
+// answers for the other
+TEST(vocabularies_of_a_dialect_an_ancestor_carries_under_an_equivalent_name) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schema",
+    "$defs": {
+      "outer": {
+        "$id": "https://example.com/outer",
+        "$schema": "https://example.com/meta",
+        "$defs": {
+          "https://example.com/meta": {
+            "$id": "https://example.com/meta",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$vocabulary": {
+              "https://json-schema.org/draft/2020-12/vocab/core": true,
+              "https://json-schema.org/draft/2020-12/vocab/applicator": true
+            }
+          }
+        },
+        "properties": {
+          "inner": {
+            "$id": "https://example.com/inner",
+            "$schema": "https://EXAMPLE.com/meta"
+          }
+        }
+      }
+    }
+  })JSON");
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::References, document,
+      sourcemeta::core::schema_walker, sourcemeta::core::schema_resolver};
+
+  const auto inner{frame.traverse("https://example.com/inner")};
+  EXPECT_TRUE(inner.has_value());
+  const auto &found{
+      frame.vocabularies(inner->get(), sourcemeta::core::schema_resolver)};
+  EXPECT_EQ(found.size(), 2);
+  EXPECT_TRUE(found.contains(
+      sourcemeta::core::SchemaVocabularies::Known::JSON_SCHEMA_2020_12_CORE));
+  EXPECT_TRUE(found.contains(sourcemeta::core::SchemaVocabularies::Known::
+                                 JSON_SCHEMA_2020_12_APPLICATOR));
+}
