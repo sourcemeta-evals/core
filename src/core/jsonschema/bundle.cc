@@ -583,6 +583,11 @@ struct Fetch {
 // what a refusal the fetched document brings on has to name, however many
 // later references meet the same document and whatever they call it. One that
 // was already inside something was fetched by nothing
+struct Fetched {
+  JSON schema;
+  JSON::String dialect;
+};
+
 struct Pending {
   const JSON *schema;
   JSON::String dialect;
@@ -614,11 +619,14 @@ struct KnownResources {
   // What a later pass will place. A name is answered from here first, as the
   // document does not hold it yet
   std::unordered_map<JSON::String, Pending> pending;
-  // What came back under each name, as it came back. What a reference names
-  // within a resource is a question about what was fetched, and the document
-  // stops saying that once a name of its own and marks have gone in, so this
-  // outlives the wait rather than going when the resource is placed
-  std::unordered_map<JSON::String, JSON> fetched;
+  // What came back under each name, as it came back, and what it was read
+  // under when it did. What a reference names within a resource is a question
+  // about what was fetched, and the document stops saying that once a name of
+  // its own and marks have gone in, so this outlives the wait rather than
+  // going when the resource is placed. The two travel together, as reading
+  // what came back under anything else frames it without the vocabulary a
+  // name of its own needs
+  std::unordered_map<JSON::String, Fetched> fetched;
   // Which of these names came back as a boolean. One holds nothing at all, so
   // a reference naming a place within it names nothing, and writing it out as
   // the object saying the same thing does not put anything there to name
@@ -669,9 +677,10 @@ auto expect(KnownResources &known, const std::string_view name,
             const JSON &schema, const std::string_view dialect,
             std::optional<Fetch> fetch) -> void {
   auto canonical{canonical_uri(name)};
-  const auto held{known.fetched.insert_or_assign(canonical, schema)};
+  const auto held{known.fetched.insert_or_assign(
+      canonical, Fetched{.schema = schema, .dialect = JSON::String{dialect}})};
   known.pending.insert_or_assign(std::move(canonical),
-                                 Pending{.schema = &held.first->second,
+                                 Pending{.schema = &held.first->second.schema,
                                          .dialect = JSON::String{dialect},
                                          .fetch = std::move(fetch)});
 }
@@ -1818,19 +1827,22 @@ auto refuse_what_nothing_answers(const Reading &reading, const JSON &schema,
     // The same question as the one above: what came back under this name is
     // what a reference names within it, placed or not
     const auto held{known.fetched.find(canonical)};
-    const auto *within{
-        holds ? waiting->second.schema
-              : (held != known.fetched.cend()
-                     ? &held->second
-                     : (settled != known.placements.cend()
-                            ? try_get(schema, settled->second.where)
-                            : nullptr))};
+    const JSON *within{nullptr};
+    std::string_view reads_under;
+    if (holds) {
+      within = waiting->second.schema;
+      reads_under = waiting->second.dialect;
+    } else if (held != known.fetched.cend()) {
+      within = &held->second.schema;
+      reads_under = held->second.dialect;
+    } else if (settled != known.placements.cend()) {
+      within = try_get(schema, settled->second.where);
+      reads_under = settled->second.dialect;
+    }
+
     if (within == nullptr) {
       continue;
     }
-
-    const auto reads_under{holds ? std::string_view{waiting->second.dialect}
-                                 : std::string_view{settled->second.dialect}};
     const SchemaResolver as_the_document_does{
         answers_within(schema, known, reading.resolver)};
     if (!names_something_within(*within, asked.destination, reading.walker,
@@ -1997,14 +2009,18 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
         // resource is placed and the document has had a name of its own and
         // its marks written into it
         const auto held{known.fetched.find(canonical_uri(answering))};
-        const auto *within{
-            waiting ? pending->second.schema
-                    : (held != known.fetched.cend()
-                           ? &held->second
-                           : try_get(root, placement->second.where))};
-        const auto reads_under{
-            waiting ? std::string_view{pending->second.dialect}
-                    : std::string_view{placement->second.dialect}};
+        const JSON *within{nullptr};
+        std::string_view reads_under;
+        if (waiting) {
+          within = pending->second.schema;
+          reads_under = pending->second.dialect;
+        } else if (held != known.fetched.cend()) {
+          within = &held->second.schema;
+          reads_under = held->second.dialect;
+        } else {
+          within = try_get(root, placement->second.where);
+          reads_under = placement->second.dialect;
+        }
         const SchemaResolver as_the_document_does{
             answers_within(root, known, reading.resolver)};
         // A name the document was only fetched by is not what this reference
