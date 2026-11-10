@@ -1298,8 +1298,18 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
             // registrations all the same: the caller declared the document
             // known by it, per JSON Schema 2020-12 Section 9.1.2, and that
             // declaration does not lapse because the document was also
-            // retrieved from it
-            if (base_string == this->cache_->default_base &&
+            // retrieved from it.
+            // The retrieval base lives at the top of the document alone,
+            // where RFC 3986 Section 5.1.3 files it: "if a URI was used to
+            // retrieve the representation, that URI shall be considered the
+            // base URI". A base found at a deeper resource is never that
+            // fallback but an identifier that resolved against a declared or
+            // caller-given name, and per JSON Schema 2020-12 Section 9.1.2,
+            // "A schema MAY (and likely will) have multiple URIs", so such a
+            // name stays one of the resource's own even where its text
+            // coincides with the URI the document was retrieved from
+            if (bases.second.empty() &&
+                base_string == this->cache_->default_base &&
                 base_string != default_id_canonical &&
                 std::ranges::any_of(bases.first,
                                     [this, &default_id_canonical](

@@ -3,7 +3,8 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
-#include <format> // std::format
+#include <cstddef> // std::size_t
+#include <format>  // std::format
 
 #include <sstream>       // std::ostringstream
 #include <stdexcept>     // std::logic_error
@@ -94,6 +95,20 @@ static auto endless_metaschema_resolver(std::string_view identifier)
   }})JSON",
                                                   prefix, link, prefix,
                                                   link + 1));
+}
+
+// Answers for the first link of a meta-schema chain whose remaining links the
+// document under test carries embedded within itself
+static auto handover_metaschema_resolver(std::string_view identifier)
+    -> sourcemeta::core::SchemaResolverResult {
+  if (identifier == "https://www.sourcemeta.com/handover/0") {
+    return sourcemeta::core::parse_json(R"JSON({
+      "$id": "https://www.sourcemeta.com/handover/0",
+      "$schema": "https://www.sourcemeta.com/handover/1"
+    })JSON");
+  }
+
+  return sourcemeta::core::schema_resolver(identifier);
 }
 
 TEST(core_vocabularies_boolean_without_default) {
@@ -1249,4 +1264,65 @@ TEST(embedded_metaschema_chain_reaching_something_that_is_no_schema) {
     EXPECT_STREQ(error.what(),
                  "Could not determine the base dialect of the schema");
   }
+}
+
+// Links the resolver hands back and links the document carries embedded spend
+// from the one chain allowance, so a chain only over the limit when both
+// kinds are counted together is refused all the same
+TEST(base_dialect_a_resolved_link_handing_to_embedded_links_past_the_limit) {
+  auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/handover/0",
+    "$defs": {}
+  })JSON")};
+  auto &definitions{document.at("$defs")};
+  for (std::size_t link = 1; link <= 64; link += 1) {
+    auto metaschema{sourcemeta::core::JSON::make_object()};
+    metaschema.assign("$id",
+                      sourcemeta::core::JSON{std::format(
+                          "https://www.sourcemeta.com/handover/{}", link)});
+    metaschema.assign(
+        "$schema",
+        sourcemeta::core::JSON{
+            link == 64
+                ? std::string{"https://json-schema.org/draft/2020-12/schema"}
+                : std::format("https://www.sourcemeta.com/handover/{}",
+                              link + 1)});
+    definitions.assign(std::format("link-{}", link), std::move(metaschema));
+  }
+
+  try {
+    vocabularies(document, handover_metaschema_resolver);
+    FAIL();
+  } catch (const sourcemeta::core::SchemaUnknownBaseDialectError &error) {
+    EXPECT_STREQ(error.what(),
+                 "Could not determine the base dialect of the schema");
+  }
+}
+
+TEST(base_dialect_a_resolved_link_handing_to_embedded_links_at_the_limit) {
+  auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/handover/0",
+    "$defs": {}
+  })JSON")};
+  auto &definitions{document.at("$defs")};
+  for (std::size_t link = 1; link <= 63; link += 1) {
+    auto metaschema{sourcemeta::core::JSON::make_object()};
+    metaschema.assign("$id",
+                      sourcemeta::core::JSON{std::format(
+                          "https://www.sourcemeta.com/handover/{}", link)});
+    metaschema.assign(
+        "$schema",
+        sourcemeta::core::JSON{
+            link == 63
+                ? std::string{"https://json-schema.org/draft/2020-12/schema"}
+                : std::format("https://www.sourcemeta.com/handover/{}",
+                              link + 1)});
+    definitions.assign(std::format("link-{}", link), std::move(metaschema));
+  }
+
+  const auto result{vocabularies(document, handover_metaschema_resolver)};
+  EXPECT_TRUE(result
+                  .get(sourcemeta::core::SchemaVocabularies::Known::
+                           JSON_SCHEMA_2020_12_CORE)
+                  .has_value());
 }

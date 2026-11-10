@@ -89,6 +89,33 @@ TEST(a_limit_error_from_the_accounted_predicate_keeps_its_own_allowance) {
   }
 }
 
+// Framing consults the walker of its own accord, inside the construction this
+// operation bounds, so a limit error the walker throws is where restating the
+// allowance would lose the caller's own
+TEST(a_limit_error_from_the_walker_keeps_its_own_allowance) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "string"
+  })JSON");
+
+  sourcemeta::core::SchemaDependenciesOptions options;
+  options.max_locations = 10;
+
+  const sourcemeta::core::SchemaWalker walker{
+      [](const std::string_view, const sourcemeta::core::SchemaVocabularies &)
+          -> const sourcemeta::core::SchemaWalkerResult & {
+        throw sourcemeta::core::SchemaFrameLimitError{789};
+      }};
+
+  try {
+    sourcemeta::core::schema_dependencies(
+        document, walker, leaf_resolver, [](const auto &) -> void {}, options);
+    FAIL();
+  } catch (const sourcemeta::core::SchemaFrameLimitError &error) {
+    EXPECT_EQ(error.limit(), 789);
+  }
+}
+
 TEST(a_limit_error_from_the_accounted_callback_keeps_its_own_allowance) {
   const auto document = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",

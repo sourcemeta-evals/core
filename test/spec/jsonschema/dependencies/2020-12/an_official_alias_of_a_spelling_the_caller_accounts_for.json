@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/entry",
+    "$defs": {
+      "official": { "$ref": "https://json-schema.org/draft-07/schema" }
+    }
+  },
+  "accounted": [ "http://json-schema.org/draft-07/schema" ],
+  "accountedReported": [
+    "https://www.sourcemeta.com/entry",
+    "https://json-schema.org/draft-07/schema"
+  ],
+  "dependencies": [],
+  "locations": 2,
+  "fetched": []
+}

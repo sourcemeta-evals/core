@@ -6,6 +6,8 @@
 #include <cassert>       // assert
 #include <cstdint>       // std::uint64_t
 #include <deque>         // std::deque
+#include <exception>     // std::exception_ptr, std::current_exception,
+                         // std::rethrow_exception
 #include <functional>    // std::equal_to
 #include <memory>        // std::unique_ptr, std::make_unique
 #include <string>        // std::string
@@ -30,6 +32,41 @@ auto is_skippable_metaschema_reference(const WeakPointer &pointer,
 }
 
 using URISet = std::unordered_set<JSON::String, URIHash, std::equal_to<>>;
+
+// An exception that the caller's resolver or walker throws travels out of the
+// analysis unchanged, yet framing and dialect lookups reach for both of their
+// own accord, inside handlers that translate failures of the library's own
+// making. Marking whatever the caller throws on the way out is what keeps
+// those handlers from mistaking a caller's error for one of ours, and the
+// boundary rethrows the very exception that was thrown, dynamic type and all
+struct ForeignError {
+  std::exception_ptr error;
+};
+
+// The result borrows the resolver, so it must not outlive it
+auto guard_resolver(const SchemaResolver &resolver) -> SchemaResolver {
+  return
+      [&resolver](const std::string_view identifier) -> SchemaResolverResult {
+        try {
+          return resolver(identifier);
+        } catch (...) {
+          throw ForeignError{std::current_exception()};
+        }
+      };
+}
+
+// The result borrows the walker, so it must not outlive it
+auto guard_walker(const SchemaWalker &walker) -> SchemaWalker {
+  return [&walker](const std::string_view keyword,
+                   const SchemaVocabularies &vocabularies)
+             -> const SchemaWalkerResult & {
+    try {
+      return walker(keyword, vocabularies);
+    } catch (...) {
+      throw ForeignError{std::current_exception()};
+    }
+  };
+}
 
 // A document that the walk read, beside the URI it asked for. A document also
 // answers to whatever identifier it declares, but what the walk asked for is
@@ -90,8 +127,9 @@ auto declared_identifier(const Walk &walk, const JSON &document)
 //
 // Only framing is held to that allowance. The caller set it for this
 // operation, so the frame that ran out reports it rather than whatever was
-// left by then, while a limit error raised by the caller's own resolver or
-// callback carries an allowance of theirs and travels untouched
+// left by then, while a limit error raised by the caller's own resolver,
+// walker, or callback carries an allowance of theirs and travels untouched,
+// marked as foreign so the catch below cannot restate it
 auto frame_within(Walk &walk, const JSON &schema,
                   const std::string_view default_id,
                   const SchemaFrame::Paths &paths,
@@ -113,7 +151,9 @@ auto frame_within(Walk &walk, const JSON &schema,
 
 // Reading a document takes knowing which dialect it is written against, so one
 // that answers with nothing, or whose answer names a meta-schema that nothing
-// can produce, is not one the walk can go on from
+// can produce, is not one the walk can go on from. Only failures the lookup
+// itself produces land in these handlers: whatever the caller's own resolver
+// throws travels as foreign and passes them by, unchanged
 //
 // A meta-schema that a document carries within itself counts here, as reading
 // consults the document before the resolver. One that another document carries
@@ -206,7 +246,12 @@ auto examine(Walk &walk, const SchemaFrame &frame,
     JSON::String declared;
     if (official) {
       declared = declared_identifier(walk, remote.value());
-      if (!declared.empty() && is_accounted(walk, declared)) {
+      // The caller was asked about the spelling this reference used right
+      // above, and that one answer settles the report, so only an identifier
+      // the document declares beyond that spelling can bring an earlier
+      // report of it into play
+      if (!declared.empty() && declared != reference.base &&
+          is_accounted(walk, declared)) {
         account(walk, reference.base);
         return;
       }
@@ -241,12 +286,10 @@ auto schema_dependencies(const JSON &schema, const SchemaWalker &walker,
                          const SchemaDependenciesOptions &options)
     -> std::uint64_t {
   assert(callback);
-  // Framing reaches for the resolver of its own accord, so a limit error the
-  // caller's own resolver raises has to be told apart from one this
-  // operation's allowance ran into
   SchemaResolverCache cache;
-  const SchemaResolver bounded{resolver_within_allowance(resolver)};
-  const SchemaResolver cached{resolver_with_cache(bounded, cache)};
+  const SchemaResolver foreign{guard_resolver(resolver)};
+  const SchemaResolver cached{resolver_with_cache(foreign, cache)};
+  const SchemaWalker guarded_walker{guard_walker(walker)};
   // Framing states these as preconditions rather than checking them, and a
   // path that names nothing otherwise fails deep inside the document rather
   // than at the call that got it wrong
@@ -257,7 +300,7 @@ auto schema_dependencies(const JSON &schema, const SchemaWalker &walker,
                (target->is_object() || target->is_boolean());
       }));
 
-  Walk walk{.walker = walker,
+  Walk walk{.walker = guarded_walker,
             .resolver = cached,
             .cache = cache,
             .callback = callback,
@@ -315,8 +358,8 @@ auto schema_dependencies(const JSON &schema, const SchemaWalker &walker,
             identifier);
       }
     }
-  } catch (const ForeignFrameLimitError &foreign) {
-    throw foreign.error;
+  } catch (const ForeignError &caller) {
+    std::rethrow_exception(caller.error);
   }
 
   return options.max_locations - walk.remaining;
