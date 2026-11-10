@@ -84,15 +84,15 @@ TEST(dependencies_fetches_reports_and_accounting_interleave_in_event_order) {
       options)};
 
   EXPECT_EQ(events, "account https://www.sourcemeta.com/entry\n"
-                          "fetch https://www.sourcemeta.com/alpha\n"
-                          "report https://www.sourcemeta.com/alpha\n"
-                          "account https://www.sourcemeta.com/alpha\n"
-                          "fetch https://www.sourcemeta.com/beta\n"
-                          "report https://www.sourcemeta.com/beta\n"
-                          "account https://www.sourcemeta.com/beta\n"
-                          "fetch https://www.sourcemeta.com/gamma\n"
-                          "report https://www.sourcemeta.com/gamma\n"
-                          "account https://www.sourcemeta.com/gamma\n");
+                    "fetch https://www.sourcemeta.com/alpha\n"
+                    "report https://www.sourcemeta.com/alpha\n"
+                    "account https://www.sourcemeta.com/alpha\n"
+                    "fetch https://www.sourcemeta.com/beta\n"
+                    "report https://www.sourcemeta.com/beta\n"
+                    "account https://www.sourcemeta.com/beta\n"
+                    "fetch https://www.sourcemeta.com/gamma\n"
+                    "report https://www.sourcemeta.com/gamma\n"
+                    "account https://www.sourcemeta.com/gamma\n");
 }
 
 TEST(an_exception_the_callback_throws_travels_unchanged_and_stops_the_walk) {
@@ -141,5 +141,5 @@ TEST(an_exception_the_callback_throws_travels_unchanged_and_stops_the_walk) {
   // The first report threw, so its document was never accounted for and its
   // sibling was never fetched
   EXPECT_EQ(events, "account https://www.sourcemeta.com/entry\n"
-                          "fetch https://www.sourcemeta.com/alpha\n");
+                    "fetch https://www.sourcemeta.com/alpha\n");
 }

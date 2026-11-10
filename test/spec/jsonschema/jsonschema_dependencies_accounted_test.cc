@@ -128,8 +128,8 @@ TEST(a_document_already_reported_is_read_whatever_the_predicate_says) {
 
   [[maybe_unused]] const auto locations{sourcemeta::core::schema_dependencies(
       document, sourcemeta::core::schema_walker, chained_leaf_resolver,
-      [&held,
-       &reported](const sourcemeta::core::SchemaDependency &dependency) -> void {
+      [&held, &reported](
+          const sourcemeta::core::SchemaDependency &dependency) -> void {
         reported.emplace_back(dependency.destination);
         if (dependency.destination == "https://www.sourcemeta.com/leaf") {
           held.emplace("https://www.sourcemeta.com/leaf");

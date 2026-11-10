@@ -13,9 +13,9 @@
 // hold schemas. References beneath such a keyword are reached only where the
 // walker argument actually drives the traversal
 
-static auto x_child_walker(const std::string_view keyword,
-                           const sourcemeta::core::SchemaVocabularies
-                               &vocabularies)
+static auto
+x_child_walker(const std::string_view keyword,
+               const sourcemeta::core::SchemaVocabularies &vocabularies)
     -> const sourcemeta::core::SchemaWalkerResult & {
   if (keyword == "x-child") {
     static const sourcemeta::core::SchemaWalkerResult result{
