@@ -71,12 +71,15 @@ auto account(Walk &walk, const JSON::StringView identifier) -> void {
 
 // An official schema is never read, but the identifier it declares at its top
 // still answers for it, whichever spelling a reference used to get here
-auto account_declared_identifier(Walk &walk, const JSON &document) -> void {
+auto declared_identifier(const Walk &walk, const JSON &document)
+    -> JSON::String {
   const auto identifier{
       identify(document, walk.resolver, walk.default_dialect)};
-  if (!identifier.empty()) {
-    account(walk, URI::canonicalize(identifier));
+  if (identifier.empty()) {
+    return {};
   }
+
+  return URI::canonicalize(identifier);
 }
 
 // Every frame that the walk constructs spends from the same allowance, as how
@@ -193,19 +196,31 @@ auto examine(Walk &walk, const SchemaFrame &frame,
                                  reference.base, to_pointer(pointer));
     }
 
+    // Official schemas can only reference other official schemas, so reading
+    // them can never surface further dependencies. The identifier one declares
+    // still answers for it, whichever spelling a reference used to get here,
+    // so an answer declaring an identifier that is already accounted for
+    // settles against the report that accounted it, in whichever order the
+    // spellings came, with the one just used answering for the document too
+    const auto official{!standalone && schema_is_official(reference.base)};
+    JSON::String declared;
+    if (official) {
+      declared = declared_identifier(walk, remote.value());
+      if (!declared.empty() && is_accounted(walk, declared)) {
+        account(walk, reference.base);
+        return;
+      }
+    }
+
     walk.callback({.origin = origin,
                    .pointer = pointer,
                    .destination = reference.base,
                    .document = remote.value()});
     account(walk, reference.base);
 
-    // Official schemas can only reference other official schemas, so reading
-    // them can never surface further dependencies. The identifier one declares
-    // still answers for it, so a reference through another spelling of it
-    // settles here rather than reporting the same document again
-    if (standalone || schema_is_official(reference.base)) {
-      if (!standalone) {
-        account_declared_identifier(walk, remote.value());
+    if (standalone || official) {
+      if (!declared.empty()) {
+        account(walk, declared);
       }
 
       return;
