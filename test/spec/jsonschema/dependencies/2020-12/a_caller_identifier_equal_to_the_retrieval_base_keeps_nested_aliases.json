@@ -1,0 +1,27 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/entry",
+    "$defs": {
+      "inner": {
+        "$id": "child",
+        "type": "string"
+      }
+    },
+    "items": {
+      "$ref": "https://www.example.com/child"
+    }
+  },
+  "defaultId": "https://www.example.com/entry",
+  "defaultBase": "https://www.example.com/entry",
+  "accounted": [],
+  "accountedReported": [
+    "https://www.example.com/entry",
+    "https://www.example.com/child",
+    "https://www.sourcemeta.com/child",
+    "https://www.sourcemeta.com/entry"
+  ],
+  "dependencies": [],
+  "locations": 8,
+  "fetched": []
+}

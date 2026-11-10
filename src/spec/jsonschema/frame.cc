@@ -1293,8 +1293,14 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
             // no other base, that earlier registration is this one rather
             // than a second copy of it, and skipping would leave the document
             // as no resource at all. The name the caller gave is not one of
-            // those other bases, as the check above skips it in its own right
+            // those other bases, as the check above skips it in its own right.
+            // Where that name is the retrieval base itself, it keeps its
+            // registrations all the same: the caller declared the document
+            // known by it, per JSON Schema 2020-12 Section 9.1.2, and that
+            // declaration does not lapse because the document was also
+            // retrieved from it
             if (base_string == this->cache_->default_base &&
+                base_string != default_id_canonical &&
                 std::ranges::any_of(bases.first,
                                     [this, &default_id_canonical](
                                         const auto &candidate) -> bool {

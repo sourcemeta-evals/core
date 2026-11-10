@@ -282,9 +282,14 @@ auto schema_dependencies(const JSON &schema, const SchemaWalker &walker,
     while (!walk.pending.empty()) {
       const auto fetched{std::move(walk.pending.front())};
       walk.pending.pop_front();
-      const auto frame{frame_within(walk, fetched.document.value(),
-                                    fetched.identifier, WHOLE_DOCUMENT,
-                                    fetched.identifier)};
+      // The URI the walk asked for is where the document was retrieved from,
+      // RFC 3986 Section 5.1.3 context rather than a name anyone declared for
+      // it, so it travels as the retrieval base alone. Handing it over as a
+      // caller identifier as well would declare the document known by it, and
+      // identifiers below its top would then answer to spellings resolved
+      // against it, which is what the retrieval base deliberately does not do
+      const auto frame{frame_within(walk, fetched.document.value(), {},
+                                    WHOLE_DOCUMENT, fetched.identifier)};
       examine(walk, *frame, fetched.identifier);
     }
 
