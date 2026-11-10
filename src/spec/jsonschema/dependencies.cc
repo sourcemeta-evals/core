@@ -6,8 +6,7 @@
 #include <cassert>       // assert
 #include <cstdint>       // std::uint64_t
 #include <deque>         // std::deque
-#include <exception>     // std::exception_ptr, std::current_exception,
-                         // std::rethrow_exception
+#include <exception>     // std::rethrow_exception
 #include <functional>    // std::equal_to
 #include <memory>        // std::unique_ptr, std::make_unique
 #include <string>        // std::string
@@ -32,41 +31,6 @@ auto is_skippable_metaschema_reference(const WeakPointer &pointer,
 }
 
 using URISet = std::unordered_set<JSON::String, URIHash, std::equal_to<>>;
-
-// An exception that the caller's resolver or walker throws travels out of the
-// analysis unchanged, yet framing and dialect lookups reach for both of their
-// own accord, inside handlers that translate failures of the library's own
-// making. Marking whatever the caller throws on the way out is what keeps
-// those handlers from mistaking a caller's error for one of ours, and the
-// boundary rethrows the very exception that was thrown, dynamic type and all
-struct ForeignError {
-  std::exception_ptr error;
-};
-
-// The result borrows the resolver, so it must not outlive it
-auto guard_resolver(const SchemaResolver &resolver) -> SchemaResolver {
-  return
-      [&resolver](const std::string_view identifier) -> SchemaResolverResult {
-        try {
-          return resolver(identifier);
-        } catch (...) {
-          throw ForeignError{std::current_exception()};
-        }
-      };
-}
-
-// The result borrows the walker, so it must not outlive it
-auto guard_walker(const SchemaWalker &walker) -> SchemaWalker {
-  return [&walker](const std::string_view keyword,
-                   const SchemaVocabularies &vocabularies)
-             -> const SchemaWalkerResult & {
-    try {
-      return walker(keyword, vocabularies);
-    } catch (...) {
-      throw ForeignError{std::current_exception()};
-    }
-  };
-}
 
 // A document that the walk read, beside the URI it asked for. A document also
 // answers to whatever identifier it declares, but what the walk asked for is
@@ -287,9 +251,9 @@ auto schema_dependencies(const JSON &schema, const SchemaWalker &walker,
     -> std::uint64_t {
   assert(callback);
   SchemaResolverCache cache;
-  const SchemaResolver foreign{guard_resolver(resolver)};
+  const SchemaResolver foreign{guard(resolver)};
   const SchemaResolver cached{resolver_with_cache(foreign, cache)};
-  const SchemaWalker guarded_walker{guard_walker(walker)};
+  const SchemaWalker guarded_walker{guard(walker)};
   // Framing states these as preconditions rather than checking them, and a
   // path that names nothing otherwise fails deep inside the document rather
   // than at the call that got it wrong

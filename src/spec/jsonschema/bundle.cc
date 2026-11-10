@@ -8,6 +8,7 @@
 #include <cassert>       // assert
 #include <cstddef>       // std::size_t
 #include <cstdint>       // std::uint64_t
+#include <exception>     // std::rethrow_exception
 #include <functional>    // std::cref
 #include <iterator>      // std::make_move_iterator
 #include <map>           // std::map
@@ -1383,14 +1384,7 @@ auto guard_callback(const SchemaBundleOptions::Callback &callback)
     return callback;
   }
 
-  return [&callback](const std::string_view identifier,
-                     const sourcemeta::core::WeakPointer &location) -> void {
-    try {
-      callback(identifier, location);
-    } catch (const SchemaFrameLimitError &error) {
-      throw ForeignFrameLimitError{error};
-    }
-  };
+  return guard(callback);
 }
 
 } // namespace
@@ -1402,12 +1396,12 @@ auto schema_bundle(JSON &schema, const SchemaWalker &walker,
                    const SchemaBundleOptions &options) -> std::uint64_t {
   auto remaining{options.max_locations};
   try {
-    bundle_internal(
-        schema, walker, resolver_within_allowance(resolver), options.mode,
-        default_dialect, default_id, options.default_container, options.paths,
-        options.default_base, remaining, guard_callback(options.callback));
-  } catch (const ForeignFrameLimitError &foreign) {
-    throw foreign.error;
+    bundle_internal(schema, walker, guard(resolver), options.mode,
+                    default_dialect, default_id, options.default_container,
+                    options.paths, options.default_base, remaining,
+                    guard_callback(options.callback));
+  } catch (const ForeignError &caller) {
+    std::rethrow_exception(caller.error);
   } catch (const SchemaFrameLimitError &) {
     // Every frame spends from what is left rather than from the whole, so the
     // one that ran out reports what it was handed. The caller set the limit

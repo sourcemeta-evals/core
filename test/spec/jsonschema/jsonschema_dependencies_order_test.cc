@@ -273,9 +273,11 @@ TEST(a_dialect_error_the_resolver_throws_in_a_dialect_lookup_is_unchanged) {
                     "fetch https://www.sourcemeta.com/custom-dialect\n");
 }
 
-// The control for the two cases above: a dialect lookup that fails on its own,
-// because nothing answers for the meta-schema, is the library's failure and is
-// reported as the documented reference error
+// The control for the two cases above: the same walk, with the dialect lookup
+// answered with nothing rather than thrown at, proving the unchanged
+// propagation above comes from the caller's throw alone. A lookup that fails
+// on its own is the library's failure and reads as the documented reference
+// error
 TEST(a_dialect_nothing_answers_for_reads_as_no_schema) {
   const auto document = sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -283,9 +285,16 @@ TEST(a_dialect_nothing_answers_for_reads_as_no_schema) {
     "items": { "$ref": "https://www.sourcemeta.com/custom-remote" }
   })JSON");
 
+  std::string events;
   const sourcemeta::core::SchemaResolver resolver{
-      [](const std::string_view identifier)
+      [&events](const std::string_view identifier)
           -> sourcemeta::core::SchemaResolverResult {
+        if (!sourcemeta::core::schema_is_official(identifier)) {
+          events += "fetch ";
+          events += identifier;
+          events += '\n';
+        }
+
         if (identifier == "https://www.sourcemeta.com/custom-dialect") {
           return std::nullopt;
         }
@@ -293,13 +302,31 @@ TEST(a_dialect_nothing_answers_for_reads_as_no_schema) {
         return custom_dialect_remote_resolver(identifier);
       }};
 
+  sourcemeta::core::SchemaDependenciesOptions options;
+  options.accounted_callback =
+      [&events](const std::string_view identifier) -> void {
+    events += "account ";
+    events += identifier;
+    events += '\n';
+  };
+
   try {
     [[maybe_unused]] const auto locations{sourcemeta::core::schema_dependencies(
         document, sourcemeta::core::schema_walker, resolver,
-        [](const sourcemeta::core::SchemaDependency &) -> void {})};
+        [&events](
+            const sourcemeta::core::SchemaDependency &dependency) -> void {
+          events += "report ";
+          events += dependency.destination;
+          events += '\n';
+        },
+        options)};
     FAIL();
   } catch (const sourcemeta::core::SchemaReferenceError &error) {
     EXPECT_STREQ(error.what(), "The JSON document is not a valid JSON Schema");
     EXPECT_EQ(error.identifier(), "https://www.sourcemeta.com/custom-remote");
   }
+
+  EXPECT_EQ(events, "account https://www.sourcemeta.com/entry\n"
+                    "fetch https://www.sourcemeta.com/custom-remote\n"
+                    "fetch https://www.sourcemeta.com/custom-dialect\n");
 }
