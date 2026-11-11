@@ -1,0 +1,32 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/entry",
+    "$defs": {
+      "one": { "$ref": "http://json-schema.org/draft-07/schema" },
+      "two": { "$ref": "http://json-schema.org/draft-07/alternate" }
+    }
+  },
+  "resolver": {
+    "http://json-schema.org/draft-07/schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$id": "alternate",
+      "type": "object"
+    }
+  },
+  "accounted": [],
+  "accountedReported": [
+    "https://www.sourcemeta.com/entry",
+    "http://json-schema.org/draft-07/schema",
+    "http://json-schema.org/draft-07/alternate"
+  ],
+  "dependencies": [
+    {
+      "origin": "https://www.sourcemeta.com/entry",
+      "pointer": "/$defs/one/$ref",
+      "destination": "http://json-schema.org/draft-07/schema"
+    }
+  ],
+  "locations": 3,
+  "fetched": []
+}

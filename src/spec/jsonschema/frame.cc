@@ -1492,6 +1492,28 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
         } else {
           bool is_first = true;
           for (const auto &base_string : bases.first) {
+            // An anchor names a place within the resource enclosing it, so it
+            // answers under the names of that resource. The base the document
+            // was retrieved from is one of those names per RFC 3986 Section
+            // 5.1.3 only where the document carries no base of its own, so
+            // where the document goes by other names, the anchor is not
+            // registered against the retrieval base, exactly as identifiers
+            // are not registered against it above. The name the caller gave
+            // keeps its registrations here too, as the caller declared the
+            // document known by it per JSON Schema 2020-12 Section 9.1.2
+            if (bases.second.empty() &&
+                base_string == this->cache_->default_base &&
+                base_string != default_id_canonical &&
+                std::ranges::any_of(bases.first,
+                                    [this, &default_id_canonical](
+                                        const auto &candidate) -> bool {
+                                      return candidate !=
+                                                 this->cache_->default_base &&
+                                             candidate != default_id_canonical;
+                                    })) {
+              continue;
+            }
+
             sourcemeta::core::URI anchor_uri_builder{base_string};
             anchor_uri_builder.fragment(name);
             anchor_uri_builder.canonicalize();

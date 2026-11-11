@@ -4,10 +4,14 @@
 #include <sourcemeta/core/jsonpointer.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <sourcemeta/core/uri.h>
+
+#include <algorithm>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // The fixture suite records what was fetched, what was reported, and what was
 // accounted for as three separate lists, so what it cannot express is how the
@@ -329,4 +333,122 @@ TEST(a_dialect_nothing_answers_for_reads_as_no_schema) {
   EXPECT_EQ(events, "account https://www.sourcemeta.com/entry\n"
                     "fetch https://www.sourcemeta.com/custom-remote\n"
                     "fetch https://www.sourcemeta.com/custom-dialect\n");
+}
+
+// A remote that overrides an official schema may declare a dialect of its
+// own, and deciding whether that remote can be read asks the resolver for
+// that dialect, so a parser error of the caller's thrown right there is
+// where translation would lose it. The contract is that it travels out
+// unchanged, with nothing observed past it
+TEST(a_parser_error_the_resolver_throws_in_a_dialect_lookup_is_unchanged) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/entry",
+    "items": { "$ref": "http://json-schema.org/draft-06/schema" }
+  })JSON");
+
+  std::string events;
+  const sourcemeta::core::SchemaResolver resolver{
+      [&events](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        if (!sourcemeta::core::schema_is_official(identifier)) {
+          events += "fetch ";
+          events += identifier;
+          events += '\n';
+        }
+
+        if (identifier == "https://www.sourcemeta.com/custom-dialect") {
+          throw sourcemeta::core::URIParseError{7};
+        }
+
+        if (identifier == "http://json-schema.org/draft-06/schema") {
+          return sourcemeta::core::parse_json(R"JSON({
+            "$schema": "https://www.sourcemeta.com/custom-dialect",
+            "$id": "http://json-schema.org/draft-06/schema#",
+            "type": "object"
+          })JSON");
+        }
+
+        return sourcemeta::core::schema_resolver(identifier);
+      }};
+
+  sourcemeta::core::SchemaDependenciesOptions options;
+  options.accounted_callback =
+      [&events](const std::string_view identifier) -> void {
+    events += "account ";
+    events += identifier;
+    events += '\n';
+  };
+
+  try {
+    [[maybe_unused]] const auto locations{sourcemeta::core::schema_dependencies(
+        document, sourcemeta::core::schema_walker, resolver,
+        [&events](
+            const sourcemeta::core::SchemaDependency &dependency) -> void {
+          events += "report ";
+          events += dependency.destination;
+          events += '\n';
+        },
+        options)};
+    FAIL();
+  } catch (const sourcemeta::core::URIParseError &error) {
+    EXPECT_EQ(error.column(), 7);
+  }
+
+  // The official ask is left out of the log the way the fixture fetched list
+  // leaves it out, so the dialect ask is the one fetch the log shows
+  EXPECT_EQ(events, "account https://www.sourcemeta.com/entry\n"
+                    "fetch https://www.sourcemeta.com/custom-dialect\n");
+}
+
+// The walk asks the resolver for a given URI at most once, official schemas
+// included, which no fixture can observe as the fixture fetched list leaves
+// official schemas out
+TEST(an_official_meta_schema_is_asked_for_once_across_the_walk) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/entry",
+    "$defs": {
+      "one": { "$ref": "https://www.sourcemeta.com/alpha-leaf" },
+      "two": { "$ref": "https://www.sourcemeta.com/beta-leaf" },
+      "three": { "$ref": "https://json-schema.org/draft/2020-12/meta/core" }
+    }
+  })JSON");
+
+  std::vector<std::string> asked;
+  const sourcemeta::core::SchemaResolver resolver{
+      [&asked](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        asked.emplace_back(identifier);
+
+        if (identifier == "https://www.sourcemeta.com/alpha-leaf") {
+          return sourcemeta::core::parse_json(R"JSON({
+            "$schema": "https://json-schema.org/draft/2020-12/meta/core",
+            "$id": "https://www.sourcemeta.com/alpha-leaf",
+            "type": "string"
+          })JSON");
+        }
+
+        if (identifier == "https://www.sourcemeta.com/beta-leaf") {
+          return sourcemeta::core::parse_json(R"JSON({
+            "$schema": "https://json-schema.org/draft/2020-12/meta/core",
+            "$id": "https://www.sourcemeta.com/beta-leaf",
+            "type": "string"
+          })JSON");
+        }
+
+        return sourcemeta::core::schema_resolver(identifier);
+      }};
+
+  [[maybe_unused]] const auto locations{sourcemeta::core::schema_dependencies(
+      document, sourcemeta::core::schema_walker, resolver,
+      [](const sourcemeta::core::SchemaDependency &) -> void {})};
+
+  EXPECT_EQ(std::ranges::count(
+                asked, "https://json-schema.org/draft/2020-12/meta/core"),
+            1);
+  EXPECT_EQ(std::ranges::count(asked, "https://www.sourcemeta.com/alpha-leaf"),
+            1);
+  EXPECT_EQ(std::ranges::count(asked, "https://www.sourcemeta.com/beta-leaf"),
+            1);
 }

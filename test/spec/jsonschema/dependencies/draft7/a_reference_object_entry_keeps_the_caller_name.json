@@ -1,0 +1,30 @@
+{
+  "schema": { "$ref": "https://www.sourcemeta.com/remote" },
+  "defaultDialect": "http://json-schema.org/draft-07/schema#",
+  "defaultId": "https://www.sourcemeta.com/entry",
+  "resolver": {
+    "https://www.sourcemeta.com/remote": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$id": "https://www.sourcemeta.com/remote",
+      "properties": {
+        "loop": { "$ref": "https://www.sourcemeta.com/entry" }
+      }
+    }
+  },
+  "accounted": [],
+  "accountedReported": [
+    "https://www.sourcemeta.com/entry",
+    "https://www.sourcemeta.com/remote"
+  ],
+  "dependencies": [
+    {
+      "origin": "https://www.sourcemeta.com/entry",
+      "pointer": "/$ref",
+      "destination": "https://www.sourcemeta.com/remote"
+    }
+  ],
+  "locations": 3,
+  "fetched": [
+    "https://www.sourcemeta.com/remote"
+  ]
+}

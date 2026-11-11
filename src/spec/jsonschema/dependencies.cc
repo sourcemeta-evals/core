@@ -2,7 +2,7 @@
 
 #include "helpers.h"
 
-#include <algorithm>     // std::ranges::all_of
+#include <algorithm>     // std::ranges::all_of, std::ranges::any_of
 #include <cassert>       // assert
 #include <cstdint>       // std::uint64_t
 #include <deque>         // std::deque
@@ -72,15 +72,22 @@ auto account(Walk &walk, const JSON::StringView identifier) -> void {
 
 // An official schema is never read, but the identifier it declares at its top
 // still answers for it, whichever spelling a reference used to get here
-auto declared_identifier(const Walk &walk, const JSON &document)
-    -> JSON::String {
+auto declared_identifier(const Walk &walk, const JSON &document,
+                         const std::string_view requested) -> JSON::String {
   const auto identifier{
       identify(document, walk.resolver, walk.default_dialect)};
   if (identifier.empty()) {
     return {};
   }
 
-  return URI::canonicalize(identifier);
+  // What a document declares is a URI reference that, per JSON Schema
+  // 2020-12 Section 8.2.1, "MUST resolve to an absolute-URI", and what it
+  // resolves against for a fetched document is the URI the walk asked for,
+  // per RFC 3986 Section 5.1.3: "if a URI was used to retrieve the
+  // representation, that URI shall be considered the base URI"
+  URI declared{JSON::String{identifier}};
+  declared.resolve_from(URI{JSON::String{requested}}).canonicalize();
+  return declared.recompose();
 }
 
 // Every frame that the walk constructs spends from the same allowance, as how
@@ -209,7 +216,7 @@ auto examine(Walk &walk, const SchemaFrame &frame,
     const auto official{!standalone && schema_is_official(reference.base)};
     JSON::String declared;
     if (official) {
-      declared = declared_identifier(walk, remote.value());
+      declared = declared_identifier(walk, remote.value(), reference.base);
       // The caller was asked about the spelling this reference used right
       // above, and that one answer settles the report, so only an identifier
       // the document declares beyond that spelling can bring an earlier
@@ -290,6 +297,34 @@ auto schema_dependencies(const JSON &schema, const SchemaWalker &walker,
       if (!options.default_base.empty()) {
         account(walk,
                 sourcemeta::core::URI::canonicalize(options.default_base));
+      }
+
+      // The name the caller gave the entry document stands however little of
+      // the document framing registered: JSON Schema 2020-12 Section 9.1.2
+      // has implementations "associate arbitrary URIs with an arbitrary
+      // schema", and that association is the caller's rather than a keyword
+      // of the document's. A Draft 7 entry that is a reference object
+      // registers no resource at all, as "All other properties in a "$ref"
+      // object MUST be ignored" (JSON Schema Draft 7 Section 8.3), yet it
+      // still answers to the name the caller associated with it. The name
+      // belongs to the top of the document, so a walk whose paths leave the
+      // top out never holds the document under it
+      const auto frames_the_top{
+          std::ranges::any_of(options.paths, [](const auto &path) -> bool {
+            return path.empty();
+          })};
+      if (frames_the_top && !options.default_id.empty()) {
+        URI caller_identifier{JSON::String{options.default_id}};
+        if (!options.default_base.empty()) {
+          caller_identifier.resolve_from(
+              URI{JSON::String{options.default_base}});
+        }
+
+        caller_identifier.canonicalize();
+        auto caller_name{caller_identifier.recompose()};
+        if (!frame->traverse(caller_name).has_value()) {
+          account(walk, caller_name);
+        }
       }
 
       examine(walk, *frame, frame->root());
