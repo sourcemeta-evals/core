@@ -401,6 +401,74 @@ TEST(a_parser_error_the_resolver_throws_in_a_dialect_lookup_is_unchanged) {
                     "fetch https://www.sourcemeta.com/custom-dialect\n");
 }
 
+// Deciding whether a remote can be read translates the library's own keyword
+// error for a malformed dialect declaration, and the caller's resolver may
+// throw that very class itself, so the dialect lookup is where swallowing one
+// of the caller's would show. The contract is that it travels out unchanged,
+// with nothing observed past it
+TEST(a_keyword_error_the_resolver_throws_in_a_dialect_lookup_is_unchanged) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/entry",
+    "items": { "$ref": "https://www.sourcemeta.com/custom-remote" }
+  })JSON");
+
+  std::string events;
+  const sourcemeta::core::SchemaResolver resolver{
+      [&events](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        if (!sourcemeta::core::schema_is_official(identifier)) {
+          events += "fetch ";
+          events += identifier;
+          events += '\n';
+        }
+
+        if (identifier == "https://www.sourcemeta.com/custom-dialect") {
+          throw sourcemeta::core::SchemaKeywordError{
+              "A keyword error of the caller's own", "x-caller", "42"};
+        }
+
+        if (identifier == "https://www.sourcemeta.com/custom-remote") {
+          return sourcemeta::core::parse_json(R"JSON({
+            "$schema": "https://www.sourcemeta.com/custom-dialect",
+            "$id": "https://www.sourcemeta.com/custom-remote",
+            "type": "object"
+          })JSON");
+        }
+
+        return sourcemeta::core::schema_resolver(identifier);
+      }};
+
+  sourcemeta::core::SchemaDependenciesOptions options;
+  options.accounted_callback =
+      [&events](const std::string_view identifier) -> void {
+    events += "account ";
+    events += identifier;
+    events += '\n';
+  };
+
+  try {
+    [[maybe_unused]] const auto locations{sourcemeta::core::schema_dependencies(
+        document, sourcemeta::core::schema_walker, resolver,
+        [&events](
+            const sourcemeta::core::SchemaDependency &dependency) -> void {
+          events += "report ";
+          events += dependency.destination;
+          events += '\n';
+        },
+        options)};
+    FAIL();
+  } catch (const sourcemeta::core::SchemaKeywordError &error) {
+    EXPECT_STREQ(error.what(), "A keyword error of the caller's own");
+    EXPECT_EQ(error.keyword(), "x-caller");
+    EXPECT_EQ(error.value(), "42");
+  }
+
+  EXPECT_EQ(events, "account https://www.sourcemeta.com/entry\n"
+                    "fetch https://www.sourcemeta.com/custom-remote\n"
+                    "fetch https://www.sourcemeta.com/custom-dialect\n");
+}
+
 // The walk asks the resolver for a given URI at most once, official schemas
 // included, which no fixture can observe as the fixture fetched list leaves
 // official schemas out
