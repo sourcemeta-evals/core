@@ -142,6 +142,12 @@ auto is_readable(const JSON &document, const SchemaResolver &resolver,
     return false;
   } catch (const SchemaResolutionError &) {
     return false;
+  } catch (const SchemaKeywordError &) {
+    // A dialect declaration that is not even a string, like `{ "$schema": 42
+    // }`, leaves the dialect of the document carrying it undeterminable, so the
+    // document reads as not a valid JSON Schema rather than letting the
+    // library's own keyword error escape the analysis
+    return false;
   }
 }
 
