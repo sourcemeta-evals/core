@@ -373,6 +373,12 @@ struct PositionalReferences {
   // nothing else, so a remote that carries its own name has to be framed here
   // too for the references it brought with it to be seen at all
   std::vector<Embedding> embeddings;
+  // Also recorded while embedding: every place the document did not hold
+  // until bundling put something there. What a reference names within the
+  // caller's own document is a question about the document as the caller
+  // wrote it, which the document itself is what answers, so what has gone
+  // into it since has to be told from what it held all along
+  std::vector<Pointer> introduced;
   // Elevation lifts a resource that a remote carried out of the copy that
   // lands, so a place named inside one is no longer where the reference that
   // named it said. Such a resource answers to the name it declared, which is
@@ -824,8 +830,17 @@ auto check_container(const JSON &root, const Pointer &container) -> void {
 
 auto embed_schema(JSON &root, const Pointer &container,
                   const std::string_view identifier, JSON &&target,
-                  const SchemaBundleOptions::Callback &callback)
-    -> JSON::String {
+                  const SchemaBundleOptions::Callback &callback,
+                  std::vector<Pointer> &introduced) -> JSON::String {
+  // A step of the container the document has nothing at is one bundling makes,
+  // and a place bundling made is as much nowhere a reference could have named
+  // as the entry that goes in under it
+  auto missing{container};
+  while (!missing.empty() && try_get(root, missing) == nullptr) {
+    introduced.push_back(missing);
+    missing = missing.initial();
+  }
+
   auto *current{&root};
   for (const auto &token : container) {
     if (token.is_property()) {
@@ -851,6 +866,7 @@ auto embed_schema(JSON &root, const Pointer &container,
   }
 
   current->assign(key, std::move(target));
+  introduced.push_back(container.concat(key));
 
   if (callback) {
     auto location{to_weak_pointer(container)};
@@ -979,7 +995,7 @@ auto where_it_was_written(const Pointer &position,
 
 auto settle_positional_references(const Reading &reading, JSON &schema,
                                   const KnownResources &known,
-                                  const PositionalReferences &positional,
+                                  PositionalReferences &positional,
                                   const Pointer &wrapper,
                                   std::uint64_t &remaining,
                                   const SchemaBundleOptions::Callback &callback)
@@ -1305,7 +1321,8 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
 
           placed.emplace(seen,
                          embed_schema(schema, host_container, copy.identifier,
-                                      std::move(duplicate), callback));
+                                      std::move(duplicate), callback,
+                                      positional.introduced));
           settled = false;
         }
 
@@ -1703,7 +1720,8 @@ auto elevate_embedded_resources(
       }
 
       const auto landing{embed_schema(root, reading.container, key,
-                                      std::move(value), callback)};
+                                      std::move(value), callback,
+                                      positional.introduced)};
       placed(known, key);
       landed(known, key, reading.container.concat(landing),
              reading.container_dialect);
@@ -1739,20 +1757,40 @@ auto impossible_dialect_of_fetched(const JSON::String &identifier,
           "keyword that declares it"};
 }
 
+// Whether a place a reference named is one bundling put there rather than one
+// the resource came with. Where the resource is the caller's own document it is
+// read where it sits, and bundling has been writing into the document since the
+// caller wrote it, so where it sits is what tells the two apart. A resource
+// held aside is as it came back, with nothing of bundling's in it
+auto bundling_put_it_there(const std::optional<Pointer> &where_it_sits,
+                           const Pointer &named,
+                           const std::vector<Pointer> &introduced) -> bool {
+  if (!where_it_sits.has_value() || introduced.empty()) {
+    return false;
+  }
+
+  const auto named_within{where_it_sits.value().concat(named)};
+  return std::ranges::any_of(introduced,
+                             [&named_within](const auto &place) -> bool {
+                               return named_within.starts_with(place);
+                             });
+}
+
 // Whether what a reference named is something the resource it names holds. A
 // pointer fragment names a place of the document, and the document can answer
 // for that on its own without paying to frame it. An anchor is not a place of
 // the document, and the drafts that spell identifiers as `id` let one look
 // just like a pointer, so a miss still has to ask the frame. Only the anchors
-// of this resource matter, rather than every pointer of it
-auto names_something_within(const JSON &resource, const JSON::String &named,
-                            const SchemaWalker &walker,
-                            const SchemaResolver &resolver,
-                            const std::string_view default_dialect,
-                            const JSON::String &identifier,
-                            std::uint64_t &remaining) -> bool {
+// of this resource matter, rather than every pointer of it. Either way, what
+// bundling has put into the document is nothing the reference could have named
+auto names_something_within(
+    const JSON &resource, const JSON::String &named, const SchemaWalker &walker,
+    const SchemaResolver &resolver, const std::string_view default_dialect,
+    const JSON::String &identifier, const std::optional<Pointer> &where_it_sits,
+    const std::vector<Pointer> &introduced, std::uint64_t &remaining) -> bool {
   const auto within{fragment_to_pointer(URI{named})};
-  if (within.has_value() && try_get(resource, within.value()) != nullptr) {
+  if (within.has_value() && try_get(resource, within.value()) != nullptr &&
+      !bundling_put_it_there(where_it_sits, within.value(), introduced)) {
     return true;
   }
 
@@ -1767,7 +1805,11 @@ auto names_something_within(const JSON &resource, const JSON::String &named,
                           "",
                           remaining};
   charge(remaining, frame);
-  return frame.traverse(named).has_value();
+  const auto located{frame.traverse(named)};
+  return located.has_value() &&
+         !bundling_put_it_there(where_it_sits,
+                                to_pointer(located.value().get().pointer),
+                                introduced);
 }
 
 // What bundling fetched and has yet to put anywhere, alongside the name it
@@ -1829,6 +1871,7 @@ auto refuse_what_nothing_answers(const Reading &reading, const JSON &schema,
     const auto held{known.fetched.find(canonical)};
     const JSON *within{nullptr};
     std::string_view reads_under;
+    std::optional<Pointer> where_it_sits;
     if (holds) {
       within = waiting->second.schema;
       reads_under = waiting->second.dialect;
@@ -1838,6 +1881,7 @@ auto refuse_what_nothing_answers(const Reading &reading, const JSON &schema,
     } else if (settled != known.placements.cend()) {
       within = try_get(schema, settled->second.where);
       reads_under = settled->second.dialect;
+      where_it_sits = settled->second.where;
     }
 
     if (within == nullptr) {
@@ -1847,6 +1891,7 @@ auto refuse_what_nothing_answers(const Reading &reading, const JSON &schema,
         answers_within(schema, known, reading.resolver)};
     if (!names_something_within(*within, asked.destination, reading.walker,
                                 as_the_document_does, reads_under, answering,
+                                where_it_sits, positional.introduced,
                                 remaining)) {
       throw SchemaReferenceError(asked.destination, asked.origin,
                                  "Could not resolve schema reference");
@@ -2011,6 +2056,7 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
         const auto held{known.fetched.find(canonical_uri(answering))};
         const JSON *within{nullptr};
         std::string_view reads_under;
+        std::optional<Pointer> where_it_sits;
         if (waiting) {
           within = pending->second.schema;
           reads_under = pending->second.dialect;
@@ -2020,6 +2066,7 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
         } else {
           within = try_get(root, placement->second.where);
           reads_under = placement->second.dialect;
+          where_it_sits = placement->second.where;
         }
         const SchemaResolver as_the_document_does{
             answers_within(root, known, reading.resolver)};
@@ -2040,7 +2087,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
               (!known.says_nothing_within.contains(canonical_uri(answering)) &&
                names_something_within(*within, settled, reading.walker,
                                       as_the_document_does, reads_under,
-                                      answering, remaining));
+                                      answering, where_it_sits,
+                                      positional.introduced, remaining));
         } catch (const SchemaDialectImpossibleError &) {
           // What a fetched document brings on is the fault of the reference
           // that sent for it, which is not this one, where this one found it
@@ -2161,7 +2209,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
       try {
         exists = names_something_within(
             remote, reference.destination, reading.walker, reading.resolver,
-            reading.default_dialect, identifier, remaining);
+            reading.default_dialect, identifier, std::nullopt,
+            positional.introduced, remaining);
       } catch (const SchemaDialectImpossibleError &) {
         throw impossible_dialect_of_fetched(
             identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
@@ -2409,7 +2458,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
 
     placed(known, entry.identifier);
     const auto key{embed_schema(root, reading.container, entry.identifier,
-                                std::move(entry.schema), callback)};
+                                std::move(entry.schema), callback,
+                                positional.introduced)};
     auto landing{reading.container.concat(key)};
     landed(known, entry.identifier, landing, reading.container_dialect);
     if (positional.unnamed.contains(entry.identifier)) {
@@ -2425,7 +2475,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
 // that can hold both. A root that holds more than the reference has nothing
 // that can be done with it. Says whether the document now reads differently
 auto prepare_root_reference(JSON &schema, const SchemaBaseDialect base_dialect,
-                            Pointer wrapper) -> Pointer {
+                            Pointer wrapper, std::vector<Pointer> &introduced)
+    -> Pointer {
   if (!ref_overrides_adjacent_keywords(base_dialect) || !schema.is_object() ||
       !schema.defines("$ref"sv, JSONSCHEMA_HASH_REF)) {
     return wrapper;
@@ -2446,6 +2497,9 @@ auto prepare_root_reference(JSON &schema, const SchemaBaseDialect base_dialect,
   schema.at("$ref"sv, JSONSCHEMA_HASH_REF).into(std::move(branches));
   const auto *const branch{is_draft3 ? "extends" : "allOf"};
   schema.rename("$ref", branch);
+  // The branch is bundling's own, and so is the place the reference moved to,
+  // neither of which the caller could have named
+  introduced.push_back(Pointer{JSON::String{branch}});
   return {branch, 0};
 }
 
@@ -2538,7 +2592,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     if (initial_frame->root_location().has_value()) {
       wrapper = prepare_root_reference(
           schema, initial_frame->root_location().value().get().base_dialect,
-          std::move(wrapper));
+          std::move(wrapper), positional.introduced);
     }
 
     if (!wrapper.empty()) {
@@ -2605,11 +2659,22 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
       // anything else beside its reference is answered further down, where
       // saying so does not depend on the caller having named it
       if (schema.is_object() && schema.size() == 1) {
-        wrapper = prepare_root_reference(schema, root_location.base_dialect,
-                                         std::move(wrapper));
+        wrapper =
+            prepare_root_reference(schema, root_location.base_dialect,
+                                   std::move(wrapper), positional.introduced);
       }
 
+      // A document that declares no name of its own is handed the one it was
+      // retrieved by, which goes in where the dialect keeps a name. That is
+      // somewhere the caller never wrote, unless what it wrote there was a
+      // name that speaks for nothing outside the document
+      const auto name_keyword{
+          schema_identifier_keyword(root_location.base_dialect)};
+      const auto held_a_name{schema.defines(name_keyword)};
       schema_reidentify(schema, default_id, walker, resolver, default_dialect);
+      if (!held_a_name) {
+        positional.introduced.push_back(Pointer{JSON::String{name_keyword}});
+      }
     }
   }
 
@@ -2664,8 +2729,8 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
                       "dialect");
   }
 
-  wrapper =
-      prepare_root_reference(schema, schema_base_dialect, std::move(wrapper));
+  wrapper = prepare_root_reference(schema, schema_base_dialect,
+                                   std::move(wrapper), positional.introduced);
   if (!wrapper.empty() && (!default_id.empty() || !default_base.empty())) {
     // A root that was nothing but a reference could keep neither a name it
     // declares nor one it was handed until it was made to hold a branch, and

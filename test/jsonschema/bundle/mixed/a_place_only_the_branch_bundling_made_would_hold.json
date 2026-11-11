@@ -1,0 +1,18 @@
+{
+  "schema": { "$ref": "https://example.com/b" },
+  "defaultDialect": "http://json-schema.org/draft-07/schema#",
+  "defaultId": "https://example.com/host",
+  "resolver": {
+    "https://example.com/b": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$id": "https://example.com/b",
+      "properties": { "bad": { "$ref": "https://example.com/host#/allOf/0" } }
+    }
+  },
+  "result": {},
+  "errors": {
+    "nonOfficialMetaschemas": { "type": "SchemaReferenceError", "message": "Could not resolve schema reference", "identifier": "https://example.com/host#/allOf/0", "location": "/properties/bad/$ref" },
+    "references": { "type": "SchemaReferenceError", "message": "Could not resolve schema reference", "identifier": "https://example.com/host#/allOf/0", "location": "/properties/bad/$ref" }
+  },
+  "inserted": {}
+}
