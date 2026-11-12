@@ -315,6 +315,19 @@ static auto base_dialect_of_settled(const std::string_view dialect)
   return sourcemeta::core::to_base_dialect(settled.value() + "#");
 }
 
+// A document that names an official schema through an equivalent spelling of
+// its URI names the same schema, so a link is held up against its canonical
+// form before it can count as one the officials do not cover
+static auto link_is_official(const std::string_view link) -> bool {
+  if (sourcemeta::core::schema_is_official(link)) {
+    return true;
+  }
+
+  const auto settled{sourcemeta::core::maybe_canonicalize(link)};
+  return settled.has_value() &&
+         sourcemeta::core::schema_is_official(settled.value());
+}
+
 // Official meta-schemas are a finite set the module already knows, so no
 // resolver can extend a chain through them for ever, and only the links
 // beyond that set spend from the depth a chain is allowed
@@ -322,7 +335,7 @@ static auto chain_depth(const std::unordered_set<std::string_view> &visited)
     -> std::size_t {
   return static_cast<std::size_t>(
       std::ranges::count_if(visited, [](const auto &link) -> bool {
-        return !sourcemeta::core::schema_is_official(link);
+        return !link_is_official(link);
       }));
 }
 

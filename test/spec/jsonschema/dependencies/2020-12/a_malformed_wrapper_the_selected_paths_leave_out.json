@@ -1,0 +1,33 @@
+{
+  "schema": {
+    "$schema": 42,
+    "$id": 42,
+    "selected": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "items": {
+        "$ref": "https://www.sourcemeta.com/remote"
+      }
+    }
+  },
+  "resolver": {
+    "https://www.sourcemeta.com/remote": true
+  },
+  "paths": [
+    "/selected"
+  ],
+  "accounted": [],
+  "accountedReported": [
+    "https://www.sourcemeta.com/remote"
+  ],
+  "dependencies": [
+    {
+      "origin": "",
+      "pointer": "/selected/items/$ref",
+      "destination": "https://www.sourcemeta.com/remote"
+    }
+  ],
+  "locations": 2,
+  "fetched": [
+    "https://www.sourcemeta.com/remote"
+  ]
+}

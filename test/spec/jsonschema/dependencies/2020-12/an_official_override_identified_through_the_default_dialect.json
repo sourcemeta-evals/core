@@ -1,0 +1,31 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "contains": {
+      "$ref": "http://json-schema.org/draft-04/schema"
+    },
+    "items": {
+      "$ref": "https://www.sourcemeta.com/alias"
+    }
+  },
+  "resolver": {
+    "http://json-schema.org/draft-04/schema": {
+      "$id": "https://www.sourcemeta.com/alias"
+    }
+  },
+  "defaultDialect": "https://json-schema.org/draft/2020-12/schema",
+  "accounted": [],
+  "accountedReported": [
+    "http://json-schema.org/draft-04/schema",
+    "https://www.sourcemeta.com/alias"
+  ],
+  "dependencies": [
+    {
+      "origin": "",
+      "pointer": "/contains/$ref",
+      "destination": "http://json-schema.org/draft-04/schema"
+    }
+  ],
+  "locations": 3,
+  "fetched": []
+}

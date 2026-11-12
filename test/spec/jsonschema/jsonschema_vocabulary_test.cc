@@ -1440,6 +1440,90 @@ TEST(base_dialect_a_chain_past_the_limit_ending_at_an_official_metaschema) {
 }
 
 TEST(
+    base_dialect_a_chain_at_the_limit_ending_at_an_official_metaschema_with_an_empty_fragment) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 64, "https://json-schema.org/draft/2020-12/meta/core#");
+      }};
+
+  const auto result{vocabularies(document, resolver)};
+  EXPECT_TRUE(result
+                  .get(sourcemeta::core::SchemaVocabularies::Known::
+                           JSON_SCHEMA_2020_12_CORE)
+                  .has_value());
+}
+
+TEST(
+    base_dialect_a_chain_at_the_limit_ending_at_an_uppercase_official_metaschema) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 64, "HTTPS://JSON-SCHEMA.ORG/draft/2020-12/meta/core");
+      }};
+
+  const auto result{vocabularies(document, resolver)};
+  EXPECT_TRUE(result
+                  .get(sourcemeta::core::SchemaVocabularies::Known::
+                           JSON_SCHEMA_2020_12_CORE)
+                  .has_value());
+}
+
+TEST(
+    base_dialect_a_chain_past_the_limit_ending_at_an_official_metaschema_with_an_empty_fragment) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 65, "https://json-schema.org/draft/2020-12/meta/core#");
+      }};
+
+  try {
+    vocabularies(document, resolver);
+    FAIL();
+  } catch (const sourcemeta::core::SchemaUnknownBaseDialectError &error) {
+    EXPECT_STREQ(error.what(),
+                 "Could not determine the base dialect of the schema");
+  }
+}
+
+TEST(
+    base_dialect_a_chain_past_the_limit_ending_at_an_uppercase_official_metaschema) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 65, "HTTPS://JSON-SCHEMA.ORG/draft/2020-12/meta/core");
+      }};
+
+  try {
+    vocabularies(document, resolver);
+    FAIL();
+  } catch (const sourcemeta::core::SchemaUnknownBaseDialectError &error) {
+    EXPECT_STREQ(error.what(),
+                 "Could not determine the base dialect of the schema");
+  }
+}
+
+TEST(
     base_dialect_embedded_links_at_the_limit_ending_at_an_official_metaschema) {
   auto document{sourcemeta::core::parse_json(R"JSON({
     "$schema": "https://www.sourcemeta.com/handover/0",
