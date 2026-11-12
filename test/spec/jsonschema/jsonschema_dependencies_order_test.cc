@@ -469,6 +469,71 @@ TEST(a_keyword_error_the_resolver_throws_in_a_dialect_lookup_is_unchanged) {
                     "fetch https://www.sourcemeta.com/custom-dialect\n");
 }
 
+// An ordinary remote is reported and accounted when its reference is
+// examined, and only reading it afterwards validates the identifier it
+// declares, so a remote declaring an identifier that is not even a string is
+// reported first and throws the library's own keyword error unchanged after.
+// No fixture can state this scenario, as a fixture may not name
+// SchemaKeywordError, so only the shared event log can pin the order
+TEST(a_keyword_error_from_a_remotes_identifier_comes_after_its_report) {
+  const auto document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/entry",
+    "items": { "$ref": "https://www.sourcemeta.com/invalid-id" }
+  })JSON");
+
+  std::string events;
+  const sourcemeta::core::SchemaResolver resolver{
+      [&events](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        if (!sourcemeta::core::schema_is_official(identifier)) {
+          events += "fetch ";
+          events += identifier;
+          events += '\n';
+        }
+
+        if (identifier == "https://www.sourcemeta.com/invalid-id") {
+          return sourcemeta::core::parse_json(R"JSON({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": 42,
+            "type": "string"
+          })JSON");
+        }
+
+        return sourcemeta::core::schema_resolver(identifier);
+      }};
+
+  sourcemeta::core::SchemaDependenciesOptions options;
+  options.accounted_callback =
+      [&events](const std::string_view identifier) -> void {
+    events += "account ";
+    events += identifier;
+    events += '\n';
+  };
+
+  try {
+    [[maybe_unused]] const auto locations{sourcemeta::core::schema_dependencies(
+        document, sourcemeta::core::schema_walker, resolver,
+        [&events](
+            const sourcemeta::core::SchemaDependency &dependency) -> void {
+          events += "report ";
+          events += dependency.destination;
+          events += '\n';
+        },
+        options)};
+    FAIL();
+  } catch (const sourcemeta::core::SchemaKeywordError &error) {
+    EXPECT_STREQ(error.what(), "The schema identifier is invalid");
+    EXPECT_EQ(error.keyword(), "$id");
+    EXPECT_EQ(error.value(), "42");
+  }
+
+  EXPECT_EQ(events, "account https://www.sourcemeta.com/entry\n"
+                    "fetch https://www.sourcemeta.com/invalid-id\n"
+                    "report https://www.sourcemeta.com/invalid-id\n"
+                    "account https://www.sourcemeta.com/invalid-id\n");
+}
+
 // The walk asks the resolver for a given URI at most once, official schemas
 // included, which no fixture can observe as the fixture fetched list leaves
 // official schemas out

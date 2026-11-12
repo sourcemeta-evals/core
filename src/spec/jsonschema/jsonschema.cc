@@ -2,6 +2,7 @@
 
 #include "helpers.h"
 
+#include <algorithm>     // std::ranges::count_if
 #include <cassert>       // assert
 #include <sstream>       // std::ostringstream
 #include <string_view>   // std::string_view
@@ -314,6 +315,17 @@ static auto base_dialect_of_settled(const std::string_view dialect)
   return sourcemeta::core::to_base_dialect(settled.value() + "#");
 }
 
+// Official meta-schemas are a finite set the module already knows, so no
+// resolver can extend a chain through them for ever, and only the links
+// beyond that set spend from the depth a chain is allowed
+static auto chain_depth(const std::unordered_set<std::string_view> &visited)
+    -> std::size_t {
+  return static_cast<std::size_t>(
+      std::ranges::count_if(visited, [](const auto &link) -> bool {
+        return !sourcemeta::core::schema_is_official(link);
+      }));
+}
+
 // A meta-schema that the document embeds takes precedence over what the
 // resolver knows about, at every link of the chain, as the document pins the
 // exact meta-schemas it is described by. Across every official base dialect,
@@ -355,9 +367,10 @@ auto sourcemeta::core::metaschema_try_embedded(
     // official base dialect, just like a self-descriptive or cyclic
     // meta-schema that the resolver knows about. A chain that goes deeper
     // than any document means is refused here too, as the resolver could
-    // otherwise extend this walk with fresh links for ever
-    if (visited.size() >= BASE_DIALECT_CHAIN_LIMIT ||
-        !visited.emplace(current_identifier).second) {
+    // otherwise extend this walk with fresh links for ever, though a link
+    // that is an official schema spends nothing from that depth
+    if (!visited.emplace(current_identifier).second ||
+        chain_depth(visited) > BASE_DIALECT_CHAIN_LIMIT) {
       throw sourcemeta::core::SchemaUnknownBaseDialectError();
     }
 
@@ -460,9 +473,11 @@ base_dialect_with_visited(const sourcemeta::core::JSON &schema,
   }
 
   // Detect cycles in the metaschema chain, and refuse one that goes deeper
-  // than any document means, which no allowance a caller sets can reach
-  if (visited.size() >= BASE_DIALECT_CHAIN_LIMIT ||
-      !visited.emplace(effective_dialect).second) {
+  // than any document means, which no allowance a caller sets can reach. A
+  // link that is an official schema spends nothing from that depth, as the
+  // officials are a finite set no resolver can extend
+  if (!visited.emplace(effective_dialect).second ||
+      chain_depth(visited) > BASE_DIALECT_CHAIN_LIMIT) {
     throw sourcemeta::core::SchemaUnknownBaseDialectError();
   }
 

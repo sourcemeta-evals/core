@@ -111,6 +111,35 @@ static auto handover_metaschema_resolver(std::string_view identifier)
   return sourcemeta::core::schema_resolver(identifier);
 }
 
+// Answers a chain of custom meta-schema links that hands over to the given
+// official schema after the requested number of them
+static auto official_terminal_chain_resolver(std::string_view identifier,
+                                             const std::size_t links,
+                                             const std::string_view terminal)
+    -> sourcemeta::core::SchemaResolverResult {
+  constexpr std::string_view prefix{
+      "https://www.sourcemeta.com/official-terminal/"};
+  if (!identifier.starts_with(prefix)) {
+    return sourcemeta::core::schema_resolver(identifier);
+  }
+
+  const auto link{std::stoull(std::string{identifier.substr(prefix.size())})};
+  if (link >= links) {
+    return sourcemeta::core::parse_json(std::format(R"JSON({{
+      "$id": "{}{}",
+      "$schema": "{}"
+    }})JSON",
+                                                    prefix, link, terminal));
+  }
+
+  return sourcemeta::core::parse_json(std::format(R"JSON({{
+    "$id": "{}{}",
+    "$schema": "{}{}"
+  }})JSON",
+                                                  prefix, link, prefix,
+                                                  link + 1));
+}
+
 TEST(core_vocabularies_boolean_without_default) {
   const sourcemeta::core::JSON document{true};
   try {
@@ -1315,6 +1344,118 @@ TEST(base_dialect_a_resolved_link_handing_to_embedded_links_at_the_limit) {
         sourcemeta::core::JSON{
             link == 63
                 ? std::string{"https://json-schema.org/draft/2020-12/schema"}
+                : std::format("https://www.sourcemeta.com/handover/{}",
+                              link + 1)});
+    definitions.assign(std::format("link-{}", link), std::move(metaschema));
+  }
+
+  const auto result{vocabularies(document, handover_metaschema_resolver)};
+  EXPECT_TRUE(result
+                  .get(sourcemeta::core::SchemaVocabularies::Known::
+                           JSON_SCHEMA_2020_12_CORE)
+                  .has_value());
+}
+
+// An official schema that is not itself a base dialect, like a 2020-12
+// vocabulary meta-schema, takes one more lookup to settle, and that lookup
+// spends nothing from the allowance the custom links in front of it used up
+TEST(base_dialect_a_chain_at_the_limit_ending_at_an_official_metaschema) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 64, "https://json-schema.org/draft/2020-12/meta/core");
+      }};
+
+  const auto result{vocabularies(document, resolver)};
+  EXPECT_TRUE(result
+                  .get(sourcemeta::core::SchemaVocabularies::Known::
+                           JSON_SCHEMA_2020_12_CORE)
+                  .has_value());
+}
+
+TEST(base_dialect_a_chain_at_the_limit_ending_at_a_fragmentless_draft7) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 64, "http://json-schema.org/draft-07/schema");
+      }};
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Root, document,
+      sourcemeta::core::schema_walker, resolver, ""};
+  EXPECT_TRUE(frame.root_location().has_value());
+  EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
+              sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_DRAFT_7);
+}
+
+TEST(base_dialect_a_chain_at_the_limit_ending_at_a_draft2_schema) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 64, "http://json-schema.org/draft-02/schema#");
+      }};
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Root, document,
+      sourcemeta::core::schema_walker, resolver, ""};
+  EXPECT_TRUE(frame.root_location().has_value());
+  EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
+              sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_DRAFT_2_HYPER);
+}
+
+TEST(base_dialect_a_chain_past_the_limit_ending_at_an_official_metaschema) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 65, "https://json-schema.org/draft/2020-12/meta/core");
+      }};
+
+  try {
+    vocabularies(document, resolver);
+    FAIL();
+  } catch (const sourcemeta::core::SchemaUnknownBaseDialectError &error) {
+    EXPECT_STREQ(error.what(),
+                 "Could not determine the base dialect of the schema");
+  }
+}
+
+TEST(
+    base_dialect_embedded_links_at_the_limit_ending_at_an_official_metaschema) {
+  auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/handover/0",
+    "$defs": {}
+  })JSON")};
+  auto &definitions{document.at("$defs")};
+  for (std::size_t link = 1; link <= 63; link += 1) {
+    auto metaschema{sourcemeta::core::JSON::make_object()};
+    metaschema.assign("$id",
+                      sourcemeta::core::JSON{std::format(
+                          "https://www.sourcemeta.com/handover/{}", link)});
+    metaschema.assign(
+        "$schema",
+        sourcemeta::core::JSON{
+            link == 63
+                ? std::string{"https://json-schema.org/draft/2020-12/meta/core"}
                 : std::format("https://www.sourcemeta.com/handover/{}",
                               link + 1)});
     definitions.assign(std::format("link-{}", link), std::move(metaschema));
