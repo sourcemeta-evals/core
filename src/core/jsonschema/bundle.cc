@@ -896,17 +896,20 @@ auto embed_schema(JSON &root, const Pointer &container,
     if (token.is_property()) {
       current->assign_if_missing(token.to_property(), JSON::make_object());
       current = &current->at(token.to_property());
+    } else if (current->is_array() && token.to_index() < current->size()) {
+      // Where a resource that needs a copy of its own sits under an applicator
+      // holding a list of schemas, the way in to it runs through a step that
+      // is a number. Such a step is one bundling worked out to reach a place
+      // that is already there, rather than one it was handed, and what the
+      // caller hands over is held to naming properties before any of this
+      current = &current->at(token.to_index());
     } else {
-      throw SchemaContainerError(container,
-                                 "Could not bundle to a container that is not "
-                                 "an object");
+      throw SchemaContainerError(container, NOT_AN_OBJECT);
     }
   }
 
   if (!current->is_object()) {
-    throw SchemaContainerError(container,
-                               "Could not bundle to a container that is not "
-                               "an object");
+    throw SchemaContainerError(container, NOT_AN_OBJECT);
   }
 
   std::string key{identifier};
