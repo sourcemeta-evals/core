@@ -276,6 +276,11 @@ constexpr std::array<SchemaKeyword, 2> EMBEDDED_METASCHEMA_CONTAINERS{
     {{.name = "$defs"sv, .hash = JSONSCHEMA_HASH_DEFS},
      {.name = "definitions"sv, .hash = JSONSCHEMA_HASH_DEFINITIONS}}};
 
+// How such a meta-schema may name itself, whichever dialect it is written for
+constexpr std::array<SchemaKeyword, 2> EMBEDDED_METASCHEMA_IDENTIFIERS{
+    {{.name = "$id"sv, .hash = JSONSCHEMA_HASH_ID},
+     {.name = "id"sv, .hash = JSONSCHEMA_HASH_LEGACY_ID}}};
+
 // Whether a schema holds anything at all where a reader looks, which is what
 // makes it worth asking what it carries rather than paying to ask every schema
 // that answers to a name
@@ -325,10 +330,7 @@ inline auto embedded_metaschema_matches(
     return false;
   }
 
-  constexpr std::array<SchemaKeyword, 2> KEYWORDS{
-      {{.name = "$id"sv, .hash = JSONSCHEMA_HASH_ID},
-       {.name = "id"sv, .hash = JSONSCHEMA_HASH_LEGACY_ID}}};
-  for (const auto keyword : KEYWORDS) {
+  for (const auto keyword : EMBEDDED_METASCHEMA_IDENTIFIERS) {
     if (embedded_metaschema_identifier_matches(candidate, keyword, identifier,
                                                canonical)) {
       return true;

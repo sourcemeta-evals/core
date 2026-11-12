@@ -288,6 +288,12 @@ struct Reading {
   std::string_view container_dialect;
   const SchemaWalker &walker;
   const SchemaResolver &resolver;
+  // What the document carried where a reader looks for a meta-schema when it
+  // was handed over, answering before whatever is outside it. Asking the
+  // document as it stands would answer with what bundling has since put
+  // there, which the document does not carry, and would let the order the
+  // references were gone over decide what a schema is read under
+  const SchemaResolver &carried;
   std::string_view default_dialect;
 };
 
@@ -728,36 +734,44 @@ auto answers_within(const JSON &root, const KnownResources &known,
   };
 }
 
-// A meta-schema the document carries where its own dialect reserves
-// definitions speaks for whatever sits within that document, which is what a
-// remote landing in it becomes. What bundling brought in is not something the
-// document carries, however early it landed, so a schema fetched for one
-// reference never comes to say what a schema fetched for another is read
-// under, and the order the references were gone over decides nothing
-auto metaschemas_the_document_carries(const JSON &root,
-                                      const KnownResources &known,
-                                      const SchemaResolver &resolver)
-    -> SchemaResolver {
-  return [&root, &known,
-          &resolver](const std::string_view target) -> SchemaResolverResult {
-    if (!known.fetched.contains(canonical_uri(target))) {
-      try {
-        const auto *carried{metaschema_try_embedded(root, target, resolver)};
-        if (carried != nullptr) {
-          return *carried;
-        }
-      } catch (const SchemaUnknownBaseDialectError &) {
-        // Something the document holds under this name that cannot be read as
-        // a meta-schema is not one it carries for this, so the name is left to
-        // whatever answers outside. What nothing answers to is then refused
-        // for being unresolvable rather than held against the schema that
-        // asked by it, which says nothing wrong
-        return resolver(target);
+// What the document carries where a reader looks for a meta-schema, taken as
+// the caller handed it over. An entry saying nothing of the dialect it is
+// written for can be no meta-schema of anything, so one that names itself and
+// says what it reads under is all that is worth keeping
+auto metaschemas_carried_by(const JSON &schema) -> JSON {
+  auto result{JSON::make_object()};
+  if (!holds_embedded_candidates(schema)) {
+    return result;
+  }
+
+  for (const auto container : EMBEDDED_METASCHEMA_CONTAINERS) {
+    const auto *entries{schema.try_at(container.name, container.hash)};
+    if ((entries == nullptr) || !entries->is_object()) {
+      continue;
+    }
+
+    auto kept{JSON::make_object()};
+    for (const auto &entry : entries->as_object()) {
+      if (!entry.second.is_object() ||
+          !entry.second.defines("$schema", JSONSCHEMA_HASH_SCHEMA)) {
+        continue;
+      }
+
+      if (std::ranges::any_of(EMBEDDED_METASCHEMA_IDENTIFIERS,
+                              [&entry](const auto keyword) -> bool {
+                                return entry.second.defines(keyword.name,
+                                                            keyword.hash);
+                              })) {
+        kept.assign(entry.first, entry.second);
       }
     }
 
-    return resolver(target);
-  };
+    if (!kept.empty()) {
+      result.assign(JSON::String{container.name}, std::move(kept));
+    }
+  }
+
+  return result;
 }
 
 // Every name the document the caller handed over answers to, and where each
@@ -1507,13 +1521,8 @@ auto removable_entry(const Reading &reading, const JSON &root,
   }
 
   const JSON::String identifier{entry.value().get().base};
-  // The entry is read on its way into the document as much as anything else a
-  // remote carries, so what the document carries answers for it too, behind
-  // what the remote carries for itself
-  const SchemaResolver with_what_the_document_carries{
-      metaschemas_the_document_carries(root, known, reading.resolver)};
   const SchemaResolver as_the_remote_does{
-      resolver_with_embedded(remote, with_what_the_document_carries)};
+      resolver_with_embedded(remote, reading.carried)};
   return is_known(known, identifier) &&
          hold_against_what_is_known(reading, root,
                                     {.schema = get(remote, entry_position),
@@ -1532,16 +1541,8 @@ auto elevate_embedded_resources(
   // `$schema`, which is the only way a dialect that reserves no keyword for
   // saying so can be carried, and what it says is where its definitions live
   const auto remote_dialect_uri{dialect(remote, reading.default_dialect, true)};
-  // A meta-schema the document carries where its own dialect reserves
-  // definitions speaks for whatever sits within that document, which is where
-  // the remote is going, so it answers here as much as one the remote carries
-  // itself does. What a resource further in carries speaks for that resource
-  // alone and is left out of this
-  const SchemaResolver with_what_the_document_carries{
-      metaschemas_the_document_carries(root, known, reading.resolver)};
-  const auto remote_vocabularies{
-      vocabularies_with_embedded(remote, with_what_the_document_carries,
-                                 remote_dialect, remote_dialect_uri)};
+  const auto remote_vocabularies{vocabularies_with_embedded(
+      remote, reading.carried, remote_dialect, remote_dialect_uri)};
   if (!remote.is_object()) {
     return;
   }
@@ -1567,9 +1568,8 @@ auto elevate_embedded_resources(
                    remote.at(keyword_string).is_object() &&
                    !remote.at(keyword_string).empty();
           })) {
-    collect_pinned_dialects(remote, reading.walker,
-                            with_what_the_document_carries, remote_dialect_uri,
-                            pinned, remaining);
+    collect_pinned_dialects(remote, reading.walker, reading.carried,
+                            remote_dialect_uri, pinned, remaining);
   }
 
   // An entry can name a sibling as the dialect it is read under, and framing
@@ -1578,7 +1578,7 @@ auto elevate_embedded_resources(
   // says it is rather than by the key it sits under, since the specifications
   // leave that key to whoever bundled and nothing reads an entry by it
   const SchemaResolver entry_resolver{
-      [&remote, &resolver = with_what_the_document_carries](
+      [&remote, &resolver = reading.carried](
           const std::string_view identifier) -> SchemaResolverResult {
         const auto *sibling{
             embedded_metaschema_candidate(remote, identifier).first};
@@ -1959,14 +1959,9 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
   // Create a fresh frame for each schema we analyze to avoid key collisions
   // between different schemas that have references at the same pointer paths
   static const SchemaFrame::Paths NESTED_PATHS{EMPTY_WEAK_POINTER};
-  // Whatever is read on its way into the document is read where it is going as
-  // well as where it came from, so a meta-schema the document carries at its
-  // own definitions location answers for it
-  const SchemaResolver with_what_the_document_carries{
-      metaschemas_the_document_carries(root, known, reading.resolver)};
   const SchemaFrame frame{
-      SchemaFrame::Mode::References, subschema, reading.walker,
-      with_what_the_document_carries, reading.default_dialect, default_id,
+      SchemaFrame::Mode::References, subschema, reading.walker, reading.carried,
+      reading.default_dialect, default_id,
       SchemaFrame::IdentifierMode::Additional,
       // We only want to frame in "wrapper" mode for the top
       // level object, which is also the only one that the
@@ -1989,8 +1984,7 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
         carrier.has_value()
             ? definitions_keywords(
                   reading.walker,
-                  frame.vocabularies(carrier.value().get(),
-                                     with_what_the_document_carries))
+                  frame.vocabularies(carrier.value().get(), reading.carried))
             : DefinitionsKeywords{}};
     const auto carried_dialect{
         dialect(subschema, reading.default_dialect, true)};
@@ -2225,9 +2219,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
     std::optional<SchemaFrame> remote_root_frame;
     try {
       remote_root_frame.emplace(
-          SchemaFrame::Mode::Root, remote, reading.walker,
-          with_what_the_document_carries, reading.default_dialect, "",
-          SchemaFrame::IdentifierMode::Additional,
+          SchemaFrame::Mode::Root, remote, reading.walker, reading.carried,
+          reading.default_dialect, "", SchemaFrame::IdentifierMode::Additional,
           SchemaFrame::Paths{EMPTY_WEAK_POINTER}, "", remaining);
       charge(remaining, remote_root_frame.value());
     } catch (const SchemaUnknownBaseDialectError &) {
@@ -2239,8 +2232,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
 
     const auto &remote_root{remote_root_frame->root_location().value().get()};
     // Working these out can cost a meta-schema to resolve, so it happens once
-    const auto &remote_vocabularies{remote_root_frame->vocabularies(
-        remote_root, with_what_the_document_carries)};
+    const auto &remote_vocabularies{
+        remote_root_frame->vocabularies(remote_root, reading.carried)};
 
     const auto remote_base_dialect{remote_root.base_dialect};
     auto remote_id = remote_root_frame->root();
@@ -2261,9 +2254,9 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
       bool exists{false};
       try {
         exists = names_something_within(
-            remote, reference.destination, reading.walker,
-            with_what_the_document_carries, reading.default_dialect, identifier,
-            std::nullopt, positional.introduced, remaining);
+            remote, reference.destination, reading.walker, reading.carried,
+            reading.default_dialect, identifier, std::nullopt,
+            positional.introduced, remaining);
       } catch (const SchemaDialectImpossibleError &) {
         throw impossible_dialect_of_fetched(
             identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
@@ -2290,7 +2283,7 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
           const SchemaFrame located{SchemaFrame::Mode::Locations,
                                     remote,
                                     reading.walker,
-                                    with_what_the_document_carries,
+                                    reading.carried,
                                     reading.default_dialect,
                                     identifier,
                                     SchemaFrame::IdentifierMode::Additional,
@@ -2666,10 +2659,16 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     const auto container_dialect{dialect_within(
         initial_frame.value(), schema,
         to_weak_pointer(container_parent_pointer), default_dialect)};
+    // What the document carries is read from it as it was handed over, before
+    // anything bundling brings in has gone into it
+    const auto carried{metaschemas_carried_by(schema)};
+    const SchemaResolver as_the_document_carries{
+        resolver_with_embedded(carried, resolver)};
     const Reading reading{.container = default_container.value(),
                           .container_dialect = container_dialect,
                           .walker = walker,
                           .resolver = resolver,
+                          .carried = as_the_document_carries,
                           .default_dialect = default_dialect};
     embed_references(reading, schema, schema, mode, default_id, known,
                      positional, wrapper, remaining, callback);
@@ -2809,10 +2808,16 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   if (schema.is_object()) {
     check_container(schema, container);
   }
+  // What the document carries is read from it as it was handed over, before
+  // anything bundling brings in has gone into it
+  const auto carried{metaschemas_carried_by(schema)};
+  const SchemaResolver as_the_document_carries{
+      resolver_with_embedded(carried, resolver)};
   const Reading reading{.container = container,
                         .container_dialect = container_dialect,
                         .walker = walker,
                         .resolver = resolver,
+                        .carried = as_the_document_carries,
                         .default_dialect = default_dialect};
   embed_references(reading, schema, schema, mode, default_id, known, positional,
                    wrapper, remaining, callback);
