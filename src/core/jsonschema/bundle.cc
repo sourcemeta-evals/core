@@ -728,6 +728,29 @@ auto answers_within(const JSON &root, const KnownResources &known,
   };
 }
 
+// A meta-schema the document carries where its own dialect reserves
+// definitions speaks for whatever sits within that document, which is what a
+// remote landing in it becomes. What bundling brought in is not something the
+// document carries, however early it landed, so a schema fetched for one
+// reference never comes to say what a schema fetched for another is read
+// under, and the order the references were gone over decides nothing
+auto metaschemas_the_document_carries(const JSON &root,
+                                      const KnownResources &known,
+                                      const SchemaResolver &resolver)
+    -> SchemaResolver {
+  return [&root, &known,
+          &resolver](const std::string_view target) -> SchemaResolverResult {
+    if (!known.fetched.contains(canonical_uri(target))) {
+      const auto *carried{metaschema_try_embedded(root, target, resolver)};
+      if (carried != nullptr) {
+        return *carried;
+      }
+    }
+
+    return resolver(target);
+  };
+}
+
 // Every name the document the caller handed over answers to, and where each
 // of those sits within it, so that what a fetched schema names within one is
 // held against what is there. The top of a document answers to the base it
@@ -1475,8 +1498,13 @@ auto removable_entry(const Reading &reading, const JSON &root,
   }
 
   const JSON::String identifier{entry.value().get().base};
+  // The entry is read on its way into the document as much as anything else a
+  // remote carries, so what the document carries answers for it too, behind
+  // what the remote carries for itself
+  const SchemaResolver with_what_the_document_carries{
+      metaschemas_the_document_carries(root, known, reading.resolver)};
   const SchemaResolver as_the_remote_does{
-      resolver_with_embedded(remote, reading.resolver)};
+      resolver_with_embedded(remote, with_what_the_document_carries)};
   return is_known(known, identifier) &&
          hold_against_what_is_known(reading, root,
                                     {.schema = get(remote, entry_position),
@@ -1495,8 +1523,16 @@ auto elevate_embedded_resources(
   // `$schema`, which is the only way a dialect that reserves no keyword for
   // saying so can be carried, and what it says is where its definitions live
   const auto remote_dialect_uri{dialect(remote, reading.default_dialect, true)};
-  const auto remote_vocabularies{vocabularies_with_embedded(
-      remote, reading.resolver, remote_dialect, remote_dialect_uri)};
+  // A meta-schema the document carries where its own dialect reserves
+  // definitions speaks for whatever sits within that document, which is where
+  // the remote is going, so it answers here as much as one the remote carries
+  // itself does. What a resource further in carries speaks for that resource
+  // alone and is left out of this
+  const SchemaResolver with_what_the_document_carries{
+      metaschemas_the_document_carries(root, known, reading.resolver)};
+  const auto remote_vocabularies{
+      vocabularies_with_embedded(remote, with_what_the_document_carries,
+                                 remote_dialect, remote_dialect_uri)};
   if (!remote.is_object()) {
     return;
   }
@@ -1522,8 +1558,9 @@ auto elevate_embedded_resources(
                    remote.at(keyword_string).is_object() &&
                    !remote.at(keyword_string).empty();
           })) {
-    collect_pinned_dialects(remote, reading.walker, reading.resolver,
-                            remote_dialect_uri, pinned, remaining);
+    collect_pinned_dialects(remote, reading.walker,
+                            with_what_the_document_carries, remote_dialect_uri,
+                            pinned, remaining);
   }
 
   // An entry can name a sibling as the dialect it is read under, and framing
@@ -1532,7 +1569,7 @@ auto elevate_embedded_resources(
   // says it is rather than by the key it sits under, since the specifications
   // leave that key to whoever bundled and nothing reads an entry by it
   const SchemaResolver entry_resolver{
-      [&remote, &resolver = reading.resolver](
+      [&remote, &resolver = with_what_the_document_carries](
           const std::string_view identifier) -> SchemaResolverResult {
         const auto *sibling{
             embedded_metaschema_candidate(remote, identifier).first};
@@ -1913,9 +1950,14 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
   // Create a fresh frame for each schema we analyze to avoid key collisions
   // between different schemas that have references at the same pointer paths
   static const SchemaFrame::Paths NESTED_PATHS{EMPTY_WEAK_POINTER};
+  // Whatever is read on its way into the document is read where it is going as
+  // well as where it came from, so a meta-schema the document carries at its
+  // own definitions location answers for it
+  const SchemaResolver with_what_the_document_carries{
+      metaschemas_the_document_carries(root, known, reading.resolver)};
   const SchemaFrame frame{
       SchemaFrame::Mode::References, subschema, reading.walker,
-      reading.resolver, reading.default_dialect, default_id,
+      with_what_the_document_carries, reading.default_dialect, default_id,
       SchemaFrame::IdentifierMode::Additional,
       // We only want to frame in "wrapper" mode for the top
       // level object, which is also the only one that the
@@ -1938,7 +1980,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
         carrier.has_value()
             ? definitions_keywords(
                   reading.walker,
-                  frame.vocabularies(carrier.value().get(), reading.resolver))
+                  frame.vocabularies(carrier.value().get(),
+                                     with_what_the_document_carries))
             : DefinitionsKeywords{}};
     const auto carried_dialect{
         dialect(subschema, reading.default_dialect, true)};
@@ -2173,8 +2216,9 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
     std::optional<SchemaFrame> remote_root_frame;
     try {
       remote_root_frame.emplace(
-          SchemaFrame::Mode::Root, remote, reading.walker, reading.resolver,
-          reading.default_dialect, "", SchemaFrame::IdentifierMode::Additional,
+          SchemaFrame::Mode::Root, remote, reading.walker,
+          with_what_the_document_carries, reading.default_dialect, "",
+          SchemaFrame::IdentifierMode::Additional,
           SchemaFrame::Paths{EMPTY_WEAK_POINTER}, "", remaining);
       charge(remaining, remote_root_frame.value());
     } catch (const SchemaUnknownBaseDialectError &) {
@@ -2186,8 +2230,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
 
     const auto &remote_root{remote_root_frame->root_location().value().get()};
     // Working these out can cost a meta-schema to resolve, so it happens once
-    const auto &remote_vocabularies{
-        remote_root_frame->vocabularies(remote_root, reading.resolver)};
+    const auto &remote_vocabularies{remote_root_frame->vocabularies(
+        remote_root, with_what_the_document_carries)};
 
     const auto remote_base_dialect{remote_root.base_dialect};
     auto remote_id = remote_root_frame->root();
@@ -2208,9 +2252,9 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
       bool exists{false};
       try {
         exists = names_something_within(
-            remote, reference.destination, reading.walker, reading.resolver,
-            reading.default_dialect, identifier, std::nullopt,
-            positional.introduced, remaining);
+            remote, reference.destination, reading.walker,
+            with_what_the_document_carries, reading.default_dialect, identifier,
+            std::nullopt, positional.introduced, remaining);
       } catch (const SchemaDialectImpossibleError &) {
         throw impossible_dialect_of_fetched(
             identifier, where_the_caller_wrote(to_pointer(pointer), wrote));
@@ -2237,7 +2281,7 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
           const SchemaFrame located{SchemaFrame::Mode::Locations,
                                     remote,
                                     reading.walker,
-                                    reading.resolver,
+                                    with_what_the_document_carries,
                                     reading.default_dialect,
                                     identifier,
                                     SchemaFrame::IdentifierMode::Additional,
