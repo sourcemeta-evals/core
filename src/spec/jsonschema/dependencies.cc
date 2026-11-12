@@ -136,6 +136,16 @@ auto frame_within(Walk &walk, const JSON &schema,
 // from the resolver passed in
 auto is_readable(const JSON &document, const SchemaResolver &resolver,
                  const std::string_view default_dialect) -> bool {
+  // A dialect declaration that is not even a string, like `{ "$schema": 42
+  // }`, leaves the dialect of the document carrying it undeterminable, so the
+  // document reads as not a valid JSON Schema however else a dialect could be
+  // found for it, the override markers that bundling plants included
+  const auto *declared_dialect{
+      document.try_at("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
+  if (declared_dialect != nullptr && !declared_dialect->is_string()) {
+    return false;
+  }
+
   try {
     return base_dialect(document, resolver, default_dialect).has_value();
   } catch (const SchemaUnknownBaseDialectError &) {
@@ -143,10 +153,9 @@ auto is_readable(const JSON &document, const SchemaResolver &resolver,
   } catch (const SchemaResolutionError &) {
     return false;
   } catch (const SchemaKeywordError &) {
-    // A dialect declaration that is not even a string, like `{ "$schema": 42
-    // }`, leaves the dialect of the document carrying it undeterminable, so the
-    // document reads as not a valid JSON Schema rather than letting the
-    // library's own keyword error escape the analysis
+    // A keyword error the lookup itself produces further along the chain, like
+    // a meta-schema carrying a dialect declaration that is not a string or one
+    // that is not a valid URI, leaves the document just as undeterminable
     return false;
   }
 }
