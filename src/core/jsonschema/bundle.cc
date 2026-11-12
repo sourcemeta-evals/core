@@ -756,6 +756,20 @@ auto metaschemas_carried_by(const JSON &schema) -> JSON {
   return result;
 }
 
+// A meta-schema a schema carries speaks for that schema and for whatever sits
+// within it, so what is carried where something lands is whatever the schema
+// holding that place carries. Where the caller framed the schemas it wanted
+// bundled inside a document of its own, the place holding them is no schema at
+// all, and carries nothing for anything to read
+auto metaschemas_carried_at(const SchemaFrame &frame, const JSON &document,
+                            const WeakPointer &position) -> JSON {
+  if (!frame.traverse(position).has_value()) {
+    return JSON::make_object();
+  }
+
+  return metaschemas_carried_by(get(document, position));
+}
+
 // What the document carries answers before whatever is outside it. An entry it
 // holds under the name a schema reads by may be no meta-schema at all, saying
 // nothing of the dialect it is written for, and such a name is left to
@@ -2666,9 +2680,11 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     const auto container_dialect{dialect_within(
         initial_frame.value(), schema,
         to_weak_pointer(container_parent_pointer), default_dialect)};
-    // What the document carries is read from it as it was handed over, before
-    // anything bundling brings in has gone into it
-    const auto carried{metaschemas_carried_by(schema)};
+    // What the schema holding the container carries is read from it as it was
+    // handed over, before anything bundling brings in has gone into it
+    const auto carried{
+        metaschemas_carried_at(initial_frame.value(), schema,
+                               to_weak_pointer(container_parent_pointer))};
     const SchemaResolver as_the_document_carries{
         resolver_with_carried(carried, resolver)};
     const Reading reading{.container = default_container.value(),
@@ -2815,9 +2831,11 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   if (schema.is_object()) {
     check_container(schema, container);
   }
-  // What the document carries is read from it as it was handed over, before
-  // anything bundling brings in has gone into it
-  const auto carried{metaschemas_carried_by(schema)};
+  // The container goes at the top of the document, so what carries it is the
+  // document itself, read as it was handed over, before anything bundling
+  // brings in has gone into it
+  const auto carried{metaschemas_carried_at(initial_frame.value(), schema,
+                                            EMPTY_WEAK_POINTER)};
   const SchemaResolver as_the_document_carries{
       resolver_with_carried(carried, resolver)};
   const Reading reading{.container = container,
