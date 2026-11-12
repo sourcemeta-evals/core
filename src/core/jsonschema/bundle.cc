@@ -506,7 +506,7 @@ auto mark_dialect_of_every_subschema(const Reading &reading, JSON &schema,
   const SchemaFrame frame{SchemaFrame::Mode::Locations,
                           schema,
                           reading.walker,
-                          reading.resolver,
+                          reading.carried,
                           marking.reads_as,
                           "",
                           SchemaFrame::IdentifierMode::Additional,
@@ -519,12 +519,12 @@ auto mark_dialect_of_every_subschema(const Reading &reading, JSON &schema,
   // does, which is what framing went by, so reading a name any other way would
   // hold what the frame said against something it never said
   const SchemaResolver as_the_document_does{
-      resolver_with_embedded(schema, reading.resolver)};
+      resolver_with_embedded(schema, reading.carried)};
 
   std::vector<std::pair<Pointer, JSON::String>> targets;
   frame.for_each_location(
       [&targets, lands_under = marking.lands_under, &frame,
-       &resolver = reading.resolver, &as_the_document_does,
+       &carried = reading.carried, &as_the_document_does,
        &document = std::as_const(schema)](const auto, const auto &,
                                           const auto &location) -> void {
         if (location.type != SchemaFrame::LocationType::Resource &&
@@ -556,7 +556,7 @@ auto mark_dialect_of_every_subschema(const Reading &reading, JSON &schema,
         // place reads under the frame has worked out already
         const auto lands_as{reading_named_by(inherited, as_the_document_does)};
         if (lands_as.has_value() &&
-            read_the_same_way(frame.vocabularies(location, resolver),
+            read_the_same_way(frame.vocabularies(location, carried),
                               lands_as.value())) {
           return;
         }
