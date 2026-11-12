@@ -735,9 +735,9 @@ auto answers_within(const JSON &root, const KnownResources &known,
 }
 
 // What the document carries where a reader looks for a meta-schema, taken as
-// the caller handed it over. An entry saying nothing of the dialect it is
-// written for can be no meta-schema of anything, so one that names itself and
-// says what it reads under is all that is worth keeping
+// the caller handed it over. Which of those entries is a meta-schema of
+// anything is not asked here, as asking would mean reading what each one holds
+// before anything has framed it, and a lookup settles it entry by entry anyway
 auto metaschemas_carried_by(const JSON &schema) -> JSON {
   auto result{JSON::make_object()};
   if (!holds_embedded_candidates(schema)) {
@@ -750,28 +750,32 @@ auto metaschemas_carried_by(const JSON &schema) -> JSON {
       continue;
     }
 
-    auto kept{JSON::make_object()};
-    for (const auto &entry : entries->as_object()) {
-      if (!entry.second.is_object() ||
-          !entry.second.defines("$schema", JSONSCHEMA_HASH_SCHEMA)) {
-        continue;
-      }
-
-      if (std::ranges::any_of(EMBEDDED_METASCHEMA_IDENTIFIERS,
-                              [&entry](const auto keyword) -> bool {
-                                return entry.second.defines(keyword.name,
-                                                            keyword.hash);
-                              })) {
-        kept.assign(entry.first, entry.second);
-      }
-    }
-
-    if (!kept.empty()) {
-      result.assign(JSON::String{container.name}, std::move(kept));
-    }
+    result.assign(JSON::String{container.name}, *entries);
   }
 
   return result;
+}
+
+// What the document carries answers before whatever is outside it. An entry it
+// holds under the name a schema reads by may be no meta-schema at all, saying
+// nothing of the dialect it is written for, and such a name is left to
+// whatever answers outside, so that it is refused for being unresolvable
+// rather than held against the schema that asked by it
+auto resolver_with_carried(const JSON &carried, const SchemaResolver &resolver)
+    -> SchemaResolver {
+  return [&carried,
+          &resolver](const std::string_view target) -> SchemaResolverResult {
+    try {
+      const auto *embedded{metaschema_try_embedded(carried, target, resolver)};
+      if (embedded != nullptr) {
+        return *embedded;
+      }
+    } catch (const SchemaUnknownBaseDialectError &) {
+      return resolver(target);
+    }
+
+    return resolver(target);
+  };
 }
 
 // Every name the document the caller handed over answers to, and where each
@@ -2663,7 +2667,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     // anything bundling brings in has gone into it
     const auto carried{metaschemas_carried_by(schema)};
     const SchemaResolver as_the_document_carries{
-        resolver_with_embedded(carried, resolver)};
+        resolver_with_carried(carried, resolver)};
     const Reading reading{.container = default_container.value(),
                           .container_dialect = container_dialect,
                           .walker = walker,
@@ -2812,7 +2816,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   // anything bundling brings in has gone into it
   const auto carried{metaschemas_carried_by(schema)};
   const SchemaResolver as_the_document_carries{
-      resolver_with_embedded(carried, resolver)};
+      resolver_with_carried(carried, resolver)};
   const Reading reading{.container = container,
                         .container_dialect = container_dialect,
                         .walker = walker,
