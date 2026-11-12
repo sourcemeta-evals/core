@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "items": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/items/absent"
+    }
+  },
+  "defaultBase": "https://example.com/a",
+  "paths": [
+    "/items"
+  ],
+  "accounted": [],
+  "accountedReported": [
+    "https://example.com/a"
+  ],
+  "dependencies": [],
+  "fetched": [],
+  "error": {
+    "type": "SchemaReferenceError",
+    "message": "Could not resolve schema reference",
+    "identifier": "https://example.com/a#/items/absent",
+    "location": "/items/$ref"
+  }
+}
