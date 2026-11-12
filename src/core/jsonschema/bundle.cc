@@ -741,9 +741,18 @@ auto metaschemas_the_document_carries(const JSON &root,
   return [&root, &known,
           &resolver](const std::string_view target) -> SchemaResolverResult {
     if (!known.fetched.contains(canonical_uri(target))) {
-      const auto *carried{metaschema_try_embedded(root, target, resolver)};
-      if (carried != nullptr) {
-        return *carried;
+      try {
+        const auto *carried{metaschema_try_embedded(root, target, resolver)};
+        if (carried != nullptr) {
+          return *carried;
+        }
+      } catch (const SchemaUnknownBaseDialectError &) {
+        // Something the document holds under this name that cannot be read as
+        // a meta-schema is not one it carries for this, so the name is left to
+        // whatever answers outside. What nothing answers to is then refused
+        // for being unresolvable rather than held against the schema that
+        // asked by it, which says nothing wrong
+        return resolver(target);
       }
     }
 
