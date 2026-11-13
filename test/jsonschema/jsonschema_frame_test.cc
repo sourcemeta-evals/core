@@ -765,6 +765,81 @@ TEST(accessors_vocabularies_of_a_resource_that_carries_its_own_dialect) {
                              JSON_SCHEMA_2020_12_APPLICATOR);
 }
 
+TEST(accessors_a_dialect_carried_at_the_far_end_of_a_chain_of_resources) {
+  // Every resource between the one asking and the one carrying the dialect it
+  // reads by names itself and carries an entry of its own, none of which
+  // answers to the name asked for, so what answers is reached by going out
+  // through all of them. Nothing outside the document answers for that name,
+  // and neither does the schema the walk started from
+  constexpr std::size_t RESOURCES{24};
+  auto document = sourcemeta::core::parse_json(R"JSON({
+    "$id": "https://example.com/deepest",
+    "$schema": "https://example.com/narrow"
+  })JSON");
+
+  // Built from the inside out, as each resource is what holds the one before
+  for (std::size_t level{RESOURCES}; level > 1; --level) {
+    const auto aside{"https://example.com/aside" + std::to_string(level)};
+    auto held = sourcemeta::core::parse_json(R"JSON({
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$vocabulary": {
+        "https://json-schema.org/draft/2020-12/vocab/core": true
+      }
+    })JSON");
+    held.assign("$id", sourcemeta::core::JSON{aside});
+
+    auto definitions{sourcemeta::core::JSON::make_object()};
+    definitions.assign(aside, std::move(held));
+    definitions.assign("within", std::move(document));
+
+    // The one furthest out is the only one carrying the dialect the innermost
+    // reads by
+    if (level == 2) {
+      definitions.assign("https://example.com/narrow",
+                         sourcemeta::core::parse_json(R"JSON({
+        "$id": "https://example.com/narrow",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$vocabulary": {
+          "https://json-schema.org/draft/2020-12/vocab/core": true,
+          "https://json-schema.org/draft/2020-12/vocab/applicator": true
+        }
+      })JSON"));
+    }
+
+    auto enclosing{sourcemeta::core::JSON::make_object()};
+    enclosing.assign("$id", sourcemeta::core::JSON{"https://example.com/" +
+                                                   std::to_string(level)});
+    enclosing.assign("$defs", std::move(definitions));
+    document = std::move(enclosing);
+  }
+
+  auto outermost = sourcemeta::core::parse_json(R"JSON({
+    "$id": "https://example.com/outermost",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {}
+  })JSON");
+  outermost.at("$defs").assign("within", std::move(document));
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::References, outermost,
+      sourcemeta::core::schema_walker, sourcemeta::core::schema_resolver};
+
+  // What that copy says it is written for is what settles the base dialect
+  // here, so reaching it is what the answer rests on
+  const auto deepest{frame.traverse("https://example.com/deepest")};
+  EXPECT_TRUE(deepest.has_value());
+  EXPECT_EQ(deepest->get().dialect, "https://example.com/narrow");
+  EXPECT_EQ(deepest->get().base_dialect,
+            sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_2020_12);
+
+  // What each resource along the way carries answers for itself, which is not
+  // what the one asking reads by
+  const auto nearest{frame.traverse("https://example.com/aside24")};
+  EXPECT_TRUE(nearest.has_value());
+  EXPECT_EQ(nearest->get().dialect,
+            "https://json-schema.org/draft/2020-12/schema");
+}
+
 TEST(accessors_location_count) {
   const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "$id": "https://example.com/schema",
