@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "items": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/items/type",
+      "type": "integer"
+    }
+  },
+  "defaultBase": "https://example.com/doc",
+  "paths": [
+    "/items"
+  ],
+  "maxLocations": 1,
+  "accounted": [],
+  "accountedReported": [],
+  "dependencies": [],
+  "fetched": [],
+  "error": {
+    "type": "SchemaFrameLimitError",
+    "message": "The schema exceeds the maximum number of frame locations",
+    "limit": 1
+  }
+}

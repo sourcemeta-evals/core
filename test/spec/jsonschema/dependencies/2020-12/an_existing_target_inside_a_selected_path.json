@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "items": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/items/type",
+      "type": "integer"
+    }
+  },
+  "defaultBase": "https://example.com/doc",
+  "paths": [
+    "/items"
+  ],
+  "accounted": [],
+  "accountedReported": [
+    "https://example.com/doc"
+  ],
+  "dependencies": [],
+  "locations": 2,
+  "fetched": []
+}
