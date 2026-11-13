@@ -1,0 +1,116 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "holder": {
+        "$id": "https://example.com/holder",
+        "$defs": {
+          "https://example.com/narrow": {
+            "$id": "https://example.com/narrow",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$vocabulary": {
+              "https://json-schema.org/draft/2020-12/vocab/core": true,
+              "https://json-schema.org/draft/2020-12/vocab/applicator": true
+            }
+          },
+          "inner": {
+            "$id": "https://example.com/inner",
+            "$schema": "https://example.com/narrow",
+            "properties": {
+              "pointer": { "$ref": "https://example.com/remote" }
+            },
+            "$defs": {}
+          }
+        }
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/remote": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/remote",
+      "type": "string"
+    }
+  },
+  "container": "/properties/holder/$defs/inner/$defs",
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "holder": {
+          "$id": "https://example.com/holder",
+          "$defs": {
+            "https://example.com/narrow": {
+              "$id": "https://example.com/narrow",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$vocabulary": {
+                "https://json-schema.org/draft/2020-12/vocab/core": true,
+                "https://json-schema.org/draft/2020-12/vocab/applicator": true
+              }
+            },
+            "inner": {
+              "$id": "https://example.com/inner",
+              "$schema": "https://example.com/narrow",
+              "properties": {
+                "pointer": { "$ref": "https://example.com/remote" }
+              },
+              "$defs": {
+                "https://example.com/remote": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/remote",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "holder": {
+          "$id": "https://example.com/holder",
+          "$defs": {
+            "https://example.com/narrow": {
+              "$id": "https://example.com/narrow",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$vocabulary": {
+                "https://json-schema.org/draft/2020-12/vocab/core": true,
+                "https://json-schema.org/draft/2020-12/vocab/applicator": true
+              }
+            },
+            "inner": {
+              "$id": "https://example.com/inner",
+              "$schema": "https://example.com/narrow",
+              "properties": {
+                "pointer": { "$ref": "https://example.com/remote" }
+              },
+              "$defs": {
+                "https://example.com/remote": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/remote",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/remote",
+        "at": "/properties/holder/$defs/inner/$defs/https:~1~1example.com~1remote"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/remote",
+        "at": "/properties/holder/$defs/inner/$defs/https:~1~1example.com~1remote"
+      }
+    ]
+  }
+}

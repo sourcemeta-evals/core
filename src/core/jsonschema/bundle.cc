@@ -878,6 +878,28 @@ auto resolver_within_carried(const CarriedMetaschemas &carried,
   };
 }
 
+// Whether the dialect in force where a container sits reserves that place for
+// schema definitions. What the schemas holding the place carry is what settles
+// the dialect there, as a document can hold the meta-schema that says so, and
+// asking what is outside the document on its own goes looking for a name the
+// document itself answers to
+auto container_is_reserved(const SchemaFrame &frame, const JSON &document,
+                           const SchemaFrame::Paths &paths,
+                           const SchemaWalker &walker,
+                           const SchemaResolver &resolver,
+                           const Pointer &container,
+                           const SchemaFrame::Location &parent) -> bool {
+  const auto carried{metaschemas_carried_at(
+      frame, document, paths, to_weak_pointer(container.initial()))};
+  const SchemaResolver as_the_framed_schema_carries{
+      resolver_with_framed(carried.framed, resolver)};
+  const SchemaResolver as_the_document_carries{
+      resolver_within_carried(carried, as_the_framed_schema_carries)};
+  return walker(container.back().to_property(),
+                frame.vocabularies(parent, as_the_document_carries))
+             .type == SchemaKeywordType::LocationMembers;
+}
+
 // Every name the document the caller handed over answers to, and where each
 // of those sits within it, so that what a fetched schema names within one is
 // held against what is there. The top of a document answers to the base it
@@ -2760,9 +2782,9 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
       if (!parent.has_value() ||
           (parent.value().get().type != SchemaFrame::LocationType::Resource &&
            parent.value().get().type != SchemaFrame::LocationType::Subschema) ||
-          walker(default_container.value().back().to_property(),
-                 initial_frame->vocabularies(parent.value().get(), resolver))
-                  .type != SchemaKeywordType::LocationMembers) {
+          !container_is_reserved(initial_frame.value(), schema, paths, walker,
+                                 resolver, default_container.value(),
+                                 parent.value().get())) {
         throw SchemaContainerError(
             default_container.value(),
             "Could not bundle to a container that the dialect does not "
