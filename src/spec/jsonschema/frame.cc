@@ -1876,9 +1876,11 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
       // even where the caller's paths leave the document's top out and that
       // base holds no location of its own: the base still names the whole
       // document, so the fragment resolves against its root, though only a
-      // target within a selected path is one this frame holds
+      // target within a selected path is one this frame holds. An anonymous
+      // document retrieved from no base at all reads the same way: its
+      // fragment-only references carry an empty base, which is the base it
+      // was retrieved from
       const auto through_retrieval{base_entry == this->locations_.cend() &&
-                                   !this->cache_->default_base.empty() &&
                                    reference.second.base ==
                                        this->cache_->default_base};
       if (base_entry == this->locations_.cend() && !through_retrieval) {
