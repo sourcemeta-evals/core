@@ -9,6 +9,7 @@
 #include <cassert>       // assert
 #include <cstddef>       // std::size_t
 #include <cstdint>       // std::uint64_t
+#include <deque>         // std::deque
 #include <functional>    // std::cref
 #include <map>           // std::map
 #include <optional>      // std::optional
@@ -734,10 +735,10 @@ auto answers_within(const JSON &root, const KnownResources &known,
   };
 }
 
-// What the document carries where a reader looks for a meta-schema, taken as
-// the caller handed it over. Which of those entries is a meta-schema of
-// anything is not asked here, as asking would mean reading what each one holds
-// before anything has framed it, and a lookup settles it entry by entry anyway
+// What a schema carries where a reader looks for a meta-schema, taken as the
+// caller handed it over. Which of those entries is a meta-schema of anything
+// is not asked here, as asking would mean reading what each one holds before
+// anything has framed it, and a lookup settles it entry by entry anyway
 auto metaschemas_carried_by(const JSON &schema) -> JSON {
   auto result{JSON::make_object()};
   if (!holds_embedded_candidates(schema)) {
@@ -756,39 +757,124 @@ auto metaschemas_carried_by(const JSON &schema) -> JSON {
   return result;
 }
 
-// A meta-schema a schema carries speaks for that schema and for whatever sits
-// within it, so what is carried where something lands is whatever the schema
-// holding that place carries. Where the caller framed the schemas it wanted
-// bundled inside a document of its own, the place holding them is no schema at
-// all, and carries nothing for anything to read
-auto metaschemas_carried_at(const SchemaFrame &frame, const JSON &document,
-                            const WeakPointer &position) -> JSON {
-  if (!frame.traverse(position).has_value()) {
-    return JSON::make_object();
+// What each schema holding a place carries, nearest first, and apart from
+// those what the schema the caller framed carries, as the two are asked in
+// different ways. They stay a chain rather than one pool, as a reader asks
+// them one at a time: what the nearest holds answers first whichever container
+// a reader would look in for it, two of them can hold an entry under one key,
+// and an entry answering to the name asked for that leads nowhere leaves the
+// next one out to be asked. Each is kept as a copy of its own, as bundling
+// goes on to write into the document
+struct CarriedMetaschemas {
+  std::vector<JSON> held;
+  std::deque<PinnedScope> scopes;
+  JSON framed{JSON::make_object()};
+};
+
+// Which of the schemas the caller framed holds a given place, as naming a path
+// is what puts everything outside it out of scope
+auto framed_schema_holding(const SchemaFrame::Paths &paths,
+                           const WeakPointer &position) -> const WeakPointer * {
+  for (const auto &path : paths) {
+    if (position.starts_with(path)) {
+      return &path;
+    }
   }
 
-  return metaschemas_carried_by(get(document, position));
+  return nullptr;
 }
 
-// What the document carries answers before whatever is outside it. An entry it
-// holds under the name a schema reads by may be no meta-schema at all, saying
-// nothing of the dialect it is written for, and such a name is left to
-// whatever answers outside, so that it is refused for being unresolvable
-// rather than held against the schema that asked by it
-auto resolver_with_carried(const JSON &carried, const SchemaResolver &resolver)
+// A meta-schema a schema carries speaks for that schema and for whatever sits
+// within it, which is how a dialect is settled where something lands: the
+// schema the caller framed answers for everything inside it, and below that
+// only a schema that answers to a name of its own encloses anything in its own
+// right. So what is carried where something lands is what each schema holding
+// that place carries, nearest first, up to the one the caller framed. Where
+// the caller framed the schemas it wanted bundled inside a document of its
+// own, a place outside every one of them sits within no schema at all, and
+// carries nothing for anything to read
+auto metaschemas_carried_at(const SchemaFrame &frame, const JSON &document,
+                            const SchemaFrame::Paths &paths,
+                            const WeakPointer &position) -> CarriedMetaschemas {
+  CarriedMetaschemas result;
+  const auto *framed{framed_schema_holding(paths, position)};
+  if (framed == nullptr) {
+    return result;
+  }
+
+  auto current{position};
+  while (current.size() > framed->size()) {
+    const auto &schema{get(document, current)};
+    if (holds_embedded_candidates(schema) &&
+        frame.traverse(current, SchemaFrame::LocationType::Resource)
+            .has_value()) {
+      result.held.push_back(metaschemas_carried_by(schema));
+    }
+
+    current.pop_back();
+  }
+
+  result.framed = metaschemas_carried_by(get(document, *framed));
+  // Built from the outside in, as each link says which one encloses it
+  for (auto held{result.held.crbegin()}; held != result.held.crend(); ++held) {
+    const auto *enclosing{result.scopes.empty() ? nullptr
+                                                : &result.scopes.front()};
+    result.scopes.push_front({.holder = &*held, .enclosing = enclosing});
+  }
+
+  return result;
+}
+
+// What the schema the caller framed carries answers before whatever is outside
+// the document, whichever dialect is asked for, as that schema pins the
+// meta-schema it is itself described by. An entry it holds under the name a
+// schema reads by may be no meta-schema at all, saying nothing of the dialect
+// it is written for, and nothing outside can stand in for one, as a reader of
+// the document would come upon that same entry. Such a name answers to
+// nothing, so that it is refused for being unresolvable rather than held
+// against the schema that asked by it
+auto resolver_with_framed(const JSON &framed, const SchemaResolver &resolver)
     -> SchemaResolver {
-  return [&carried,
+  return [&framed,
           &resolver](const std::string_view target) -> SchemaResolverResult {
     try {
-      const auto *embedded{metaschema_try_embedded(carried, target, resolver)};
+      const auto *embedded{metaschema_try_embedded(framed, target, resolver)};
       if (embedded != nullptr) {
         return *embedded;
       }
     } catch (const SchemaUnknownBaseDialectError &) {
-      return resolver(target);
+      return std::nullopt;
     }
 
     return resolver(target);
+  };
+}
+
+// What a schema within the document carries answers before whatever encloses
+// it, nearest first, and a name none of them answers for is left to the schema
+// the caller framed and to whatever is outside the document after that, while
+// an entry one of them holds that says nothing of the dialect it is written
+// for leaves that name answering to nothing at all
+auto resolver_within_carried(const CarriedMetaschemas &carried,
+                             const SchemaResolver &framed) -> SchemaResolver {
+  return [&carried,
+          &framed](const std::string_view target) -> SchemaResolverResult {
+    const auto *innermost{carried.scopes.empty() ? nullptr
+                                                 : &carried.scopes.front()};
+    for (const auto *scope{innermost}; scope != nullptr;
+         scope = scope->enclosing) {
+      try {
+        const auto *embedded{
+            metaschema_try_embedded(*scope->holder, target, framed, innermost)};
+        if (embedded != nullptr) {
+          return *embedded;
+        }
+      } catch (const SchemaUnknownBaseDialectError &) {
+        return std::nullopt;
+      }
+    }
+
+    return framed(target);
   };
 }
 
@@ -2616,9 +2702,7 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     // format keeps its container outside every schema it frames, where JSON
     // Schema has nothing to say about where things may go
     const auto container{to_weak_pointer(default_container.value())};
-    if (std::ranges::any_of(paths, [&container](const auto &path) -> bool {
-          return container.starts_with(path);
-        })) {
+    if (framed_schema_holding(paths, container) != nullptr) {
       const auto parent_pointer{default_container.value().initial()};
       const auto parent{
           initial_frame->traverse(to_weak_pointer(parent_pointer))};
@@ -2680,13 +2764,16 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
     const auto container_dialect{dialect_within(
         initial_frame.value(), schema,
         to_weak_pointer(container_parent_pointer), default_dialect)};
-    // What the schema holding the container carries is read from it as it was
-    // handed over, before anything bundling brings in has gone into it
+    // What carries the place the container sits in is read from the document
+    // as it was handed over, before anything bundling brings in has gone into
+    // it
     const auto carried{
-        metaschemas_carried_at(initial_frame.value(), schema,
+        metaschemas_carried_at(initial_frame.value(), schema, paths,
                                to_weak_pointer(container_parent_pointer))};
+    const SchemaResolver as_the_framed_schema_carries{
+        resolver_with_framed(carried.framed, resolver)};
     const SchemaResolver as_the_document_carries{
-        resolver_with_carried(carried, resolver)};
+        resolver_within_carried(carried, as_the_framed_schema_carries)};
     const Reading reading{.container = default_container.value(),
                           .container_dialect = container_dialect,
                           .walker = walker,
@@ -2835,9 +2922,11 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   // document itself, read as it was handed over, before anything bundling
   // brings in has gone into it
   const auto carried{metaschemas_carried_at(initial_frame.value(), schema,
-                                            EMPTY_WEAK_POINTER)};
+                                            paths, EMPTY_WEAK_POINTER)};
+  const SchemaResolver as_the_framed_schema_carries{
+      resolver_with_framed(carried.framed, resolver)};
   const SchemaResolver as_the_document_carries{
-      resolver_with_carried(carried, resolver)};
+      resolver_within_carried(carried, as_the_framed_schema_carries)};
   const Reading reading{.container = container,
                         .container_dialect = container_dialect,
                         .walker = walker,
