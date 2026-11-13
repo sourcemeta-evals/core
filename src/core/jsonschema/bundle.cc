@@ -1497,6 +1497,46 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
   }
 }
 
+// What the caller's document held somewhere when it was handed over. Bundling
+// has been writing into it ever since, and a place bundling made is no part of
+// what the schema holding it says, so reading it as it stands would hold a
+// copy against however much had been fetched by the time the two were held
+// together
+auto as_it_was_handed_over(const JSON &root, const Pointer &where,
+                           const SchemaBaseDialect base_dialect,
+                           const std::vector<Pointer> &introduced) -> JSON {
+  const auto carries{id_keyword(base_dialect)};
+  auto result{get(root, where)};
+  for (const auto &place : introduced) {
+    if (place.size() <= where.size() || !place.starts_with(where)) {
+      continue;
+    }
+
+    Pointer within;
+    for (auto step{where.size()}; step < place.size(); ++step) {
+      within.emplace_back(place.at(step));
+    }
+
+    // Writing out the name a document was handed is saying what it is called
+    // rather than putting something in it, and claiming that name is the only
+    // way a copy could be held against this one in the first place. Taking it
+    // back out would leave the two disagreeing over the one thing they have to
+    // share
+    if (within.size() == 1 && within.back().is_property() &&
+        within.back().to_property() == carries.name) {
+      continue;
+    }
+
+    // A place bundling made within another is gone along with the one holding
+    // it, which leaves nothing here to take out
+    if (try_get(result, within) != nullptr) {
+      remove(result, within);
+    }
+  }
+
+  return result;
+}
+
 // What the document already holds under a name, wherever it sits. The
 // container alone cannot answer that, as a caller may hold a resource
 // anywhere, and holding the two against each other is what keeps a name
@@ -1504,18 +1544,22 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
 auto hold_against_what_is_known(const Reading &reading, const JSON &root,
                                 const Copy &arriving,
                                 const KnownResources &known,
+                                const std::vector<Pointer> &introduced,
                                 const JSON::String &identifier,
                                 std::uint64_t &remaining) -> bool {
   const SchemaResolver as_the_document_does{
       answers_within(root, known, reading.resolver)};
 
-  // What a later pass will place is not in the document yet, so a candidate
-  // arriving first would otherwise be dropped against nothing at all
-  const auto pending{known.pending.find(canonical_uri(identifier))};
-  if (pending != known.pending.cend()) {
+  // What came back under a name is what that name stands for, whether or not
+  // it is in the document yet: one arriving before it goes in would otherwise
+  // be dropped against nothing at all, and once it is in, whatever it carried
+  // has been lifted out of the copy that landed, which says less than the name
+  // was answered with
+  const auto came_back{known.fetched.find(canonical_uri(identifier))};
+  if (came_back != known.fetched.cend()) {
     if (!says_the_same(reading,
-                       {.schema = *(pending->second.schema),
-                        .dialect = pending->second.dialect,
+                       {.schema = came_back->second.schema,
+                        .dialect = came_back->second.dialect,
                         .reads_with = as_the_document_does},
                        arriving, identifier, remaining)) {
       throw SchemaError(
@@ -1600,8 +1644,11 @@ auto hold_against_what_is_known(const Reading &reading, const JSON &root,
   // inherits it, and either can spell it its own way, none of which says
   // anything about whether they are the same schema
   const auto &held_location{location.value().get()};
+  const auto held{as_it_was_handed_over(root, to_pointer(held_location.pointer),
+                                        held_location.base_dialect,
+                                        introduced)};
   if (!says_the_same(reading,
-                     {.schema = get(root, to_pointer(held_location.pointer)),
+                     {.schema = held,
                       .dialect = held_location.dialect,
                       .reads_with = as_the_document_does},
                      arriving, identifier, remaining)) {
@@ -1619,6 +1666,7 @@ auto hold_against_what_is_known(const Reading &reading, const JSON &root,
 auto removable_entry(const Reading &reading, const JSON &root,
                      const JSON &remote, const SchemaFrame &frame,
                      const Pointer &entry_position, const KnownResources &known,
+                     const std::vector<Pointer> &introduced,
                      std::string_view remote_dialect_uri,
                      std::uint64_t &remaining) -> bool {
   const auto entry{frame.traverse(to_weak_pointer(entry_position),
@@ -1635,7 +1683,7 @@ auto removable_entry(const Reading &reading, const JSON &root,
                                     {.schema = get(remote, entry_position),
                                      .dialect = remote_dialect_uri,
                                      .reads_with = as_the_remote_does},
-                                    known, identifier, remaining);
+                                    known, introduced, identifier, remaining);
 }
 
 auto elevate_embedded_resources(
@@ -1818,7 +1866,8 @@ auto elevate_embedded_resources(
                                          {.schema = value,
                                           .dialect = remote_dialect_uri,
                                           .reads_with = entry_resolver},
-                                         known, identifier_string, remaining)) {
+                                         known, positional.introduced,
+                                         identifier_string, remaining)) {
             to_remove.push_back({.key = key, .identifier = identifier_string});
             continue;
           }
@@ -1843,7 +1892,8 @@ auto elevate_embedded_resources(
                                         {.schema = value,
                                          .dialect = remote_dialect_uri,
                                          .reads_with = entry_resolver},
-                                        known, identifier_string, remaining)) {
+                                        known, positional.introduced,
+                                        identifier_string, remaining)) {
           continue;
         }
 
@@ -2115,7 +2165,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
           removable_entry(reading, root, subschema, frame,
                           Pointer{JSON::String{position.at(0).to_property()},
                                   position.at(1)},
-                          known, carried_dialect, remaining)) {
+                          known, positional.introduced, carried_dialect,
+                          remaining)) {
         return;
       }
 
