@@ -1066,6 +1066,15 @@ struct PositionalCopy {
   bool carries_its_dialect;
 };
 
+// A copy that a round has prepared but not yet put in. What a frame hands back
+// points into the document it read, and putting anything into an object moves
+// what its keys are held as, so a round reads what every copy of it needs
+// before any of them goes in
+struct PendingCopy {
+  std::pair<Pointer, JSON::String> seen;
+  JSON duplicate;
+};
+
 // Elevation lifts a resource out of the copy that lands, so a place named
 // inside one is no longer where the reference that named it said. Saying the
 // name of what moved reaches the same schema, but only where what the
@@ -1232,6 +1241,7 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
     charge(remaining, frame);
 
     std::vector<PositionalCopy> copies;
+    std::vector<PendingCopy> pending;
     frame.for_each_unresolved_reference([&](const auto &pointer,
                                             const auto &reference) -> void {
       const JSON::String base{reference.base};
@@ -1463,8 +1473,15 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
         }
       }
 
-      if (!spelled.has_value()) {
-        if (!placed.contains(seen)) {
+      // Where a copy has gone in already, saying where it went is all that is
+      // left to do. Where one has not, this round prepares it and says nothing
+      // of it, as what the frame hands back is read by everything above and
+      // putting a copy in is what spoils that
+      if (!spelled.has_value() && !placed.contains(seen)) {
+        if (std::ranges::none_of(pending,
+                                 [&seen](const auto &prepared) -> bool {
+                                   return prepared.seen == seen;
+                                 })) {
           auto duplicate{JSON{get(schema, landing)}};
 
           // A resource that another carried resource holds is reached through
@@ -1494,13 +1511,14 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
                 remaining);
           }
 
-          placed.emplace(seen,
-                         embed_schema(schema, host_container, copy.identifier,
-                                      std::move(duplicate), callback,
-                                      positional.introduced));
+          pending.push_back({.seen = seen, .duplicate = std::move(duplicate)});
           settled = false;
         }
 
+        continue;
+      }
+
+      if (!spelled.has_value()) {
         Pointer target{copy.keyword};
         target.push_back(JSON::String{placed.at(seen)});
         if (copy.tail.has_value()) {
@@ -1511,6 +1529,17 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
       }
 
       rewrites.insert_or_assign(copy.reference, std::move(spelled).value());
+    }
+
+    // Everything this round reads is read by now, so what it prepared can go
+    // in, which is also what leaves the next round something to say about
+    // where each of them went
+    for (auto &prepared : pending) {
+      placed.emplace(prepared.seen,
+                     embed_schema(schema, prepared.seen.first,
+                                  prepared.seen.second,
+                                  std::move(prepared.duplicate), callback,
+                                  positional.introduced));
     }
   }
 
