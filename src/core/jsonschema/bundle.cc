@@ -1166,18 +1166,6 @@ auto rewrite_into_what_elevation_moved(
   return covered;
 }
 
-// Whether what a reference named inside a remote is somewhere elevation moved
-// it to. Where that went is settled once the document is finished, and the
-// pass that settles it refuses a reference that named nothing there, so asking
-// here would hold the reference against a place the remote no longer keeps
-auto elevation_moved_what_it_named(const Pointer &named,
-                                   const std::vector<Elevated> &elevated)
-    -> bool {
-  return std::ranges::any_of(elevated, [&named](const auto &moved) -> bool {
-    return reaches_into(named, moved.at);
-  });
-}
-
 // Where a reference was written, which is the document it arrived in rather
 // than the one it ends up in. A refusal names it there, and this pass reads the
 // finished document, so what went in is what says which of those a place
@@ -2156,19 +2144,6 @@ auto refuse_what_nothing_answers(const Reading &reading, const JSON &schema,
 
     const auto &answering{answers_to(known, asked.identifier)};
 
-    // Elevation lifts a resource out of the copy that landed, so a place named
-    // inside one is no longer where the reference that named it said. Settling
-    // has already put that reference onto where it went, which leaves nothing
-    // here to ask after
-    const auto elevated{positional.elevations.find(answering)};
-    if (elevated != positional.elevations.cend()) {
-      const auto named{fragment_to_pointer(destination)};
-      if (named.has_value() &&
-          elevation_moved_what_it_named(named.value(), elevated->second)) {
-        continue;
-      }
-    }
-
     const auto canonical{canonical_uri(answering)};
     const auto waiting{known.pending.find(canonical)};
     const auto settled{known.placements.find(canonical)};
@@ -2337,18 +2312,8 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
       const auto &answering{answers_to(known, identifier)};
       const auto pending{known.pending.find(canonical_uri(answering))};
       const auto placement{known.placements.find(canonical_uri(answering))};
-      const auto elevated{positional.elevations.find(answering)};
-      auto moved_away{false};
-      if (elevated != positional.elevations.cend() &&
-          reference.fragment.has_value() &&
-          !reference.fragment.value().empty()) {
-        const auto named{fragment_to_pointer(URI{reference.destination})};
-        moved_away = named.has_value() && elevation_moved_what_it_named(
-                                              named.value(), elevated->second);
-      }
-
       if (reference.fragment.has_value() &&
-          !reference.fragment.value().empty() && !moved_away &&
+          !reference.fragment.value().empty() &&
           (pending != known.pending.cend() ||
            placement != known.placements.cend())) {
         // What it was read under is what it was recorded with, as a resource
