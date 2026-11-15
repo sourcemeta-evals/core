@@ -1,0 +1,111 @@
+{
+  "schema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "a": {
+        "$ref": "https://example.com/marked"
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/marked": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect",
+      "properties": {
+        "b": {
+          "prefixItems": [
+            {
+              "$ref": "https://example.com/dep"
+            }
+          ]
+        }
+      }
+    },
+    "https://example.com/dep": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "const": 42
+    }
+  },
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "a": {
+          "$ref": "#/definitions/https:~1~1example.com~1marked"
+        }
+      },
+      "definitions": {
+        "https://example.com/dep": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "const": 42,
+          "$id": "https://example.com/dep"
+        },
+        "https://example.com/marked": {
+          "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect",
+          "properties": {
+            "b": {
+              "prefixItems": [
+                {
+                  "$ref": "https://example.com/dep",
+                  "x-sourcemeta-dialect-override-subschema": "https://json-schema.org/draft/2020-12/schema"
+                }
+              ],
+              "x-sourcemeta-dialect-override-subschema": "https://json-schema.org/draft/2020-12/schema"
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "a": {
+          "$ref": "#/definitions/https:~1~1example.com~1marked"
+        }
+      },
+      "definitions": {
+        "https://example.com/dep": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "const": 42,
+          "$id": "https://example.com/dep"
+        },
+        "https://example.com/marked": {
+          "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect",
+          "properties": {
+            "b": {
+              "prefixItems": [
+                {
+                  "$ref": "https://example.com/dep",
+                  "x-sourcemeta-dialect-override-subschema": "https://json-schema.org/draft/2020-12/schema"
+                }
+              ],
+              "x-sourcemeta-dialect-override-subschema": "https://json-schema.org/draft/2020-12/schema"
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/dep",
+        "at": "/definitions/https:~1~1example.com~1dep"
+      },
+      {
+        "from": "https://example.com/marked",
+        "at": "/definitions/https:~1~1example.com~1marked"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/dep",
+        "at": "/definitions/https:~1~1example.com~1dep"
+      },
+      {
+        "from": "https://example.com/marked",
+        "at": "/definitions/https:~1~1example.com~1marked"
+      }
+    ]
+  }
+}

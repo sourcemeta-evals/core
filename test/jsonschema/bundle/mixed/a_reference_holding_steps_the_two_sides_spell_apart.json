@@ -1,0 +1,245 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/pet"
+  },
+  "resolver": {
+    "https://example.com/pet": {
+      "allOf": [
+        {
+          "properties": {
+            "1": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://example.com/plain",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "self": {
+                  "$ref": "https://example.com/pet#/allOf/0/properties/1/properties/name"
+                },
+                "leading": {
+                  "$ref": "https://example.com/pet#/allOf/0/properties/01/properties/name"
+                },
+                "huge": {
+                  "$ref": "https://example.com/pet#/allOf/0/properties/18446744073709551616/properties/name"
+                },
+                "dash": {
+                  "$ref": "https://example.com/pet#/allOf/0/properties/-/properties/name"
+                },
+                "max": {
+                  "$ref": "https://example.com/pet#/allOf/0/properties/18446744073709551615/properties/name"
+                }
+              }
+            },
+            "01": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://example.com/leading",
+              "properties": {
+                "name": {
+                  "type": "integer"
+                }
+              }
+            },
+            "18446744073709551616": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://example.com/huge",
+              "properties": {
+                "name": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "-": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://example.com/dash",
+              "properties": {
+                "name": {
+                  "type": "number"
+                }
+              }
+            },
+            "18446744073709551615": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://example.com/max",
+              "properties": {
+                "name": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "defaultDialect": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect",
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/$defs/https:~1~1example.com~1pet",
+      "$defs": {
+        "https://example.com/pet": {
+          "allOf": [
+            {
+              "properties": {
+                "1": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/plain",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "self": {
+                      "$ref": "https://example.com/plain#/properties/name"
+                    },
+                    "leading": {
+                      "$ref": "https://example.com/leading#/properties/name"
+                    },
+                    "huge": {
+                      "$ref": "https://example.com/huge#/properties/name"
+                    },
+                    "dash": {
+                      "$ref": "https://example.com/dash#/properties/name"
+                    },
+                    "max": {
+                      "$ref": "https://example.com/max#/properties/name"
+                    }
+                  }
+                },
+                "01": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/leading",
+                  "properties": {
+                    "name": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "18446744073709551616": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/huge",
+                  "properties": {
+                    "name": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "-": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/dash",
+                  "properties": {
+                    "name": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "18446744073709551615": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/max",
+                  "properties": {
+                    "name": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
+            }
+          ],
+          "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/$defs/https:~1~1example.com~1pet",
+      "$defs": {
+        "https://example.com/pet": {
+          "allOf": [
+            {
+              "properties": {
+                "1": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/plain",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "self": {
+                      "$ref": "https://example.com/plain#/properties/name"
+                    },
+                    "leading": {
+                      "$ref": "https://example.com/leading#/properties/name"
+                    },
+                    "huge": {
+                      "$ref": "https://example.com/huge#/properties/name"
+                    },
+                    "dash": {
+                      "$ref": "https://example.com/dash#/properties/name"
+                    },
+                    "max": {
+                      "$ref": "https://example.com/max#/properties/name"
+                    }
+                  }
+                },
+                "01": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/leading",
+                  "properties": {
+                    "name": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "18446744073709551616": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/huge",
+                  "properties": {
+                    "name": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "-": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/dash",
+                  "properties": {
+                    "name": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "18446744073709551615": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/max",
+                  "properties": {
+                    "name": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
+            }
+          ],
+          "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/pet",
+        "at": "/$defs/https:~1~1example.com~1pet"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/pet",
+        "at": "/$defs/https:~1~1example.com~1pet"
+      }
+    ]
+  }
+}

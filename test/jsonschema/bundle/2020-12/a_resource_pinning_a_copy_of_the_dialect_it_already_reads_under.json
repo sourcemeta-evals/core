@@ -1,0 +1,126 @@
+{
+  "schema": {
+    "$schema": "https://example.com/meta/outer.json",
+    "$defs": {
+      "child": {
+        "$id": "https://example.com/child",
+        "$schema": "https://example.com/meta/outer.json",
+        "$defs": {
+          "meta": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://example.com/meta/outer.json",
+            "$vocabulary": {
+              "https://json-schema.org/draft/2020-12/vocab/core": true,
+              "https://json-schema.org/draft/2020-12/vocab/applicator": true
+            }
+          }
+        },
+        "properties": {
+          "a": {
+            "properties": {
+              "b": {
+                "$ref": "https://www.sourcemeta.com/deep"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/meta/outer.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/meta/outer.json",
+      "$vocabulary": {
+        "https://json-schema.org/draft/2020-12/vocab/core": true
+      }
+    },
+    "https://www.sourcemeta.com/deep": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://www.sourcemeta.com/deep",
+      "type": "string"
+    }
+  },
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://example.com/meta/outer.json",
+      "$defs": {
+        "child": {
+          "$id": "https://example.com/child",
+          "$schema": "https://example.com/meta/outer.json",
+          "$defs": {
+            "meta": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://example.com/meta/outer.json",
+              "$vocabulary": {
+                "https://json-schema.org/draft/2020-12/vocab/core": true,
+                "https://json-schema.org/draft/2020-12/vocab/applicator": true
+              }
+            }
+          },
+          "properties": {
+            "a": {
+              "properties": {
+                "b": {
+                  "$ref": "https://www.sourcemeta.com/deep"
+                }
+              }
+            }
+          }
+        },
+        "https://www.sourcemeta.com/deep": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://www.sourcemeta.com/deep",
+          "type": "string"
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://example.com/meta/outer.json",
+      "$defs": {
+        "child": {
+          "$id": "https://example.com/child",
+          "$schema": "https://example.com/meta/outer.json",
+          "$defs": {
+            "meta": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://example.com/meta/outer.json",
+              "$vocabulary": {
+                "https://json-schema.org/draft/2020-12/vocab/core": true,
+                "https://json-schema.org/draft/2020-12/vocab/applicator": true
+              }
+            }
+          },
+          "properties": {
+            "a": {
+              "properties": {
+                "b": {
+                  "$ref": "https://www.sourcemeta.com/deep"
+                }
+              }
+            }
+          }
+        },
+        "https://www.sourcemeta.com/deep": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://www.sourcemeta.com/deep",
+          "type": "string"
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://www.sourcemeta.com/deep",
+        "at": "/$defs/https:~1~1www.sourcemeta.com~1deep"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://www.sourcemeta.com/deep",
+        "at": "/$defs/https:~1~1www.sourcemeta.com~1deep"
+      }
+    ]
+  }
+}

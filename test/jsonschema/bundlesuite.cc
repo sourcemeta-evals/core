@@ -4,10 +4,10 @@
 #include <sourcemeta/core/jsonpointer.h>
 #include <sourcemeta/core/jsonschema.h>
 
-#include <algorithm>   // std::ranges::find, std::ranges::any_of
-#include <array>       // std::array
-#include <cstddef>     // std::size_t
-#include <cstdint>     // std::uint64_t
+#include <algorithm> // std::ranges::find, std::ranges::any_of, std::ranges::sort
+#include <array>     // std::array
+#include <cstddef>   // std::size_t
+#include <cstdint>   // std::uint64_t
 #include <filesystem>  // std::filesystem
 #include <iostream>    // std::cerr
 #include <limits>      // std::numeric_limits
@@ -16,7 +16,7 @@
 #include <string>      // std::string
 #include <string_view> // std::string_view
 #include <utility>     // std::pair
-#include <vector>      // std::vector
+#include <vector>      // std::erase_if, std::vector
 
 namespace {
 
@@ -37,10 +37,12 @@ const std::vector<std::string> KNOWN_ERROR_TYPES{
     "SchemaReferenceError",
     "SchemaReferenceObjectResourceError",
     "SchemaUnknownBaseDialectError",
+    "SchemaContainerError",
+    "SchemaDialectImpossibleError",
     "SchemaFrameLimitError"};
 
-const std::vector<std::string> KNOWN_ERROR_KEYS{"type", "message", "identifier",
-                                                "location", "limit"};
+const std::vector<std::string> KNOWN_ERROR_KEYS{
+    "type", "message", "identifier", "location", "keyword", "dialect", "limit"};
 // NOLINTEND(cert-err58-cpp,bugprone-throwing-static-initialization)
 
 struct Mode {
@@ -208,14 +210,37 @@ auto to_json(const Insertions &insertions) -> sourcemeta::core::JSON {
   return result;
 }
 
+// The callback says nothing about the order it reports insertions in, so a
+// fixture that stated one would hold a solution to an order that is not part
+// of what bundling promises
+auto sorted_insertions(const sourcemeta::core::JSON &insertions)
+    -> sourcemeta::core::JSON {
+  std::vector<sourcemeta::core::JSON> entries{insertions.as_array().cbegin(),
+                                              insertions.as_array().cend()};
+  std::ranges::sort(entries, [](const auto &left, const auto &right) -> bool {
+    if (left.at("from") == right.at("from")) {
+      return left.at("at") < right.at("at");
+    }
+
+    return left.at("from") < right.at("from");
+  });
+
+  auto result{sourcemeta::core::JSON::make_array()};
+  for (auto &entry : entries) {
+    result.push_back(std::move(entry));
+  }
+
+  return result;
+}
+
 auto expect_insertions(const std::string_view mode, const Insertions &actual,
                        const sourcemeta::core::JSON &expected) -> void {
   auto actual_entry{sourcemeta::core::JSON::make_object()};
   actual_entry.assign("mode", sourcemeta::core::JSON{mode});
-  actual_entry.assign("inserted", to_json(actual));
+  actual_entry.assign("inserted", sorted_insertions(to_json(actual)));
   auto expected_entry{sourcemeta::core::JSON::make_object()};
   expected_entry.assign("mode", sourcemeta::core::JSON{mode});
-  expected_entry.assign("inserted", expected);
+  expected_entry.assign("inserted", sorted_insertions(expected));
 
   EXPECT_EQ(actual_entry, expected_entry);
 }
@@ -230,6 +255,12 @@ auto expect_insertions(const std::string_view mode, const Insertions &actual,
 // the dialect traverses, and one it does not traverse never settles no matter
 // what this returns. Handing back fewer paths can only make the next pass
 // embed more and fail louder, never pass when it should not
+//
+// Which of two nested insertions survives cannot depend on which the callback
+// reported first, as nothing promises an order. The outermost is the one to
+// keep, since framing it reaches what sits inside it, whereas keeping only the
+// inner one leaves the resource around it unframed and the next pass embeds a
+// second copy of what it can no longer see
 auto with_insertions(const Inputs &inputs, const Insertions &insertions)
     -> Inputs {
   Inputs result;
@@ -237,8 +268,12 @@ auto with_insertions(const Inputs &inputs, const Insertions &insertions)
   result.default_id = inputs.default_id;
   result.default_base = inputs.default_base;
   result.container = inputs.container;
+  // Where a fixture named no pointers of its own, this pass frames what the
+  // one before it framed, as naming none and naming nothing but the root ask
+  // for different documents to be framed. Neither selection points into what
+  // the fixture owns, so there is nothing to carry
   if (inputs.path_storage.empty()) {
-    result.paths.push_back(sourcemeta::core::EMPTY_WEAK_POINTER);
+    result.paths = inputs.paths;
     return result;
   }
 
@@ -247,6 +282,26 @@ auto with_insertions(const Inputs &inputs, const Insertions &insertions)
                              inputs.path_storage.cbegin(),
                              inputs.path_storage.cend());
   for (const auto &insertion : insertions) {
+    // Framing takes paths that do not sit inside one another, and where a
+    // container is itself within a framed schema its entries are already
+    // covered by the path that covers it. What has been gathered so far is
+    // what each one is held against, so the invariant holds over the whole set
+    // rather than over the ones the fixture started with
+    if (std::ranges::any_of(result.path_storage,
+                            [&insertion](const auto &path) -> bool {
+                              return insertion.second.starts_with(path);
+                            })) {
+      continue;
+    }
+
+    // An insertion that contains one already gathered takes its place, while
+    // what the fixture itself asked to be framed is left alone
+    std::erase_if(result.path_storage,
+                  [&insertion, &inputs](const auto &path) -> bool {
+                    return path.starts_with(insertion.second) &&
+                           std::ranges::find(inputs.path_storage, path) ==
+                               inputs.path_storage.cend();
+                  });
     result.path_storage.push_back(insertion.second);
   }
   result.paths.reserve(result.path_storage.size());
@@ -297,7 +352,13 @@ auto check_shape(const sourcemeta::core::JSON &test) -> void {
                     type == "SchemaReferenceError" ||
                     type == "SchemaReferenceObjectResourceError");
       EXPECT_EQ(entry.second.defines("location"),
-                type == "SchemaReferenceError");
+                type == "SchemaReferenceError" ||
+                    type == "SchemaContainerError" ||
+                    type == "SchemaDialectImpossibleError");
+      EXPECT_EQ(entry.second.defines("keyword"),
+                type == "SchemaDialectImpossibleError");
+      EXPECT_EQ(entry.second.defines("dialect"),
+                type == "SchemaDialectImpossibleError");
       EXPECT_EQ(entry.second.defines("limit"), type == "SchemaFrameLimitError");
     }
   }
@@ -376,6 +437,30 @@ auto check_error(const sourcemeta::core::JSON &schema,
       EXPECT_STREQ(error.what(), message.c_str());
       EXPECT_EQ(error.identifier(), expected.at("identifier").to_string());
     }
+  } else if (type == "SchemaContainerError") {
+    try {
+      Insertions insertions;
+      [[maybe_unused]] const auto document{bundle_schema(
+          schema, resolver, inputs, mode, inputs.max_locations, insertions)};
+      FAIL();
+    } catch (const sourcemeta::core::SchemaContainerError &error) {
+      EXPECT_STREQ(error.what(), message.c_str());
+      EXPECT_EQ(sourcemeta::core::to_string(error.location()),
+                expected.at("location").to_string());
+    }
+  } else if (type == "SchemaDialectImpossibleError") {
+    try {
+      Insertions insertions;
+      [[maybe_unused]] const auto document{bundle_schema(
+          schema, resolver, inputs, mode, inputs.max_locations, insertions)};
+      FAIL();
+    } catch (const sourcemeta::core::SchemaDialectImpossibleError &error) {
+      EXPECT_STREQ(error.what(), message.c_str());
+      EXPECT_EQ(error.keyword(), expected.at("keyword").to_string());
+      EXPECT_EQ(error.dialect(), expected.at("dialect").to_string());
+      EXPECT_EQ(sourcemeta::core::to_string(error.location()),
+                expected.at("location").to_string());
+    }
   } else if (type == "SchemaUnknownBaseDialectError") {
     try {
       Insertions insertions;
@@ -434,12 +519,34 @@ auto run_bundle_test(const sourcemeta::core::JSON &test) -> void {
     // The limit is a budget rather than semantics, and the output is larger
     // than the input it came from, so this pass spends whatever it needs
     const auto settled{with_insertions(inputs, insertions)};
+
+    // What bundling produced has to stand on its own, which the expected
+    // output cannot say by itself, as a reference that resolves nowhere reads
+    // the same as one that does. Meta-schemas are the exception, since the
+    // References mode leaves the ones it did not pull in where they are
+    const sourcemeta::core::SchemaFrame frame{
+        sourcemeta::core::SchemaFrame::Mode::References,
+        document,
+        sourcemeta::core::schema_walker,
+        resolver,
+        settled.default_dialect,
+        settled.default_id,
+        sourcemeta::core::SchemaFrame::IdentifierMode::Additional,
+        settled.paths,
+        settled.default_base};
+    EXPECT_TRUE(frame.standalone_ignoring_metaschemas());
+
     Insertions repeated;
     expect_equal(mode.name,
                  bundle_schema(document, resolver, settled, mode,
                                std::numeric_limits<std::uint64_t>::max(),
                                repeated),
                  document);
+
+    // An output that stands on its own has nothing left to go and get, which
+    // the comparison above cannot say on its own, as a pass that reports work
+    // it did not need to do leaves the document exactly as it found it
+    EXPECT_TRUE(repeated.empty());
   }
 }
 

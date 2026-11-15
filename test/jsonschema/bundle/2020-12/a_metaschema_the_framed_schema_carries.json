@@ -1,0 +1,84 @@
+{
+  "schema": {
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "https://example.com/b",
+      "$defs": {
+        "https://example.com/meta": {
+          "$id": "https://example.com/meta",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$vocabulary": {
+            "https://json-schema.org/draft/2020-12/vocab/core": true
+          }
+        }
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/b": {
+      "$schema": "https://example.com/meta",
+      "$id": "https://example.com/b",
+      "type": "string"
+    }
+  },
+  "paths": [
+    "/schema"
+  ],
+  "container": "/schema/$defs",
+  "result": {
+    "nonOfficialMetaschemas": {
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$ref": "https://example.com/b",
+        "$defs": {
+          "https://example.com/meta": {
+            "$id": "https://example.com/meta",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$vocabulary": {
+              "https://json-schema.org/draft/2020-12/vocab/core": true
+            }
+          },
+          "https://example.com/b": {
+            "$schema": "https://example.com/meta",
+            "$id": "https://example.com/b",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "references": {
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$ref": "https://example.com/b",
+        "$defs": {
+          "https://example.com/meta": {
+            "$id": "https://example.com/meta",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$vocabulary": {
+              "https://json-schema.org/draft/2020-12/vocab/core": true
+            }
+          },
+          "https://example.com/b": {
+            "$schema": "https://example.com/meta",
+            "$id": "https://example.com/b",
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/b",
+        "at": "/schema/$defs/https:~1~1example.com~1b"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/b",
+        "at": "/schema/$defs/https:~1~1example.com~1b"
+      }
+    ]
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "properties": {
+      "a": {
+        "$ref": "https://example.com/remote"
+      },
+      "b": {
+        "$ref": "https://example.com/remote#/$defs/0"
+      }
+    },
+    "$defs": {
+      "known": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://example.com/dup",
+        "type": "string"
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/remote": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/remote",
+      "$defs": {
+        "0": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/dup",
+          "type": "string"
+        }
+      }
+    }
+  },
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "properties": {
+        "a": {
+          "$ref": "https://example.com/remote"
+        },
+        "b": {
+          "$ref": "https://example.com/dup"
+        }
+      },
+      "$defs": {
+        "known": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/dup",
+          "type": "string"
+        },
+        "https://example.com/remote": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/remote"
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "properties": {
+        "a": {
+          "$ref": "https://example.com/remote"
+        },
+        "b": {
+          "$ref": "https://example.com/dup"
+        }
+      },
+      "$defs": {
+        "known": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/dup",
+          "type": "string"
+        },
+        "https://example.com/remote": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/remote"
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/remote",
+        "at": "/$defs/https:~1~1example.com~1remote"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/remote",
+        "at": "/$defs/https:~1~1example.com~1remote"
+      }
+    ]
+  }
+}

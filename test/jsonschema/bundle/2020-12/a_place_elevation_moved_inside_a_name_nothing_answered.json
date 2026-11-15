@@ -1,0 +1,129 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "x": {
+        "$ref": "https://example.com/realpet#/$defs/https:~1~1x~1t"
+      },
+      "y": {
+        "$ref": "https://example.com/B"
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/B": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/B",
+      "properties": {
+        "p": {
+          "$ref": "https://example.com/pet"
+        }
+      }
+    },
+    "https://example.com/pet": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/realpet",
+      "$defs": {
+        "https://x/t": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://x/t",
+          "type": "string"
+        }
+      }
+    }
+  },
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "x": {
+          "$ref": "https://x/t"
+        },
+        "y": {
+          "$ref": "https://example.com/B"
+        }
+      },
+      "$defs": {
+        "https://x/t": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://x/t",
+          "type": "string"
+        },
+        "https://example.com/realpet": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/realpet"
+        },
+        "https://example.com/B": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/B",
+          "properties": {
+            "p": {
+              "$ref": "https://example.com/realpet"
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "x": {
+          "$ref": "https://x/t"
+        },
+        "y": {
+          "$ref": "https://example.com/B"
+        }
+      },
+      "$defs": {
+        "https://x/t": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://x/t",
+          "type": "string"
+        },
+        "https://example.com/realpet": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/realpet"
+        },
+        "https://example.com/B": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/B",
+          "properties": {
+            "p": {
+              "$ref": "https://example.com/realpet"
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://x/t",
+        "at": "/$defs/https:~1~1x~1t"
+      },
+      {
+        "from": "https://example.com/realpet",
+        "at": "/$defs/https:~1~1example.com~1realpet"
+      },
+      {
+        "from": "https://example.com/B",
+        "at": "/$defs/https:~1~1example.com~1B"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://x/t",
+        "at": "/$defs/https:~1~1x~1t"
+      },
+      {
+        "from": "https://example.com/realpet",
+        "at": "/$defs/https:~1~1example.com~1realpet"
+      },
+      {
+        "from": "https://example.com/B",
+        "at": "/$defs/https:~1~1example.com~1B"
+      }
+    ]
+  }
+}

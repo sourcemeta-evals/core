@@ -1,0 +1,45 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "allOf": [
+      {
+        "$ref": "https://example.com/b"
+      },
+      {
+        "$ref": "https://example.com/a"
+      }
+    ]
+  },
+  "resolver": {
+    "https://example.com/a": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object"
+    },
+    "https://example.com/b": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/b",
+      "allOf": [
+        {
+          "$ref": "https://example.com/a#/$id"
+        }
+      ]
+    }
+  },
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaReferenceError",
+      "message": "Could not resolve schema reference",
+      "identifier": "https://example.com/a#/$id",
+      "location": "/allOf/0/$ref"
+    },
+    "references": {
+      "type": "SchemaReferenceError",
+      "message": "Could not resolve schema reference",
+      "identifier": "https://example.com/a#/$id",
+      "location": "/allOf/0/$ref"
+    }
+  },
+  "result": {},
+  "inserted": {}
+}

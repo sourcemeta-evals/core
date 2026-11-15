@@ -1,0 +1,19 @@
+{
+  "schema": true,
+  "defaultDialect": "https://json-schema.org/draft/2020-12/schema",
+  "container": "/$defs",
+  "result": {},
+  "inserted": {},
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaContainerError",
+      "message": "Could not bundle to a container that is not an object",
+      "location": "/$defs"
+    },
+    "references": {
+      "type": "SchemaContainerError",
+      "message": "Could not bundle to a container that is not an object",
+      "location": "/$defs"
+    }
+  }
+}

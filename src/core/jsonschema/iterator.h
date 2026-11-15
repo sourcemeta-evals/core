@@ -5,15 +5,18 @@
 
 #include <sourcemeta/core/jsonschema.h>
 
+#include <sourcemeta/core/uri.h>
+
 #include "helpers.h"
 
-#include <cassert>     // assert
-#include <cstddef>     // std::size_t
-#include <functional>  // std::cref, std::reference_wrapper
-#include <optional>    // std::optional, std::nullopt
-#include <string_view> // std::string_view
-#include <utility>     // std::move
-#include <vector>      // std::vector
+#include <cassert>      // assert
+#include <cstddef>      // std::size_t
+#include <forward_list> // std::forward_list
+#include <functional>   // std::cref, std::reference_wrapper
+#include <optional>     // std::optional, std::nullopt
+#include <string_view>  // std::string_view
+#include <utility>      // std::move
+#include <vector>       // std::vector
 
 namespace sourcemeta::core {
 
@@ -27,12 +30,18 @@ struct SubschemaEntry {
   std::reference_wrapper<const sourcemeta::core::JSON> subschema;
   bool orphan;
   bool property_name;
+  // What answered for the dialect in force, where the document carries it
+  // rather than anything outside answering for it. Whoever holds this walk's
+  // result would otherwise have to settle that name again without the scopes
+  // the walk had, and a name whose chain reaches across them would be lost
+  const sourcemeta::core::JSON *embedded_metaschema{nullptr};
 };
 
 struct DialectInfo {
   std::string_view dialect;
   sourcemeta::core::SchemaBaseDialect base_dialect;
   bool override_active;
+  bool names_itself;
 };
 
 // An identifier only counts where the dialect in force gives the keyword that
@@ -99,6 +108,24 @@ inline auto declaration_counts(const sourcemeta::core::JSON &subschema,
       "$schema"sv);
 }
 
+// Whether a name a place wrote for itself makes a resource of that place. One
+// that is nothing but a fragment leaves the place within whatever resource
+// encloses it instead, where a dialect spells such names that way at all.
+// Input that is no name at all is nobody's to turn down here, as whatever goes
+// on to read the identifier refuses it in terms that say which keyword carried
+// it, so it is passed on rather than quietly held to say nothing
+inline auto names_a_resource(const std::string_view identifier) -> bool {
+  if (identifier.empty()) {
+    return false;
+  }
+
+  try {
+    return !sourcemeta::core::URI{identifier}.is_fragment_only();
+  } catch (const sourcemeta::core::URIParseError &) {
+    return true;
+  }
+}
+
 inline auto
 resolve_dialect_at(const sourcemeta::core::JSON &subschema,
                    const std::string_view inherited_dialect,
@@ -142,7 +169,8 @@ resolve_dialect_at(const sourcemeta::core::JSON &subschema,
   if (!override_active && level > 0 && identifier.empty()) {
     return {.dialect = inherited_dialect,
             .base_dialect = inherited_base,
-            .override_active = false};
+            .override_active = false,
+            .names_itself = false};
   }
   const auto resolved_base{
       local != inherited_dialect
@@ -150,9 +178,39 @@ resolve_dialect_at(const sourcemeta::core::JSON &subschema,
                                            allow_dialect_override)
                 .value_or(inherited_base)
           : inherited_base};
+  // A name that is nothing but a fragment leaves the place within whatever
+  // resource encloses it rather than making one of its own, where a dialect
+  // spells such names this way at all, and says nothing anywhere else
   return {.dialect = local,
           .base_dialect = resolved_base,
-          .override_active = override_active};
+          .override_active = override_active,
+          .names_itself = names_a_resource(identifier)};
+}
+
+// A meta-schema is looked for in the nearest schema that pinned one, then in
+// each schema enclosing that, before anything outside the document is asked.
+// The result borrows the chain and the resolver, so it must not outlive either
+inline auto
+resolver_within_scopes(const PinnedScope &innermost,
+                       const sourcemeta::core::SchemaResolver &resolver)
+    -> sourcemeta::core::SchemaResolver {
+  return [&innermost, &resolver](const std::string_view target)
+             -> sourcemeta::core::SchemaResolverResult {
+    // A dialect a base dialect answers for is published rather than carried,
+    // so nothing a document holds stands in front of one
+    if (!sourcemeta::core::to_base_dialect(target).has_value()) {
+      for (const auto *scope{&innermost}; scope != nullptr;
+           scope = scope->enclosing) {
+        const auto *embedded{sourcemeta::core::metaschema_try_embedded(
+            *scope->holder, target, resolver, &innermost)};
+        if (embedded != nullptr) {
+          return *embedded;
+        }
+      }
+    }
+
+    return resolver(target);
+  };
 }
 
 // A subschema that the traversal has discovered but not visited yet
@@ -165,6 +223,9 @@ struct PendingSubschema {
   std::size_t level;
   bool orphan;
   bool property_name;
+  // Where this one has to go on looking for the dialect in force, which is
+  // every schema above it that pinned one, nearest first
+  const PinnedScope *pinned_within{nullptr};
 };
 
 inline auto enqueue(std::vector<PendingSubschema> &children,
@@ -199,6 +260,9 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
      const sourcemeta::core::SchemaBaseDialect root_base_dialect,
      const std::size_t root_level, const bool root_orphan,
      const bool root_property_name) -> void {
+  // Every scope the walk has entered, in a container that never relocates
+  // what it holds, as the subschemas below each of them keep pointers into it
+  std::forward_list<PinnedScope> scopes;
   std::vector<PendingSubschema> pending;
   pending.push_back({.parent = root_parent,
                      .pointer = root_pointer,
@@ -207,7 +271,8 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
                      .base_dialect = root_base_dialect,
                      .level = root_level,
                      .orphan = root_orphan,
-                     .property_name = root_property_name});
+                     .property_name = root_property_name,
+                     .pinned_within = nullptr});
 
   std::vector<PendingSubschema> children;
   while (!pending.empty()) {
@@ -226,6 +291,16 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     if (!subschema.is_object() && !subschema.is_boolean()) {
       continue;
     }
+
+    // Inheriting a dialect without inheriting where it was found leaves this
+    // asking for a meta-schema the document already holds, so every schema
+    // that pinned one stays in scope for everything below it
+    std::optional<sourcemeta::core::SchemaResolver> scoped;
+    if (current.pinned_within != nullptr) {
+      scoped.emplace(resolver_within_scopes(*current.pinned_within, resolver));
+    }
+
+    const auto &effective{scoped.has_value() ? scoped.value() : resolver};
 
     // Recalculate the dialect and its vocabularies at every step.
     // This is needed for correctly traversing through schemas that
@@ -247,7 +322,7 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
         sourcemeta::core::ref_overrides_adjacent_keywords(base_dialect)};
 
     const auto entry{resolve_dialect_at(subschema, dialect, base_dialect,
-                                        resolver, walker, level,
+                                        effective, walker, level,
                                         !enclosing_ref_overrides)};
     const auto current_dialect{entry.dialect};
     const auto current_base_dialect{entry.base_dialect};
@@ -257,7 +332,14 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     // same way we do at the document root, so that nested self-contained
     // meta-schemas resolve to their embedded definition before the resolver
     const auto vocabularies{sourcemeta::core::vocabularies_with_embedded(
-        subschema, resolver, current_base_dialect, current_dialect)};
+        subschema, effective, current_base_dialect, current_dialect)};
+
+    const auto *embedded_metaschema{
+        sourcemeta::core::to_base_dialect(current_dialect).has_value()
+            ? nullptr
+            : sourcemeta::core::metaschema_try_embedded(
+                  subschema, current_dialect, effective,
+                  current.pinned_within)};
 
     // A schema that names its dialect through a keyword that very dialect
     // leaves undefined cannot be taken at its word, because honouring it would
@@ -267,7 +349,7 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
       const auto *declared{
           subschema.try_at("$schema"sv, JSONSCHEMA_HASH_SCHEMA)};
       if (declared != nullptr && declared->is_string() &&
-          !declaration_counts(subschema, declared->to_string(), resolver,
+          !declaration_counts(subschema, declared->to_string(), effective,
                               walker)) {
         throw sourcemeta::core::SchemaDialectImpossibleError(
             "$schema", declared->to_string(),
@@ -282,7 +364,8 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
                                   .base_dialect = current_base_dialect,
                                   .subschema = subschema,
                                   .orphan = orphan,
-                                  .property_name = property_name};
+                                  .property_name = property_name,
+                                  .embedded_metaschema = embedded_metaschema};
     subschemas.push_back(std::move(iterator_entry));
 
     // We can't recurse any further
@@ -292,10 +375,26 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
 
     const auto child{entry.override_active
                          ? resolve_dialect_at(subschema, dialect, base_dialect,
-                                              resolver, walker, level, false)
+                                              effective, walker, level, false)
                          : entry};
     const auto child_dialect{child.dialect};
     const auto child_base_dialect{child.base_dialect};
+
+    // A meta-schema a schema carries speaks for whatever sits within that
+    // schema, which is a question of where the copy sits rather than of what
+    // the schema holding it reads under: one that carries a dialect for a
+    // resource below it reads under whatever it likes, and a copy that answers
+    // for nothing below it is asked and hands nothing back. Only a schema that
+    // answers to a name encloses anything in its own right, and the schema the
+    // walk started from is the caller's own to answer for, which is why a scope
+    // of ours never stands in front of the caller's there
+    const auto *pinned_within{current.pinned_within};
+    if (child.names_itself && &subschema != &root_subschema &&
+        sourcemeta::core::holds_embedded_candidates(subschema)) {
+      scopes.push_front(
+          {.holder = &subschema, .enclosing = current.pinned_within});
+      pinned_within = &scopes.front();
+    }
 
     const auto has_overriding_ref{
         subschema.defines("$ref"sv, JSONSCHEMA_HASH_REF) &&
@@ -549,6 +648,7 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     // Push in reverse so that the first child is popped first, which keeps the
     // resulting order identical to a depth-first recursive traversal
     while (!children.empty()) {
+      children.back().pinned_within = pinned_within;
       pending.push_back(std::move(children.back()));
       children.pop_back();
     }

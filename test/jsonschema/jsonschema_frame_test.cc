@@ -172,6 +172,21 @@ static auto metaschema_test_resolver(std::string_view identifier)
   return sourcemeta::core::schema_resolver(identifier);
 }
 
+static auto narrow_metaschema_test_resolver(std::string_view identifier)
+    -> sourcemeta::core::SchemaResolverResult {
+  if (identifier == "https://example.com/narrow") {
+    return sourcemeta::core::parse_json(R"JSON({
+      "$id": "https://example.com/narrow",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$vocabulary": {
+        "https://json-schema.org/draft/2020-12/vocab/core": true
+      }
+    })JSON");
+  }
+
+  return sourcemeta::core::schema_resolver(identifier);
+}
+
 TEST(to_json_mode_references_with_tracking) {
   sourcemeta::core::PointerPositionTracker tracker;
   sourcemeta::core::JSON document{nullptr};
@@ -689,6 +704,94 @@ TEST(embedded_custom_metaschema_across_two_frames) {
   EXPECT_FALSE(
       root_vocabularies.contains(sourcemeta::core::SchemaVocabularies::Known::
                                      JSON_SCHEMA_2020_12_VALIDATION));
+}
+
+TEST(accessors_vocabularies_of_a_resource_that_carries_its_own_dialect) {
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://example.com/narrow",
+    "$id": "https://example.com/schema",
+    "$defs": {
+      "child": {
+        "$id": "https://example.com/child",
+        "$schema": "https://example.com/narrow",
+        "$defs": {
+          "https://example.com/narrow": {
+            "$id": "https://example.com/narrow",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$vocabulary": {
+              "https://json-schema.org/draft/2020-12/vocab/core": true,
+              "https://json-schema.org/draft/2020-12/vocab/applicator": true
+            }
+          }
+        }
+      }
+    }
+  })JSON");
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::References, document,
+      sourcemeta::core::schema_walker, narrow_metaschema_test_resolver};
+
+  // Asked of the schema whose dialect only the resolver answers for before
+  // the one that carries its own copy of it, as an answer settled before the
+  // copy was found would be the resolver's
+  const auto outer{frame.traverse("https://example.com/schema")};
+  EXPECT_TRUE(outer.has_value());
+  [[maybe_unused]] const auto &outer_vocabularies{
+      frame.vocabularies(outer->get(), narrow_metaschema_test_resolver)};
+
+  const auto inner{frame.traverse("https://example.com/child")};
+  EXPECT_TRUE(inner.has_value());
+  const auto &inner_vocabularies{
+      frame.vocabularies(inner->get(), narrow_metaschema_test_resolver)};
+  EXPECT_EQ(inner_vocabularies.size(), 2);
+  EXPECT_VOCABULARY_REQUIRED(inner_vocabularies, JSON_SCHEMA_2020_12_CORE);
+  EXPECT_VOCABULARY_REQUIRED(inner_vocabularies,
+                             JSON_SCHEMA_2020_12_APPLICATOR);
+
+  // Asked with nothing having been asked before it, as the copy the document
+  // carries is what answers either way
+  const sourcemeta::core::SchemaFrame asked_on_its_own{
+      sourcemeta::core::SchemaFrame::Mode::References, document,
+      sourcemeta::core::schema_walker, narrow_metaschema_test_resolver};
+
+  const auto alone{asked_on_its_own.traverse("https://example.com/child")};
+  EXPECT_TRUE(alone.has_value());
+  const auto &alone_vocabularies{asked_on_its_own.vocabularies(
+      alone->get(), narrow_metaschema_test_resolver)};
+  EXPECT_EQ(alone_vocabularies.size(), 2);
+  EXPECT_VOCABULARY_REQUIRED(alone_vocabularies, JSON_SCHEMA_2020_12_CORE);
+  EXPECT_VOCABULARY_REQUIRED(alone_vocabularies,
+                             JSON_SCHEMA_2020_12_APPLICATOR);
+}
+
+TEST(accessors_nothing_beside_a_reference_that_overrides_it_is_framed) {
+  // Where a dialect lets a reference override what sits beside it, nothing
+  // beside one is read as holding schemas, so a place the dialect reserves for
+  // definitions there is payload: what it holds answers to no name and sits at
+  // no place of the schema, however much it looks like a resource
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://example.com/remote",
+    "$ref": "https://example.com/second",
+    "definitions": {
+      "https://example.com/shared": {
+        "$id": "https://example.com/shared",
+        "type": "boolean"
+      }
+    }
+  })JSON");
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::References, document,
+      sourcemeta::core::schema_walker, sourcemeta::core::schema_resolver};
+
+  EXPECT_EQ(frame.location_count(), 1);
+  EXPECT_FALSE(frame.traverse("https://example.com/shared").has_value());
+  EXPECT_FALSE(frame
+                   .traverse(to_weak_pointer(TO_POINTER(
+                       "/definitions/https:~1~1example.com~1shared")))
+                   .has_value());
 }
 
 TEST(accessors_location_count) {
