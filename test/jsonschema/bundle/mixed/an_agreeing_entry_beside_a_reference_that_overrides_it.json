@@ -21,7 +21,7 @@
         "https://example.com/ignored": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/ignored",
-          "type": "boolean"
+          "type": "integer"
         }
       }
     },
@@ -50,13 +50,6 @@
         },
         "https://example.com/remote": {
           "$ref": "#/$defs/https:~1~1example.com~1second",
-          "x-definitions": {
-            "https://example.com/ignored": {
-              "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "$id": "https://example.com/ignored",
-              "type": "boolean"
-            }
-          },
           "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
         }
       }
@@ -80,13 +73,6 @@
         },
         "https://example.com/remote": {
           "$ref": "#/$defs/https:~1~1example.com~1second",
-          "x-definitions": {
-            "https://example.com/ignored": {
-              "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "$id": "https://example.com/ignored",
-              "type": "boolean"
-            }
-          },
           "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
         }
       }

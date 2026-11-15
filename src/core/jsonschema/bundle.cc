@@ -1802,16 +1802,6 @@ auto elevate_embedded_resources(
     return;
   }
 
-  // Where this dialect lets a reference override what sits beside it, a
-  // document that holds one at the top holds whatever else it holds for no
-  // reader at all. Lifting a resource out of there would put a name into the
-  // document that nothing asked for, and hold that name against whatever the
-  // caller already answers to, so what is read by nobody is left where it is
-  if (ref_overrides_adjacent_keywords(remote_dialect) &&
-      remote.defines("$ref"sv, JSONSCHEMA_HASH_REF)) {
-    return;
-  }
-
   // A schema finds a meta-schema it pins by looking for it among the locations
   // the specifications reserve, at the top of the document it is reading, and
   // which of those it reserves is its own dialect's answer. So what is pinned

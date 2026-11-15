@@ -1,0 +1,45 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "properties": {
+      "a": {
+        "$ref": "https://example.com/remote"
+      }
+    },
+    "$defs": {
+      "mine": {
+        "$id": "https://example.com/ignored",
+        "type": "integer"
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/remote": {
+      "$ref": "https://example.com/second",
+      "x-definitions": {
+        "https://example.com/ignored": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/ignored",
+          "type": "boolean"
+        }
+      }
+    },
+    "https://example.com/second": {
+      "type": "string"
+    }
+  },
+  "defaultDialect": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect",
+  "result": {},
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaError",
+      "message": "Conflicting embedded resources with the same identifier"
+    },
+    "references": {
+      "type": "SchemaError",
+      "message": "Conflicting embedded resources with the same identifier"
+    }
+  },
+  "inserted": {}
+}
