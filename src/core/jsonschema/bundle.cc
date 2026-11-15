@@ -1802,6 +1802,17 @@ auto elevate_embedded_resources(
     return;
   }
 
+  // Where a dialect lets a reference override what sits beside it, nothing
+  // beside one is read as holding schemas at all, so a place the dialect
+  // reserves for definitions there is payload rather than somewhere resources
+  // sit. A name written in it names nothing, which is why the walk goes
+  // straight past it, and lifting what sits there out would make a resource of
+  // the document out of something no reader of it would ever come upon
+  if (ref_overrides_adjacent_keywords(remote_dialect) &&
+      remote.defines("$ref"sv, JSONSCHEMA_HASH_REF)) {
+    return;
+  }
+
   // A schema finds a meta-schema it pins by looking for it among the locations
   // the specifications reserve, at the top of the document it is reading, and
   // which of those it reserves is its own dialect's answer. So what is pinned

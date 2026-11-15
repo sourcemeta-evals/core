@@ -765,6 +765,35 @@ TEST(accessors_vocabularies_of_a_resource_that_carries_its_own_dialect) {
                              JSON_SCHEMA_2020_12_APPLICATOR);
 }
 
+TEST(accessors_nothing_beside_a_reference_that_overrides_it_is_framed) {
+  // Where a dialect lets a reference override what sits beside it, nothing
+  // beside one is read as holding schemas, so a place the dialect reserves for
+  // definitions there is payload: what it holds answers to no name and sits at
+  // no place of the schema, however much it looks like a resource
+  const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://example.com/remote",
+    "$ref": "https://example.com/second",
+    "definitions": {
+      "https://example.com/shared": {
+        "$id": "https://example.com/shared",
+        "type": "boolean"
+      }
+    }
+  })JSON");
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::References, document,
+      sourcemeta::core::schema_walker, sourcemeta::core::schema_resolver};
+
+  EXPECT_EQ(frame.location_count(), 1);
+  EXPECT_FALSE(frame.traverse("https://example.com/shared").has_value());
+  EXPECT_FALSE(frame
+                   .traverse(to_weak_pointer(TO_POINTER(
+                       "/definitions/https:~1~1example.com~1shared")))
+                   .has_value());
+}
+
 TEST(accessors_location_count) {
   const sourcemeta::core::JSON document = sourcemeta::core::parse_json(R"JSON({
     "$id": "https://example.com/schema",
