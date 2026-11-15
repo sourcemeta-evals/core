@@ -3,6 +3,7 @@
 #include <sourcemeta/core/json.h>
 #include <sourcemeta/core/jsonschema.h>
 
+#include <cctype>  // std::isalpha, std::isupper, std::toupper
 #include <cstddef> // std::size_t
 #include <format>  // std::format
 
@@ -138,6 +139,72 @@ static auto official_terminal_chain_resolver(std::string_view identifier,
   }})JSON",
                                                   prefix, link, prefix,
                                                   link + 1));
+}
+
+// Spells the host of the 2020-12 core vocabulary meta-schema with the case
+// pattern the link number gives, so every link of a chain names that same
+// official schema under a spelling of its own
+static auto respelled_core_metaschema(const std::size_t link) -> std::string {
+  constexpr std::string_view host{"json-schema.org"};
+  std::string result{"https://"};
+  auto bits{link};
+  for (const auto character : host) {
+    if (std::isalpha(static_cast<unsigned char>(character)) != 0 && bits != 0) {
+      result += (bits & std::size_t{1}) != 0
+                    ? static_cast<char>(
+                          std::toupper(static_cast<unsigned char>(character)))
+                    : character;
+      bits >>= 1U;
+    } else {
+      result += character;
+    }
+  }
+
+  result += "/draft/2020-12/meta/core";
+  return result;
+}
+
+// Answers every spelling of that meta-schema with a document declaring the
+// next spelling as its dialect, and only settles the chain at the official
+// dialect once the walk outlives any depth a correct implementation refuses
+static auto respelled_core_chain_resolver(const std::string_view identifier,
+                                          const std::size_t links)
+    -> sourcemeta::core::SchemaResolverResult {
+  constexpr std::string_view prefix{"https://"};
+  constexpr std::string_view suffix{"/draft/2020-12/meta/core"};
+  if (!identifier.starts_with(prefix) || !identifier.ends_with(suffix) ||
+      identifier.size() <= prefix.size() + suffix.size()) {
+    return sourcemeta::core::schema_resolver(identifier);
+  }
+
+  const auto host{identifier.substr(
+      prefix.size(), identifier.size() - prefix.size() - suffix.size())};
+  std::size_t link{0};
+  std::size_t position{0};
+  for (const auto character : host) {
+    if (std::isalpha(static_cast<unsigned char>(character)) != 0) {
+      if (std::isupper(static_cast<unsigned char>(character)) != 0) {
+        link |= std::size_t{1} << position;
+      }
+
+      position += 1;
+    }
+  }
+
+  if (link >= links) {
+    return sourcemeta::core::parse_json(std::format(R"JSON({{
+      "$id": "{}",
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }})JSON",
+                                                    identifier));
+  }
+
+  return sourcemeta::core::parse_json(
+      std::format(R"JSON({{
+    "$id": "{}",
+    "$schema": "{}"
+  }})JSON",
+                  identifier, respelled_core_metaschema(link + 1)));
 }
 
 TEST(core_vocabularies_boolean_without_default) {
@@ -1512,6 +1579,67 @@ TEST(
           -> sourcemeta::core::SchemaResolverResult {
         return official_terminal_chain_resolver(
             identifier, 65, "HTTPS://JSON-SCHEMA.ORG/draft/2020-12/meta/core");
+      }};
+
+  try {
+    vocabularies(document, resolver);
+    FAIL();
+  } catch (const sourcemeta::core::SchemaUnknownBaseDialectError &error) {
+    EXPECT_STREQ(error.what(),
+                 "Could not determine the base dialect of the schema");
+  }
+}
+
+TEST(base_dialect_a_chain_of_other_spellings_of_one_official_metaschema) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://Json-schema.org/draft/2020-12/meta/core"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return respelled_core_chain_resolver(identifier, 300);
+      }};
+
+  try {
+    vocabularies(document, resolver);
+    FAIL();
+  } catch (const sourcemeta::core::SchemaUnknownBaseDialectError &error) {
+    EXPECT_STREQ(error.what(),
+                 "Could not determine the base dialect of the schema");
+  }
+}
+
+TEST(base_dialect_a_chain_at_the_limit_through_a_known_nonofficial_dialect) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 63, "https://spec.openapis.org/oas/3.1/dialect/base");
+      }};
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Root, document,
+      sourcemeta::core::schema_walker, resolver, ""};
+  EXPECT_TRUE(frame.root_location().has_value());
+  EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
+              sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_2020_12);
+}
+
+TEST(base_dialect_a_chain_past_the_limit_through_a_known_nonofficial_dialect) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/official-terminal/1"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        return official_terminal_chain_resolver(
+            identifier, 64, "https://spec.openapis.org/oas/3.1/dialect/base");
       }};
 
   try {

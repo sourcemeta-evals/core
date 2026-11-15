@@ -328,10 +328,24 @@ static auto link_is_official(const std::string_view link) -> bool {
          sourcemeta::core::schema_is_official(settled.value());
 }
 
+// The spellings that URI equivalence folds together name one meta-schema, so
+// the chain walk holds each link by its canonical form, and a resolver that
+// respells a link it already answered for cannot start the walk afresh
+static auto link_identity(const std::string_view link)
+    -> sourcemeta::core::JSON::String {
+  auto settled{sourcemeta::core::maybe_canonicalize(link)};
+  if (settled.has_value()) {
+    return std::move(settled).value();
+  }
+
+  return sourcemeta::core::JSON::String{link};
+}
+
 // Official meta-schemas are a finite set the module already knows, so no
 // resolver can extend a chain through them for ever, and only the links
 // beyond that set spend from the depth a chain is allowed
-static auto chain_depth(const std::unordered_set<std::string_view> &visited)
+static auto
+chain_depth(const std::unordered_set<sourcemeta::core::JSON::String> &visited)
     -> std::size_t {
   return static_cast<std::size_t>(
       std::ranges::count_if(visited, [](const auto &link) -> bool {
@@ -362,7 +376,7 @@ auto sourcemeta::core::metaschema_try_embedded(
     return nullptr;
   }
 
-  std::unordered_set<std::string_view> visited;
+  std::unordered_set<sourcemeta::core::JSON::String> visited;
   std::vector<sourcemeta::core::EmbeddedMetaschemaLink> links{
       {.schema = candidate.first,
        .identifier = identifier,
@@ -382,7 +396,7 @@ auto sourcemeta::core::metaschema_try_embedded(
     // than any document means is refused here too, as the resolver could
     // otherwise extend this walk with fresh links for ever, though a link
     // that is an official schema spends nothing from that depth
-    if (!visited.emplace(current_identifier).second ||
+    if (!visited.emplace(link_identity(current_identifier)).second ||
         chain_depth(visited) > BASE_DIALECT_CHAIN_LIMIT) {
       throw sourcemeta::core::SchemaUnknownBaseDialectError();
     }
@@ -456,13 +470,12 @@ static auto resolve_settled(const sourcemeta::core::SchemaResolver &resolver,
   return resolver(settled.value());
 }
 
-static auto
-base_dialect_with_visited(const sourcemeta::core::JSON &schema,
-                          const sourcemeta::core::SchemaResolver &resolver,
-                          std::string_view default_dialect,
-                          std::unordered_set<std::string_view> &visited,
-                          const bool allow_dialect_override,
-                          const sourcemeta::core::JSON &document)
+static auto base_dialect_with_visited(
+    const sourcemeta::core::JSON &schema,
+    const sourcemeta::core::SchemaResolver &resolver,
+    std::string_view default_dialect,
+    std::unordered_set<sourcemeta::core::JSON::String> &visited,
+    const bool allow_dialect_override, const sourcemeta::core::JSON &document)
     -> std::optional<sourcemeta::core::SchemaBaseDialect> {
   assert((schema.is_object() || schema.is_boolean()));
   const std::string_view effective_dialect{sourcemeta::core::dialect(
@@ -489,7 +502,7 @@ base_dialect_with_visited(const sourcemeta::core::JSON &schema,
   // than any document means, which no allowance a caller sets can reach. A
   // link that is an official schema spends nothing from that depth, as the
   // officials are a finite set no resolver can extend
-  if (!visited.emplace(effective_dialect).second ||
+  if (!visited.emplace(link_identity(effective_dialect)).second ||
       chain_depth(visited) > BASE_DIALECT_CHAIN_LIMIT) {
     throw sourcemeta::core::SchemaUnknownBaseDialectError();
   }
@@ -560,7 +573,7 @@ auto sourcemeta::core::base_dialect(
     const sourcemeta::core::SchemaResolver &resolver,
     std::string_view default_dialect, const bool allow_dialect_override)
     -> std::optional<SchemaBaseDialect> {
-  std::unordered_set<std::string_view> visited;
+  std::unordered_set<sourcemeta::core::JSON::String> visited;
   return base_dialect_with_visited(schema, resolver, default_dialect, visited,
                                    allow_dialect_override, schema);
 }
