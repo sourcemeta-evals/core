@@ -6,8 +6,9 @@
 #include <sourcemeta/core/uri.h>
 
 #include <algorithm>     // std::ranges::any_of
-#include <array>         // std::array
+#include <array>         // std::array, std::to_array
 #include <cassert>       // assert
+#include <cstddef>       // std::size_t
 #include <deque>         // std::deque
 #include <optional>      // std::optional
 #include <string_view>   // std::string_view
@@ -197,23 +198,34 @@ inline auto definitions_keyword(const SchemaWalker &walker,
   return {};
 }
 
-using DefinitionsKeywords =
-    std::array<std::string_view, DEFINITIONS_KEYWORDS.size()>;
-
 // Every name the dialect in force reserves, in the order it prefers them. A
 // dialect that kept an older name for the location alongside the one it
 // introduced reserves both, and what sits under either is a definition, so a
-// question about where definitions live has more than one answer there. Unused
-// slots are left empty for a caller to pass over
+// question about where definitions live has more than one answer there. What a
+// dialect does not reserve is no part of what this holds, so a caller goes
+// over what it is handed rather than passing over anything
+struct DefinitionsKeywords {
+  std::array<std::string_view, DEFINITIONS_KEYWORDS.size()> names;
+  std::size_t count{0};
+
+  [[nodiscard]] auto begin() const -> const std::string_view * {
+    return this->names.data();
+  }
+
+  [[nodiscard]] auto end() const -> const std::string_view * {
+    return this->names.data() + this->count;
+  }
+};
+
 inline auto definitions_keywords(const SchemaWalker &walker,
                                  const SchemaVocabularies &vocabularies)
     -> DefinitionsKeywords {
   DefinitionsKeywords result{};
-  auto *target{result.begin()};
   for (const auto candidate : DEFINITIONS_KEYWORDS) {
     if (walker(candidate, vocabularies).type ==
         SchemaKeywordType::LocationMembers) {
-      *target++ = candidate;
+      result.names.at(result.count) = candidate;
+      result.count += 1;
     }
   }
 
@@ -276,8 +288,9 @@ constexpr std::array<SchemaKeyword, 2> EMBEDDED_METASCHEMA_CONTAINERS{
     {{.name = "$defs"sv, .hash = JSONSCHEMA_HASH_DEFS},
      {.name = "definitions"sv, .hash = JSONSCHEMA_HASH_DEFINITIONS}}};
 
-// How such a meta-schema may name itself, whichever dialect it is written for
-constexpr std::array<SchemaKeyword, 2> EMBEDDED_METASCHEMA_IDENTIFIERS{
+// Every keyword a dialect may reserve for a name, in the order a reader that
+// does not know which of them is reserved here tries them
+constexpr std::array<SchemaKeyword, 2> IDENTIFIER_KEYWORDS{
     {{.name = "$id"sv, .hash = JSONSCHEMA_HASH_ID},
      {.name = "id"sv, .hash = JSONSCHEMA_HASH_LEGACY_ID}}};
 
@@ -330,7 +343,7 @@ inline auto embedded_metaschema_matches(
     return false;
   }
 
-  for (const auto keyword : EMBEDDED_METASCHEMA_IDENTIFIERS) {
+  for (const auto keyword : IDENTIFIER_KEYWORDS) {
     if (embedded_metaschema_identifier_matches(candidate, keyword, identifier,
                                                canonical)) {
       return true;

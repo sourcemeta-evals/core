@@ -12,6 +12,7 @@
     "https://www.sourcemeta.com/pet": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "$id": "https://www.sourcemeta.com/pet",
+      "$anchor": "tag",
       "type": "object",
       "$defs": {
         "inner": {
