@@ -1,0 +1,137 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "properties": {
+      "a": {
+        "$ref": "https://example.com/a"
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/a": {
+      "$id": "https://example.com/a",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "c": {
+          "$ref": "https://example.com/c"
+        }
+      },
+      "$defs": {
+        "x": {
+          "$id": "https://example.com/x",
+          "properties": {
+            "y": {
+              "$id": "https://example.com/b",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "https://example.com/c": {
+      "$id": "https://example.com/c",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$defs": {
+        "B": {
+          "$id": "https://example.com/b",
+          "type": "string"
+        }
+      }
+    }
+  },
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "properties": {
+        "a": {
+          "$ref": "https://example.com/a"
+        }
+      },
+      "$defs": {
+        "https://example.com/c": {
+          "$id": "https://example.com/c",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://example.com/a": {
+          "$id": "https://example.com/a",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "c": {
+              "$ref": "https://example.com/c"
+            }
+          },
+          "$defs": {
+            "x": {
+              "$id": "https://example.com/x",
+              "properties": {
+                "y": {
+                  "$id": "https://example.com/b",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "properties": {
+        "a": {
+          "$ref": "https://example.com/a"
+        }
+      },
+      "$defs": {
+        "https://example.com/c": {
+          "$id": "https://example.com/c",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://example.com/a": {
+          "$id": "https://example.com/a",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "c": {
+              "$ref": "https://example.com/c"
+            }
+          },
+          "$defs": {
+            "x": {
+              "$id": "https://example.com/x",
+              "properties": {
+                "y": {
+                  "$id": "https://example.com/b",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/c",
+        "at": "/$defs/https:~1~1example.com~1c"
+      },
+      {
+        "from": "https://example.com/a",
+        "at": "/$defs/https:~1~1example.com~1a"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/c",
+        "at": "/$defs/https:~1~1example.com~1c"
+      },
+      {
+        "from": "https://example.com/a",
+        "at": "/$defs/https:~1~1example.com~1a"
+      }
+    ]
+  }
+}

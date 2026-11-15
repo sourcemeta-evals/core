@@ -1,0 +1,53 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "properties": {
+      "remote": {
+        "$ref": "https://example.com/remote"
+      },
+      "second": {
+        "$ref": "https://example.com/second"
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/remote": {
+      "$id": "https://example.com/remote",
+      "$schema": "https://example.com/meta",
+      "definitions": {
+        "https://example.com/meta": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$id": "https://example.com/meta",
+          "type": "object"
+        }
+      },
+      "type": "string"
+    },
+    "https://example.com/second": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/second",
+      "properties": {
+        "bad": {
+          "$ref": "https://example.com/meta#/properties/missing"
+        }
+      }
+    }
+  },
+  "result": {},
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaReferenceError",
+      "message": "Could not resolve schema reference",
+      "identifier": "https://example.com/meta#/properties/missing",
+      "location": "/properties/bad/$ref"
+    },
+    "references": {
+      "type": "SchemaReferenceError",
+      "message": "Could not resolve schema reference",
+      "identifier": "https://example.com/meta#/properties/missing",
+      "location": "/properties/bad/$ref"
+    }
+  },
+  "inserted": {}
+}

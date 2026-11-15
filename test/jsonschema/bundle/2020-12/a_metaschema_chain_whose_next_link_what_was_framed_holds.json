@@ -1,0 +1,108 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/b",
+    "$defs": {
+      "two": {
+        "$id": "https://example.com/m2",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$vocabulary": {
+          "https://json-schema.org/draft/2020-12/vocab/core": true
+        }
+      }
+    },
+    "properties": {
+      "holder": {
+        "$id": "https://example.com/holder",
+        "$defs": {
+          "one": {
+            "$id": "https://example.com/m1",
+            "$schema": "https://example.com/m2"
+          }
+        }
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/b": {
+      "$schema": "https://example.com/m1",
+      "$id": "https://example.com/b",
+      "type": "string"
+    }
+  },
+  "container": "/properties/holder/$defs",
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "https://example.com/b",
+      "$defs": {
+        "two": {
+          "$id": "https://example.com/m2",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$vocabulary": {
+            "https://json-schema.org/draft/2020-12/vocab/core": true
+          }
+        }
+      },
+      "properties": {
+        "holder": {
+          "$id": "https://example.com/holder",
+          "$defs": {
+            "one": {
+              "$id": "https://example.com/m1",
+              "$schema": "https://example.com/m2"
+            },
+            "https://example.com/b": {
+              "$schema": "https://example.com/m1",
+              "$id": "https://example.com/b",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "https://example.com/b",
+      "$defs": {
+        "two": {
+          "$id": "https://example.com/m2",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$vocabulary": {
+            "https://json-schema.org/draft/2020-12/vocab/core": true
+          }
+        }
+      },
+      "properties": {
+        "holder": {
+          "$id": "https://example.com/holder",
+          "$defs": {
+            "one": {
+              "$id": "https://example.com/m1",
+              "$schema": "https://example.com/m2"
+            },
+            "https://example.com/b": {
+              "$schema": "https://example.com/m1",
+              "$id": "https://example.com/b",
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/b",
+        "at": "/properties/holder/$defs/https:~1~1example.com~1b"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/b",
+        "at": "/properties/holder/$defs/https:~1~1example.com~1b"
+      }
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "$defs": {
+      "carrier": {
+        "$id": "https://example.com/carrier",
+        "$schema": "https://example.com/meta",
+        "properties": {
+          "tags": {
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "$defs": {
+          "https://example.com/meta": {
+            "$id": "https://example.com/meta",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$vocabulary": {
+              "https://json-schema.org/draft/2020-12/vocab/core": true,
+              "https://json-schema.org/draft/2020-12/vocab/applicator": true,
+              "https://json-schema.org/draft/2020-12/vocab/validation": true
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "$defs": {
+        "carrier": {
+          "$id": "https://example.com/carrier",
+          "$schema": "https://example.com/meta",
+          "properties": {
+            "tags": {
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          "$defs": {
+            "https://example.com/meta": {
+              "$id": "https://example.com/meta",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$vocabulary": {
+                "https://json-schema.org/draft/2020-12/vocab/core": true,
+                "https://json-schema.org/draft/2020-12/vocab/applicator": true,
+                "https://json-schema.org/draft/2020-12/vocab/validation": true
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "$defs": {
+        "carrier": {
+          "$id": "https://example.com/carrier",
+          "$schema": "https://example.com/meta",
+          "properties": {
+            "tags": {
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          "$defs": {
+            "https://example.com/meta": {
+              "$id": "https://example.com/meta",
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$vocabulary": {
+                "https://json-schema.org/draft/2020-12/vocab/core": true,
+                "https://json-schema.org/draft/2020-12/vocab/applicator": true,
+                "https://json-schema.org/draft/2020-12/vocab/validation": true
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [],
+    "references": []
+  }
+}

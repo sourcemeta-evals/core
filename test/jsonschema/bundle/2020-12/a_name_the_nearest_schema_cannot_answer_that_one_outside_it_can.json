@@ -1,0 +1,108 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/b",
+    "$defs": {
+      "valid": {
+        "$id": "https://example.com/meta",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$vocabulary": {
+          "https://json-schema.org/draft/2020-12/vocab/core": true
+        }
+      }
+    },
+    "properties": {
+      "holder": {
+        "$id": "https://example.com/holder",
+        "$defs": {
+          "decoy": {
+            "id": "https://example.com/meta",
+            "$schema": "https://json-schema.org/draft/2020-12/schema"
+          }
+        }
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/b": {
+      "$schema": "https://example.com/meta",
+      "$id": "https://example.com/b",
+      "type": "string"
+    }
+  },
+  "container": "/properties/holder/$defs",
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "https://example.com/b",
+      "$defs": {
+        "valid": {
+          "$id": "https://example.com/meta",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$vocabulary": {
+            "https://json-schema.org/draft/2020-12/vocab/core": true
+          }
+        }
+      },
+      "properties": {
+        "holder": {
+          "$id": "https://example.com/holder",
+          "$defs": {
+            "decoy": {
+              "id": "https://example.com/meta",
+              "$schema": "https://json-schema.org/draft/2020-12/schema"
+            },
+            "https://example.com/b": {
+              "$schema": "https://example.com/meta",
+              "$id": "https://example.com/b",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "https://example.com/b",
+      "$defs": {
+        "valid": {
+          "$id": "https://example.com/meta",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$vocabulary": {
+            "https://json-schema.org/draft/2020-12/vocab/core": true
+          }
+        }
+      },
+      "properties": {
+        "holder": {
+          "$id": "https://example.com/holder",
+          "$defs": {
+            "decoy": {
+              "id": "https://example.com/meta",
+              "$schema": "https://json-schema.org/draft/2020-12/schema"
+            },
+            "https://example.com/b": {
+              "$schema": "https://example.com/meta",
+              "$id": "https://example.com/b",
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/b",
+        "at": "/properties/holder/$defs/https:~1~1example.com~1b"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/b",
+        "at": "/properties/holder/$defs/https:~1~1example.com~1b"
+      }
+    ]
+  }
+}

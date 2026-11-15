@@ -1,0 +1,55 @@
+{
+  "schema": {
+    "type": "object",
+    "properties": {
+      "outer": {
+        "$ref": "https://example.com/outer"
+      }
+    }
+  },
+  "defaultDialect": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect",
+  "resolver": {
+    "https://example.com/outer": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/outer",
+      "type": "object",
+      "$defs": {
+        "https://example.com/child": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/child",
+          "properties": {
+            "bad": {
+              "$ref": "https://www.sourcemeta.com/pet#tag"
+            }
+          }
+        }
+      }
+    },
+    "https://www.sourcemeta.com/pet": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "x-sourcemeta-dialect-override-subschema": "https://json-schema.org/draft/2020-12/schema",
+          "$anchor": "tag",
+          "type": "string"
+        }
+      }
+    }
+  },
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaReferenceError",
+      "message": "Could not resolve schema reference",
+      "identifier": "https://www.sourcemeta.com/pet#tag",
+      "location": "/$defs/https:~1~1example.com~1child/properties/bad/$ref"
+    },
+    "references": {
+      "type": "SchemaReferenceError",
+      "message": "Could not resolve schema reference",
+      "identifier": "https://www.sourcemeta.com/pet#tag",
+      "location": "/$defs/https:~1~1example.com~1child/properties/bad/$ref"
+    }
+  },
+  "result": {},
+  "inserted": {}
+}

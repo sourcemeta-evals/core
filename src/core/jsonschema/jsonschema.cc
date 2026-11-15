@@ -258,8 +258,7 @@ auto sourcemeta::core::dialect(const sourcemeta::core::JSON &schema,
 
   if (allow_dialect_override && schema.is_object()) {
     const auto *override_value{
-        schema.try_at("x-sourcemeta-dialect-override-subschema"sv,
-                      sourcemeta::core::JSONSCHEMA_HASH_DIALECT_OVERRIDE)};
+        schema.try_at("x-sourcemeta-dialect-override-subschema")};
     if ((override_value != nullptr) && override_value->is_string() &&
         !override_value->to_string().empty()) {
       return override_value->to_string();
@@ -296,7 +295,8 @@ auto sourcemeta::core::dialect(const sourcemeta::core::JSON &schema,
 // container in a way that is valid for such base dialect
 auto sourcemeta::core::metaschema_try_embedded(
     const sourcemeta::core::JSON &schema, const std::string_view identifier,
-    const SchemaResolver &resolver) -> const sourcemeta::core::JSON * {
+    const SchemaResolver &resolver, const sourcemeta::core::PinnedScope *scopes)
+    -> const sourcemeta::core::JSON * {
   // Relative or invalid meta-schema references are not acceptable
   // according to the JSON Schema specifications
   if (!sourcemeta::core::URI::is_uri(identifier)) {
@@ -348,8 +348,18 @@ auto sourcemeta::core::metaschema_try_embedded(
     }
 
     if (sourcemeta::core::URI::is_uri(dialect_uri)) {
-      const auto next{
+      // A link further along the chain may sit in any of the schemas enclosing
+      // the place being read rather than in the one that carries the link
+      // before it, as a meta-schema speaks for everything below whatever
+      // holds it
+      auto next{
           sourcemeta::core::embedded_metaschema_candidate(schema, dialect_uri)};
+      for (const auto *scope{scopes}; next.first == nullptr && scope != nullptr;
+           scope = scope->enclosing) {
+        next = sourcemeta::core::embedded_metaschema_candidate(*scope->holder,
+                                                               dialect_uri);
+      }
+
       if (next.first != nullptr) {
         links.push_back({.schema = next.first,
                          .identifier = dialect_uri,

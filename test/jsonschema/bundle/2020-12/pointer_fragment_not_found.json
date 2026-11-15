@@ -1,6 +1,7 @@
 {
   "schema": {
     "$id": "https://example.com",
+    "$id": "https://example.com",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "foo": { "$ref": "https://example.com/baz-anchor#/$defs/qux" }

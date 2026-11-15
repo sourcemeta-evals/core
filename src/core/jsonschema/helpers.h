@@ -5,6 +5,7 @@
 
 #include <sourcemeta/core/uri.h>
 
+#include <algorithm>     // std::ranges::any_of
 #include <array>         // std::array
 #include <cassert>       // assert
 #include <deque>         // std::deque
@@ -33,8 +34,6 @@ constexpr auto JSONSCHEMA_HASH_RECURSIVE_ANCHOR{
 constexpr auto JSONSCHEMA_HASH_VOCABULARY{JSON::Object::hash("$vocabulary"sv)};
 constexpr auto JSONSCHEMA_HASH_DEFS{JSON::Object::hash("$defs"sv)};
 constexpr auto JSONSCHEMA_HASH_DEFINITIONS{JSON::Object::hash("definitions"sv)};
-constexpr auto JSONSCHEMA_HASH_DIALECT_OVERRIDE{
-    JSON::Object::hash("x-sourcemeta-dialect-override-subschema"sv)};
 
 /// A keyword whose name is only known once the base dialect is, paired with
 /// the hash of that name so that looking it up does not have to hash it again
@@ -69,9 +68,19 @@ auto vocabularies(const SchemaResolver &resolver,
                   std::string_view dialect) -> SchemaVocabularies;
 auto to_base_dialect(const std::string_view base_dialect)
     -> std::optional<SchemaBaseDialect>;
+// A schema that holds the dialect it reads under among its own containers,
+// together with whatever held the dialect of the schema enclosing it. A
+// meta-schema speaks for everything below the schema carrying it, so entering
+// one of these never takes the reader out of the ones around it
+struct PinnedScope {
+  const sourcemeta::core::JSON *holder;
+  const PinnedScope *enclosing;
+};
+
 auto metaschema_try_embedded(const sourcemeta::core::JSON &schema,
                              std::string_view identifier,
-                             const SchemaResolver &resolver)
+                             const SchemaResolver &resolver,
+                             const PinnedScope *scopes = nullptr)
     -> const sourcemeta::core::JSON *;
 auto vocabulary_uri(SchemaVocabularies::Known vocabulary) -> std::string_view;
 auto vocabulary_uri(const SchemaVocabularies::URI &vocabulary)
@@ -151,6 +160,61 @@ inline auto vocabularies_with_embedded(const sourcemeta::core::JSON &schema,
       resolver_with_embedded(schema, resolver), base_dialect, dialect);
 }
 
+// Every name this implementation knows for a location reserved for schema
+// definitions, in the order a dialect that reserves more than one prefers them
+constexpr auto DEFINITIONS_KEYWORDS{
+    std::to_array<std::string_view>({"$defs", "definitions", "x-definitions"})};
+
+// A name the document or the caller wrote has been through nothing, so what it
+// means is what the canonical form of it says. Input that is no URI at all is
+// left as it is, for whatever meets it next to refuse in its own terms
+inline auto canonical_uri(const std::string_view uri) -> JSON::String {
+  try {
+    return URI::canonicalize(uri);
+  } catch (const URIParseError &) {
+    return JSON::String{uri};
+  }
+}
+
+// Which of those names the dialect in force actually reserves. Asking its own
+// vocabularies rather than its base dialect is what keeps a dialect that drops
+// or renames the location from being handed the one its base dialect would use
+inline auto definitions_keyword(const SchemaWalker &walker,
+                                const SchemaVocabularies &vocabularies)
+    -> std::string_view {
+  for (const auto candidate : DEFINITIONS_KEYWORDS) {
+    if (walker(candidate, vocabularies).type ==
+        SchemaKeywordType::LocationMembers) {
+      return candidate;
+    }
+  }
+
+  return {};
+}
+
+using DefinitionsKeywords =
+    std::array<std::string_view, DEFINITIONS_KEYWORDS.size()>;
+
+// Every name the dialect in force reserves, in the order it prefers them. A
+// dialect that kept an older name for the location alongside the one it
+// introduced reserves both, and what sits under either is a definition, so a
+// question about where definitions live has more than one answer there. Unused
+// slots are left empty for a caller to pass over
+inline auto definitions_keywords(const SchemaWalker &walker,
+                                 const SchemaVocabularies &vocabularies)
+    -> DefinitionsKeywords {
+  DefinitionsKeywords result{};
+  auto *target{result.begin()};
+  for (const auto candidate : DEFINITIONS_KEYWORDS) {
+    if (walker(candidate, vocabularies).type ==
+        SchemaKeywordType::LocationMembers) {
+      *target++ = candidate;
+    }
+  }
+
+  return result;
+}
+
 inline auto definitions_keyword(const SchemaBaseDialect base_dialect)
     -> std::string_view {
   switch (base_dialect) {
@@ -201,6 +265,34 @@ ref_overrides_adjacent_keywords(const SchemaBaseDialect base_dialect) -> bool {
   }
 }
 
+// Where a reader looks for a meta-schema a schema carries, in the order it
+// looks
+constexpr std::array<SchemaKeyword, 2> EMBEDDED_METASCHEMA_CONTAINERS{
+    {{.name = "$defs"sv, .hash = JSONSCHEMA_HASH_DEFS},
+     {.name = "definitions"sv, .hash = JSONSCHEMA_HASH_DEFINITIONS}}};
+
+// How such a meta-schema may name itself, whichever dialect it is written for
+constexpr std::array<SchemaKeyword, 2> EMBEDDED_METASCHEMA_IDENTIFIERS{
+    {{.name = "$id"sv, .hash = JSONSCHEMA_HASH_ID},
+     {.name = "id"sv, .hash = JSONSCHEMA_HASH_LEGACY_ID}}};
+
+// Whether a schema holds anything at all where a reader looks, which is what
+// makes it worth asking what it carries rather than paying to ask every schema
+// that answers to a name
+inline auto holds_embedded_candidates(const sourcemeta::core::JSON &document)
+    -> bool {
+  if (!document.is_object()) {
+    return false;
+  }
+
+  return std::ranges::any_of(
+      EMBEDDED_METASCHEMA_CONTAINERS,
+      [&document](const auto container) -> bool {
+        const auto *entries{document.try_at(container.name, container.hash)};
+        return entries != nullptr && entries->is_object();
+      });
+}
+
 inline auto embedded_metaschema_identifier_matches(
     const sourcemeta::core::JSON &candidate, const SchemaKeyword keyword,
     const std::string_view identifier,
@@ -233,10 +325,7 @@ inline auto embedded_metaschema_matches(
     return false;
   }
 
-  constexpr std::array<SchemaKeyword, 2> KEYWORDS{
-      {{.name = "$id"sv, .hash = JSONSCHEMA_HASH_ID},
-       {.name = "id"sv, .hash = JSONSCHEMA_HASH_LEGACY_ID}}};
-  for (const auto keyword : KEYWORDS) {
+  for (const auto keyword : EMBEDDED_METASCHEMA_IDENTIFIERS) {
     if (embedded_metaschema_identifier_matches(candidate, keyword, identifier,
                                                canonical)) {
       return true;
@@ -261,10 +350,7 @@ embedded_metaschema_candidate(const sourcemeta::core::JSON &document,
     canonical = std::nullopt;
   }
 
-  constexpr std::array<SchemaKeyword, 2> CONTAINERS{
-      {{.name = "$defs"sv, .hash = JSONSCHEMA_HASH_DEFS},
-       {.name = "definitions"sv, .hash = JSONSCHEMA_HASH_DEFINITIONS}}};
-  for (const auto container : CONTAINERS) {
+  for (const auto container : EMBEDDED_METASCHEMA_CONTAINERS) {
     const auto *entries{document.try_at(container.name, container.hash)};
     if ((entries == nullptr) || !entries->is_object()) {
       continue;

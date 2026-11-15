@@ -1,0 +1,155 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "properties": {
+      "a": {
+        "$ref": "https://example.com/a"
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/a": {
+      "$id": "https://example.com/a",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "b": {
+          "$id": "https://example.com/b",
+          "properties": {
+            "z": {
+              "$ref": "shared"
+            }
+          }
+        },
+        "c": {
+          "$ref": "https://example.com/c"
+        }
+      }
+    },
+    "https://example.com/c": {
+      "$id": "https://example.com/c",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$defs": {
+        "https://example.com/b": {
+          "$id": "https://example.com/b",
+          "properties": {
+            "z": {
+              "$ref": "https://example.com/shared"
+            }
+          }
+        }
+      }
+    },
+    "https://example.com/shared": {
+      "$id": "https://example.com/shared",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string"
+    }
+  },
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "properties": {
+        "a": {
+          "$ref": "https://example.com/a"
+        }
+      },
+      "$defs": {
+        "https://example.com/shared": {
+          "$id": "https://example.com/shared",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "string"
+        },
+        "https://example.com/c": {
+          "$id": "https://example.com/c",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://example.com/a": {
+          "$id": "https://example.com/a",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "b": {
+              "$id": "https://example.com/b",
+              "properties": {
+                "z": {
+                  "$ref": "https://example.com/shared"
+                }
+              }
+            },
+            "c": {
+              "$ref": "https://example.com/c"
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "properties": {
+        "a": {
+          "$ref": "https://example.com/a"
+        }
+      },
+      "$defs": {
+        "https://example.com/shared": {
+          "$id": "https://example.com/shared",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "string"
+        },
+        "https://example.com/c": {
+          "$id": "https://example.com/c",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "https://example.com/a": {
+          "$id": "https://example.com/a",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "b": {
+              "$id": "https://example.com/b",
+              "properties": {
+                "z": {
+                  "$ref": "https://example.com/shared"
+                }
+              }
+            },
+            "c": {
+              "$ref": "https://example.com/c"
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/a",
+        "at": "/$defs/https:~1~1example.com~1a"
+      },
+      {
+        "from": "https://example.com/c",
+        "at": "/$defs/https:~1~1example.com~1c"
+      },
+      {
+        "from": "https://example.com/shared",
+        "at": "/$defs/https:~1~1example.com~1shared"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/a",
+        "at": "/$defs/https:~1~1example.com~1a"
+      },
+      {
+        "from": "https://example.com/c",
+        "at": "/$defs/https:~1~1example.com~1c"
+      },
+      {
+        "from": "https://example.com/shared",
+        "at": "/$defs/https:~1~1example.com~1shared"
+      }
+    ]
+  }
+}

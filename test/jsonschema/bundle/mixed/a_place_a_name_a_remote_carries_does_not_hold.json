@@ -1,0 +1,42 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "a": {
+        "$ref": "https://example.com/pet"
+      },
+      "b": {
+        "$ref": "https://example.com/tag#/$defs/missing"
+      }
+    }
+  },
+  "resolver": {
+    "https://example.com/pet": {
+      "type": "object",
+      "x-definitions": {
+        "tag": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/tag",
+          "type": "string"
+        }
+      }
+    }
+  },
+  "defaultDialect": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect",
+  "errors": {
+    "nonOfficialMetaschemas": {
+      "type": "SchemaReferenceError",
+      "message": "Could not resolve schema reference",
+      "identifier": "https://example.com/tag#/$defs/missing",
+      "location": "/properties/b/$ref"
+    },
+    "references": {
+      "type": "SchemaReferenceError",
+      "message": "Could not resolve schema reference",
+      "identifier": "https://example.com/tag#/$defs/missing",
+      "location": "/properties/b/$ref"
+    }
+  },
+  "result": {},
+  "inserted": {}
+}

@@ -81,3 +81,33 @@ TEST(reference_object_resource_error_throw) {
     EXPECT_EQ(error.identifier(), "https://sourcemeta.com/test");
   }
 }
+
+TEST(container_error_throw) {
+  static_assert(
+      std::is_base_of_v<std::exception, sourcemeta::core::SchemaContainerError>,
+      "Must subclass std::exception");
+  try {
+    throw sourcemeta::core::SchemaContainerError(
+        sourcemeta::core::Pointer{"components", "schemas"}, "My error");
+  } catch (const sourcemeta::core::SchemaContainerError &error) {
+    EXPECT_STREQ(error.what(), "My error");
+    EXPECT_EQ(sourcemeta::core::to_string(error.location()),
+              "/components/schemas");
+  }
+}
+
+TEST(container_error_keeps_its_location) {
+  sourcemeta::core::Pointer location{"components", "schemas"};
+  const sourcemeta::core::SchemaContainerError error{location, "My error"};
+  location.push_back("Pet");
+
+  sourcemeta::core::SchemaContainerError copy{
+      sourcemeta::core::Pointer{"schemas"}, "Another error"};
+  copy = error;
+
+  EXPECT_EQ(sourcemeta::core::to_string(error.location()),
+            "/components/schemas");
+  EXPECT_STREQ(copy.what(), "My error");
+  EXPECT_EQ(sourcemeta::core::to_string(copy.location()),
+            "/components/schemas");
+}

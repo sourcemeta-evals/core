@@ -1,0 +1,90 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://example.com/pet"
+  },
+  "resolver": {
+    "https://example.com/pet": {
+      "type": "object",
+      "properties": {
+        "0": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/zero",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "again": {
+              "$ref": "https://example.com/pet#/properties/0/properties/name"
+            }
+          }
+        }
+      }
+    }
+  },
+  "defaultDialect": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect",
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/$defs/https:~1~1example.com~1pet",
+      "$defs": {
+        "https://example.com/pet": {
+          "type": "object",
+          "properties": {
+            "0": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://example.com/zero",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "again": {
+                  "$ref": "https://example.com/zero#/properties/name"
+                }
+              }
+            }
+          },
+          "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/$defs/https:~1~1example.com~1pet",
+      "$defs": {
+        "https://example.com/pet": {
+          "type": "object",
+          "properties": {
+            "0": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://example.com/zero",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "again": {
+                  "$ref": "https://example.com/zero#/properties/name"
+                }
+              }
+            }
+          },
+          "x-sourcemeta-dialect-override-subschema": "tag:spec.openapis.org,2024-10-18:oas/3.0/dialect"
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/pet",
+        "at": "/$defs/https:~1~1example.com~1pet"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/pet",
+        "at": "/$defs/https:~1~1example.com~1pet"
+      }
+    ]
+  }
+}
