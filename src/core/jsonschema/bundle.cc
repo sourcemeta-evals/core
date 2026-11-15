@@ -1075,6 +1075,52 @@ struct PendingCopy {
   JSON duplicate;
 };
 
+// Whether two steps say the same thing. A number a reference spelled names a
+// place of an array and a member whose name is that number alike, which only
+// the document settles, and a document holds one or the other at a place
+// rather than both. So a step saying that number is the same step either way,
+// as the pointers a frame hands back have been through the document and the
+// one a reference spelled has not
+auto says_the_same_step(const Pointer::Token &spelled,
+                        const Pointer::Token &place) -> bool {
+  if (spelled.is_index() == place.is_index()) {
+    return spelled == place;
+  }
+
+  return spelled.is_index()
+             ? place.to_property() == std::to_string(spelled.to_index())
+             : spelled.to_property() == std::to_string(place.to_index());
+}
+
+// Whether a pointer a reference spelled reaches a place of the document, or
+// somewhere within it, held against that place step by step rather than as
+// either of the two happens to be written
+auto reaches_into(const Pointer &spelled, const Pointer &place) -> bool {
+  if (spelled.size() < place.size()) {
+    return false;
+  }
+
+  for (std::size_t step{0}; step < place.size(); ++step) {
+    if (!says_the_same_step(spelled.at(step), place.at(step))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// What a pointer says below a place it reaches into. The steps come off by
+// count, as a pointer a reference spelled and one the frame handed back agree
+// on the place while saying a step of it their own way
+auto below_the_place(const Pointer &spelled, const Pointer &place) -> Pointer {
+  Pointer result;
+  for (auto step{place.size()}; step < spelled.size(); ++step) {
+    result.emplace_back(spelled.at(step));
+  }
+
+  return result;
+}
+
 // Elevation lifts a resource out of the copy that lands, so a place named
 // inside one is no longer where the reference that named it said. Saying the
 // name of what moved reaches the same schema, but only where what the
@@ -1088,7 +1134,7 @@ auto rewrite_into_what_elevation_moved(
     std::map<Pointer, JSON::String> &rewrites) -> Moved {
   auto covered{Moved::Nothing};
   for (const auto &moved : elevated) {
-    if (!tail.starts_with(moved.at)) {
+    if (!reaches_into(tail, moved.at)) {
       continue;
     }
 
@@ -1097,7 +1143,7 @@ auto rewrite_into_what_elevation_moved(
     covered = Moved::Nowhere;
 
     const auto &identifier{moved.identifier};
-    const auto suffix{tail.resolve_from(moved.at)};
+    const auto suffix{below_the_place(tail, moved.at)};
     const auto landed{frame.traverse(identifier)};
     if (!landed.has_value()) {
       continue;
@@ -1128,7 +1174,7 @@ auto elevation_moved_what_it_named(const Pointer &named,
                                    const std::vector<Elevated> &elevated)
     -> bool {
   return std::ranges::any_of(elevated, [&named](const auto &moved) -> bool {
-    return named.starts_with(moved.at);
+    return reaches_into(named, moved.at);
   });
 }
 
@@ -1461,11 +1507,11 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
       std::optional<JSON::String> spelled;
       if (copy.tail.has_value()) {
         for (const auto &[position, name] : carried) {
-          if (!copy.tail.value().starts_with(position)) {
+          if (!reaches_into(copy.tail.value(), position)) {
             continue;
           }
 
-          const auto suffix{copy.tail.value().resolve_from(position)};
+          const auto suffix{below_the_place(copy.tail.value(), position)};
           spelled = suffix.empty()
                         ? name
                         : JSON::String{to_uri(suffix, URI{name}).recompose()};
@@ -1563,10 +1609,7 @@ auto as_it_was_handed_over(const JSON &root, const Pointer &where,
       continue;
     }
 
-    Pointer within;
-    for (auto step{where.size()}; step < place.size(); ++step) {
-      within.emplace_back(place.at(step));
-    }
+    const auto within{below_the_place(place, where)};
 
     // Writing out the name a document was handed is saying what it is called
     // rather than putting something in it, and claiming that name is the only
@@ -2026,7 +2069,7 @@ auto bundling_put_it_there(const std::optional<Pointer> &where_it_sits,
   const auto named_within{where_it_sits.value().concat(named)};
   return std::ranges::any_of(introduced,
                              [&named_within](const auto &place) -> bool {
-                               return named_within.starts_with(place);
+                               return reaches_into(named_within, place);
                              });
 }
 
