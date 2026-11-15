@@ -373,6 +373,15 @@ auto embed_references(
     // Bundling rewrites the schema before embedding it, so it needs a copy
     // it owns rather than whatever the resolver chose to hand back
     auto remote{std::move(resolved).to_owned()};
+
+    // An OpenAPI 3.0 Schema Object has no `$schema` of its own, so say what
+    // the caller handed us and let the rest of this go on as it does for
+    // anything else
+    if (remote.is_object() && !remote.defines("$schema") &&
+        !default_dialect.empty()) {
+      remote.assign("$schema", JSON{JSON::String{default_dialect}});
+    }
+
     if (!remote.is_object() && !remote.is_boolean()) {
       throw SchemaReferenceError(identifier, to_pointer(pointer),
                                  "The JSON document is not a valid JSON "

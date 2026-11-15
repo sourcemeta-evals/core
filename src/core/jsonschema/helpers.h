@@ -163,11 +163,14 @@ inline auto definitions_keyword(const SchemaBaseDialect base_dialect)
     case SchemaBaseDialect::JSON_SCHEMA_DRAFT_7_HYPER:
     case SchemaBaseDialect::JSON_SCHEMA_DRAFT_6:
     case SchemaBaseDialect::JSON_SCHEMA_DRAFT_6_HYPER:
-    case SchemaBaseDialect::JSON_SCHEMA_DRAFT_4:
-    case SchemaBaseDialect::JSON_SCHEMA_DRAFT_4_HYPER:
     case SchemaBaseDialect::JSON_SCHEMA_DRAFT_3:
     case SchemaBaseDialect::JSON_SCHEMA_DRAFT_3_HYPER:
       return "definitions";
+    // OpenAPI 3.0 Schema Objects are Draft 4 with extensions on top, and the
+    // place they keep definitions in is the `x-definitions` extension
+    case SchemaBaseDialect::JSON_SCHEMA_DRAFT_4:
+    case SchemaBaseDialect::JSON_SCHEMA_DRAFT_4_HYPER:
+      return "x-definitions";
     case SchemaBaseDialect::JSON_SCHEMA_DRAFT_2_HYPER:
     case SchemaBaseDialect::JSON_SCHEMA_DRAFT_1_HYPER:
     case SchemaBaseDialect::JSON_SCHEMA_DRAFT_0_HYPER:
