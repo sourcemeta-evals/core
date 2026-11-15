@@ -18,13 +18,13 @@ x_child_walker(const std::string_view keyword,
                const sourcemeta::core::SchemaVocabularies &vocabularies)
     -> const sourcemeta::core::SchemaWalkerResult & {
   if (keyword == "x-child") {
-    static const sourcemeta::core::SchemaWalkerResult result{
+    static const sourcemeta::core::SchemaWalkerResult RESULT{
         sourcemeta::core::SchemaKeywordType::ApplicatorValueTraverseAnyItem,
         std::nullopt,
         {},
         {},
         {}};
-    return result;
+    return RESULT;
   }
 
   return sourcemeta::core::schema_walker(keyword, vocabularies);

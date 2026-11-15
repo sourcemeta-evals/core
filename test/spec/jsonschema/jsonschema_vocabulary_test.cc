@@ -78,14 +78,14 @@ static auto vocabularies(const sourcemeta::core::JSON &document,
 
 static auto endless_metaschema_resolver(std::string_view identifier)
     -> sourcemeta::core::SchemaResolverResult {
-  constexpr std::string_view prefix{"https://www.sourcemeta.com/endless/"};
-  if (!identifier.starts_with(prefix)) {
+  constexpr std::string_view PREFIX{"https://www.sourcemeta.com/endless/"};
+  if (!identifier.starts_with(PREFIX)) {
     return sourcemeta::core::schema_resolver(identifier);
   }
 
   // A resolver that never runs out of links would otherwise keep an unbounded
   // chain lookup going until the process runs out of memory
-  const auto link{std::stoull(std::string{identifier.substr(prefix.size())})};
+  const auto link{std::stoull(std::string{identifier.substr(PREFIX.size())})};
   if (link > 200) {
     throw std::logic_error{"The chain lookup was never cut short"};
   }
@@ -94,7 +94,7 @@ static auto endless_metaschema_resolver(std::string_view identifier)
     "$id": "{}{}",
     "$schema": "{}{}"
   }})JSON",
-                                                  prefix, link, prefix,
+                                                  PREFIX, link, PREFIX,
                                                   link + 1));
 }
 
@@ -118,26 +118,26 @@ static auto official_terminal_chain_resolver(std::string_view identifier,
                                              const std::size_t links,
                                              const std::string_view terminal)
     -> sourcemeta::core::SchemaResolverResult {
-  constexpr std::string_view prefix{
+  constexpr std::string_view PREFIX{
       "https://www.sourcemeta.com/official-terminal/"};
-  if (!identifier.starts_with(prefix)) {
+  if (!identifier.starts_with(PREFIX)) {
     return sourcemeta::core::schema_resolver(identifier);
   }
 
-  const auto link{std::stoull(std::string{identifier.substr(prefix.size())})};
+  const auto link{std::stoull(std::string{identifier.substr(PREFIX.size())})};
   if (link >= links) {
     return sourcemeta::core::parse_json(std::format(R"JSON({{
       "$id": "{}{}",
       "$schema": "{}"
     }})JSON",
-                                                    prefix, link, terminal));
+                                                    PREFIX, link, terminal));
   }
 
   return sourcemeta::core::parse_json(std::format(R"JSON({{
     "$id": "{}{}",
     "$schema": "{}{}"
   }})JSON",
-                                                  prefix, link, prefix,
+                                                  PREFIX, link, PREFIX,
                                                   link + 1));
 }
 
@@ -145,10 +145,10 @@ static auto official_terminal_chain_resolver(std::string_view identifier,
 // pattern the link number gives, so every link of a chain names that same
 // official schema under a spelling of its own
 static auto respelled_core_metaschema(const std::size_t link) -> std::string {
-  constexpr std::string_view host{"json-schema.org"};
+  constexpr std::string_view HOST{"json-schema.org"};
   std::string result{"https://"};
   auto bits{link};
-  for (const auto character : host) {
+  for (const auto character : HOST) {
     if (std::isalpha(static_cast<unsigned char>(character)) != 0 && bits != 0) {
       result += (bits & std::size_t{1}) != 0
                     ? static_cast<char>(
@@ -170,15 +170,15 @@ static auto respelled_core_metaschema(const std::size_t link) -> std::string {
 static auto respelled_core_chain_resolver(const std::string_view identifier,
                                           const std::size_t links)
     -> sourcemeta::core::SchemaResolverResult {
-  constexpr std::string_view prefix{"https://"};
-  constexpr std::string_view suffix{"/draft/2020-12/meta/core"};
-  if (!identifier.starts_with(prefix) || !identifier.ends_with(suffix) ||
-      identifier.size() <= prefix.size() + suffix.size()) {
+  constexpr std::string_view PREFIX{"https://"};
+  constexpr std::string_view SUFFIX{"/draft/2020-12/meta/core"};
+  if (!identifier.starts_with(PREFIX) || !identifier.ends_with(SUFFIX) ||
+      identifier.size() <= PREFIX.size() + SUFFIX.size()) {
     return sourcemeta::core::schema_resolver(identifier);
   }
 
   const auto host{identifier.substr(
-      prefix.size(), identifier.size() - prefix.size() - suffix.size())};
+      PREFIX.size(), identifier.size() - PREFIX.size() - SUFFIX.size())};
   std::size_t link{0};
   std::size_t position{0};
   for (const auto character : host) {
@@ -1678,4 +1678,99 @@ TEST(
                   .get(sourcemeta::core::SchemaVocabularies::Known::
                            JSON_SCHEMA_2020_12_CORE)
                   .has_value());
+}
+
+// The identifier of a draft before 2019-09 carries an empty fragment, and
+// dropping that fragment is how URI equivalence spells the identifier
+// canonically, so the canonical spelling names an official dialect a chain
+// can end at and settles with no resolver in reach
+TEST(base_dialect_a_fragmentless_draft7_without_a_resolver) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-07/schema"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view) -> sourcemeta::core::SchemaResolverResult {
+        return std::nullopt;
+      }};
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Root, document,
+      sourcemeta::core::schema_walker, resolver, ""};
+  EXPECT_TRUE(frame.root_location().has_value());
+  EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
+              sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_DRAFT_7);
+}
+
+TEST(base_dialect_a_declared_draft7_spelling_without_a_resolver) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view) -> sourcemeta::core::SchemaResolverResult {
+        return std::nullopt;
+      }};
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Root, document,
+      sourcemeta::core::schema_walker, resolver, ""};
+  EXPECT_TRUE(frame.root_location().has_value());
+  EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
+              sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_DRAFT_7);
+}
+
+// A spelling that settles the chain is never taken as a link, so an answer
+// the resolver holds for it, whatever dialect that answer declares, cannot
+// steer the determination away from the official dialect it names
+TEST(base_dialect_a_fragmentless_draft7_despite_an_overriding_answer) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-07/schema"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        if (identifier == "http://json-schema.org/draft-07/schema" ||
+            identifier == "http://json-schema.org/draft-07/schema#") {
+          return sourcemeta::core::parse_json(R"JSON({
+            "$schema": "https://json-schema.org/draft/2020-12/schema"
+          })JSON");
+        }
+
+        return std::nullopt;
+      }};
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Root, document,
+      sourcemeta::core::schema_walker, resolver, ""};
+  EXPECT_TRUE(frame.root_location().has_value());
+  EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
+              sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_DRAFT_7);
+}
+
+TEST(base_dialect_a_declared_draft7_spelling_despite_an_overriding_answer) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        if (identifier == "http://json-schema.org/draft-07/schema" ||
+            identifier == "http://json-schema.org/draft-07/schema#") {
+          return sourcemeta::core::parse_json(R"JSON({
+            "$schema": "https://json-schema.org/draft/2020-12/schema"
+          })JSON");
+        }
+
+        return std::nullopt;
+      }};
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Root, document,
+      sourcemeta::core::schema_walker, resolver, ""};
+  EXPECT_TRUE(frame.root_location().has_value());
+  EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
+              sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_DRAFT_7);
 }

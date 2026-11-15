@@ -303,7 +303,7 @@ auto sourcemeta::core::dialect(const sourcemeta::core::JSON &schema,
 static auto base_dialect_of_settled(const std::string_view dialect)
     -> std::optional<sourcemeta::core::SchemaBaseDialect> {
   const auto settled{sourcemeta::core::maybe_canonicalize(dialect)};
-  if (!settled.has_value() || settled.value() == dialect) {
+  if (!settled.has_value()) {
     return std::nullopt;
   }
 
