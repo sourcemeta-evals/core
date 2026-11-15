@@ -1109,6 +1109,26 @@ auto reaches_into(const Pointer &spelled, const Pointer &place) -> bool {
   return true;
 }
 
+// A pointer a reference spelled, said the way the document says it. The other
+// face of the same fact: what the frame holds is keyed by what the document
+// says, so looking a place up by a pointer that says a step the other way
+// answers nothing at all, where holding two pointers against each other can
+// go step by step instead
+auto as_the_document_says_it(const JSON &document, const Pointer &pointer)
+    -> Pointer {
+  Pointer result;
+  for (const auto &token : pointer) {
+    const auto *holder{try_get(document, result)};
+    if (token.is_index() && holder != nullptr && holder->is_object()) {
+      result.emplace_back(JSON::String{std::to_string(token.to_index())});
+    } else {
+      result.emplace_back(token);
+    }
+  }
+
+  return result;
+}
+
 // What a pointer says below a place it reaches into. The steps come off by
 // count, as a pointer a reference spelled and one the frame handed back agree
 // on the place while saying a step of it their own way
@@ -1352,15 +1372,13 @@ auto settle_positional_references(const Reading &reading, JSON &schema,
       // again, where saying the place does neither. What makes it that
       // resource rather than a subschema of it is the name leading back to the
       // same place
-      const auto reached{frame.traverse(to_weak_pointer(within_document))};
+      const auto said{as_the_document_says_it(schema, within_document)};
+      const auto reached{frame.traverse(to_weak_pointer(said),
+                                        SchemaFrame::LocationType::Resource)};
       if (reached.has_value() && !reached.value().get().base.empty()) {
-        const auto named{frame.traverse(reached.value().get().base)};
-        if (named.has_value() &&
-            to_pointer(named.value().get().pointer) == within_document) {
-          rewrites.insert_or_assign(to_pointer(pointer),
-                                    JSON::String{reached.value().get().base});
-          return;
-        }
+        rewrites.insert_or_assign(to_pointer(pointer),
+                                  JSON::String{reached.value().get().base});
+        return;
       }
 
       // A pointer names a place of whichever resource is in force where it is
@@ -2518,13 +2536,11 @@ auto embed_references(const Reading &reading, JSON &root, JSON &subschema,
                                     "",
                                     remaining};
           charge(remaining, located);
-          const auto named{
-              located.traverse(to_weak_pointer(fragment_pointer.value()))};
-          if (named.has_value() &&
-              named.value().get().type == SchemaFrame::LocationType::Resource &&
-              to_pointer(named.value().get().pointer) ==
-                  fragment_pointer.value() &&
-              named.value().get().base != identifier) {
+          const auto said{
+              as_the_document_says_it(remote, fragment_pointer.value())};
+          const auto named{located.traverse(
+              to_weak_pointer(said), SchemaFrame::LocationType::Resource)};
+          if (named.has_value() && named.value().get().base != identifier) {
             ref_rewrites.emplace_back(to_pointer(pointer),
                                       JSON::String{named.value().get().base});
             names_a_resource = true;

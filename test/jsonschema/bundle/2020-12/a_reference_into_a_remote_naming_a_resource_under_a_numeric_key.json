@@ -1,0 +1,69 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/host",
+    "$ref": "https://example.com/remote#/properties/0"
+  },
+  "resolver": {
+    "https://example.com/remote": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/remote",
+      "properties": {
+        "0": {
+          "$id": "https://example.com/one",
+          "type": "string"
+        }
+      }
+    }
+  },
+  "result": {
+    "nonOfficialMetaschemas": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "$ref": "https://example.com/one",
+      "$defs": {
+        "https://example.com/remote": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/remote",
+          "properties": {
+            "0": {
+              "$id": "https://example.com/one",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://example.com/host",
+      "$ref": "https://example.com/one",
+      "$defs": {
+        "https://example.com/remote": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://example.com/remote",
+          "properties": {
+            "0": {
+              "$id": "https://example.com/one",
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "inserted": {
+    "nonOfficialMetaschemas": [
+      {
+        "from": "https://example.com/remote",
+        "at": "/$defs/https:~1~1example.com~1remote"
+      }
+    ],
+    "references": [
+      {
+        "from": "https://example.com/remote",
+        "at": "/$defs/https:~1~1example.com~1remote"
+      }
+    ]
+  }
+}
