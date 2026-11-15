@@ -178,9 +178,6 @@ resolve_dialect_at(const sourcemeta::core::JSON &subschema,
                                            allow_dialect_override)
                 .value_or(inherited_base)
           : inherited_base};
-  // A name that is nothing but a fragment leaves the place within whatever
-  // resource encloses it rather than making one of its own, where a dialect
-  // spells such names this way at all, and says nothing anywhere else
   return {.dialect = local,
           .base_dialect = resolved_base,
           .override_active = override_active,
@@ -188,29 +185,26 @@ resolve_dialect_at(const sourcemeta::core::JSON &subschema,
 }
 
 // A meta-schema is looked for in the nearest schema that pinned one, then in
-// each schema enclosing that, before anything outside the document is asked.
-// The result borrows the chain and the resolver, so it must not outlive either
+// each schema enclosing that, before anything outside the document is asked
 inline auto
-resolver_within_scopes(const PinnedScope &innermost,
-                       const sourcemeta::core::SchemaResolver &resolver)
-    -> sourcemeta::core::SchemaResolver {
-  return [&innermost, &resolver](const std::string_view target)
-             -> sourcemeta::core::SchemaResolverResult {
-    // A dialect a base dialect answers for is published rather than carried,
-    // so nothing a document holds stands in front of one
-    if (!sourcemeta::core::to_base_dialect(target).has_value()) {
-      for (const auto *scope{&innermost}; scope != nullptr;
-           scope = scope->enclosing) {
-        const auto *embedded{sourcemeta::core::metaschema_try_embedded(
-            *scope->holder, target, resolver, &innermost)};
-        if (embedded != nullptr) {
-          return *embedded;
-        }
+resolve_within_scopes(const PinnedScope *innermost,
+                      const std::string_view target,
+                      const sourcemeta::core::SchemaResolver &resolver)
+    -> sourcemeta::core::SchemaResolverResult {
+  // A dialect a base dialect answers for is published rather than carried, so
+  // nothing a document holds stands in front of one
+  if (!sourcemeta::core::to_base_dialect(target).has_value()) {
+    for (const auto *scope{innermost}; scope != nullptr;
+         scope = scope->enclosing) {
+      const auto *embedded{sourcemeta::core::metaschema_try_embedded(
+          *scope->holder, target, resolver, innermost)};
+      if (embedded != nullptr) {
+        return *embedded;
       }
     }
+  }
 
-    return resolver(target);
-  };
+  return resolver(target);
 }
 
 // A subschema that the traversal has discovered but not visited yet
@@ -263,6 +257,15 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
   // Every scope the walk has entered, in a container that never relocates
   // what it holds, as the subschemas below each of them keep pointers into it
   std::forward_list<PinnedScope> scopes;
+  // Which chain a lookup goes through changes from one place to the next while
+  // what consults it does not, so the chain is what moves and the resolver
+  // around it is made once for the walk rather than at every place
+  const PinnedScope *scope_in_force{nullptr};
+  const sourcemeta::core::SchemaResolver scoped{
+      [&scope_in_force, &resolver](const std::string_view target)
+          -> sourcemeta::core::SchemaResolverResult {
+        return resolve_within_scopes(scope_in_force, target, resolver);
+      }};
   std::vector<PendingSubschema> pending;
   pending.push_back({.parent = root_parent,
                      .pointer = root_pointer,
@@ -295,12 +298,8 @@ walk(const std::optional<sourcemeta::core::WeakPointer> &root_parent,
     // Inheriting a dialect without inheriting where it was found leaves this
     // asking for a meta-schema the document already holds, so every schema
     // that pinned one stays in scope for everything below it
-    std::optional<sourcemeta::core::SchemaResolver> scoped;
-    if (current.pinned_within != nullptr) {
-      scoped.emplace(resolver_within_scopes(*current.pinned_within, resolver));
-    }
-
-    const auto &effective{scoped.has_value() ? scoped.value() : resolver};
+    scope_in_force = current.pinned_within;
+    const auto &effective{scope_in_force != nullptr ? scoped : resolver};
 
     // Recalculate the dialect and its vocabularies at every step.
     // This is needed for correctly traversing through schemas that
