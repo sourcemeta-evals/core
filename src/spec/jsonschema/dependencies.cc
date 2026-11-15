@@ -163,7 +163,9 @@ auto is_readable(const JSON &document, const SchemaResolver &resolver,
 auto examine(Walk &walk, const SchemaFrame &frame,
              const std::string_view origin,
              const SchemaFrame::Paths *entry_paths = nullptr,
-             const std::string_view retrieval_base = {}) -> void {
+             const std::string_view retrieval_base = {},
+             const std::string_view caller_name = {},
+             const JSON *entry_document = nullptr) -> void {
   // Every URI that a document the walk holds answers to is one the caller
   // never has to fetch of its own, whether the document declares it at the top
   // or carries it within itself
@@ -171,7 +173,8 @@ auto examine(Walk &walk, const SchemaFrame &frame,
       [&walk](const auto &uri) -> void { account(walk, uri); });
 
   frame.for_each_unresolved_reference([&walk, &frame, origin, entry_paths,
-                                       retrieval_base](
+                                       retrieval_base, caller_name,
+                                       entry_document](
                                           const auto &pointer,
                                           const auto &reference) -> void {
     // We don't want to report official schemas, as we can expect
@@ -213,6 +216,23 @@ auto examine(Walk &walk, const SchemaFrame &frame,
                                      to_pointer(pointer));
         }
       }
+    }
+
+    // The name the caller gave the entry document names the document making
+    // this reference, so a fragment through it lands where the raw document
+    // holds what it names and nowhere otherwise, however little of the
+    // document the framing registered beside its top
+    if (!caller_name.empty() && reference.base == caller_name) {
+      assert(entry_document != nullptr);
+      const auto landing{
+          fragment_to_pointer(URI{JSON::String{reference.destination}})};
+      if (!landing.has_value() ||
+          try_get(*entry_document, landing.value()) == nullptr) {
+        throw SchemaReferenceError("Could not resolve schema reference",
+                                   reference.destination, to_pointer(pointer));
+      }
+
+      return;
     }
 
     // Whatever the walk accounts for travels with the document it came from,
@@ -354,6 +374,7 @@ auto schema_dependencies(const JSON &schema, const SchemaWalker &walker,
           std::ranges::any_of(options.paths, [](const auto &path) -> bool {
             return path.empty();
           })};
+      JSON::String caller_name;
       if (frames_the_top && !options.default_id.empty()) {
         URI caller_identifier{JSON::String{options.default_id}};
         if (!options.default_base.empty()) {
@@ -362,13 +383,14 @@ auto schema_dependencies(const JSON &schema, const SchemaWalker &walker,
         }
 
         caller_identifier.canonicalize();
-        auto caller_name{caller_identifier.recompose()};
+        caller_name = caller_identifier.recompose();
         if (!frame->traverse(caller_name).has_value()) {
           account(walk, caller_name);
         }
       }
 
-      examine(walk, *frame, frame->root(), &options.paths, retrieval_base);
+      examine(walk, *frame, frame->root(), &options.paths, retrieval_base,
+              caller_name, &schema);
     }
 
     // Reading a document can only ever add to what the walk accounts for, so
