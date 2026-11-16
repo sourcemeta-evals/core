@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/plain-entry",
+    "type": "string"
+  },
+  "accounted": [],
+  "accounted": [],
+  "accountedReported": [
+    "https://www.sourcemeta.com/plain-entry"
+  ],
+  "dependencies": [],
+  "locations": 1,
+  "fetched": []
+}

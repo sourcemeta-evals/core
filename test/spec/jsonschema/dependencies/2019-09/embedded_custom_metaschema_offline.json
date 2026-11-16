@@ -1,0 +1,26 @@
+{
+  "schema": {
+    "$schema": "https://example.com/meta",
+    "$id": "https://example.com/schema",
+    "type": "string",
+    "$defs": {
+      "https://example.com/meta": {
+        "$id": "https://example.com/meta",
+        "$schema": "https://json-schema.org/draft/2019-09/schema",
+        "$vocabulary": {
+          "https://json-schema.org/draft/2019-09/vocab/core": true,
+          "https://json-schema.org/draft/2019-09/vocab/validation": true
+        },
+        "type": "object"
+      }
+    }
+  },
+  "accounted": [],
+  "accountedReported": [
+    "https://example.com/meta",
+    "https://example.com/schema"
+  ],
+  "dependencies": [],
+  "locations": 3,
+  "fetched": []
+}

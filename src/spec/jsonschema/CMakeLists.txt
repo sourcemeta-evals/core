@@ -3,9 +3,9 @@ set(KNOWN_RESOLVER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/known_resolver.cc")
 include(./known_resolver.cmake)
 
 sourcemeta_library(NAMESPACE sourcemeta PROJECT core NAME jsonschema
-  PRIVATE_HEADERS error.h types.h vocabularies.h frame.h
-  SOURCES jsonschema.cc vocabularies.cc known_walker.cc frame.cc format.cc
-          bundle.cc hasher.h helpers.h iterator.h
+  PRIVATE_HEADERS dependencies.h error.h frame.h types.h vocabularies.h
+  SOURCES bundle.cc dependencies.cc format.cc frame.cc hasher.h
+          helpers.h iterator.h jsonschema.cc known_walker.cc vocabularies.cc
     "${CMAKE_CURRENT_BINARY_DIR}/known_resolver.cc")
 
 if(SOURCEMETA_CORE_INSTALL)
