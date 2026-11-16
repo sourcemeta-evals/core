@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "a b": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/outside%20path/missing"
+    }
+  },
+  "defaultBase": "https://example.com/doc",
+  "paths": [
+    "/a b"
+  ],
+  "accounted": [],
+  "accountedReported": [
+    "https://example.com/doc"
+  ],
+  "dependencies": [],
+  "locations": 1,
+  "fetched": []
+}

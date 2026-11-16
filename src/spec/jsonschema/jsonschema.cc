@@ -2,11 +2,24 @@
 
 #include "helpers.h"
 
+#include <algorithm>     // std::ranges::count_if
 #include <cassert>       // assert
 #include <sstream>       // std::ostringstream
 #include <string_view>   // std::string_view
 #include <unordered_set> // std::unordered_set
 #include <utility>       // std::move, std::to_underlying, std::unreachable
+
+namespace {
+
+// How many meta-schemas deep a chain of them may go before determining a base
+// dialect gives up. A document declares the dialect it is written against,
+// which may itself declare another, and following that is what settles which
+// revision of the specification applies. Every revision needs a handful of
+// links at most, so a chain longer than this is one no document means, and
+// following it is recursion, so the stack is what an unbounded one costs
+constexpr std::size_t BASE_DIALECT_CHAIN_LIMIT{64};
+
+} // namespace
 
 // TODO: Make this function detect schemas only using identifier/comment
 // keywords, etc
@@ -290,7 +303,7 @@ auto sourcemeta::core::dialect(const sourcemeta::core::JSON &schema,
 static auto base_dialect_of_settled(const std::string_view dialect)
     -> std::optional<sourcemeta::core::SchemaBaseDialect> {
   const auto settled{sourcemeta::core::maybe_canonicalize(dialect)};
-  if (!settled.has_value() || settled.value() == dialect) {
+  if (!settled.has_value()) {
     return std::nullopt;
   }
 
@@ -301,6 +314,48 @@ static auto base_dialect_of_settled(const std::string_view dialect)
 
   return sourcemeta::core::to_base_dialect(settled.value() + "#");
 }
+
+// A document that names an official schema through an equivalent spelling of
+// its URI names the same schema, so a link is held up against its canonical
+// form before it can count as one the officials do not cover
+static auto link_is_official(const std::string_view link) -> bool {
+  if (sourcemeta::core::schema_is_official(link)) {
+    return true;
+  }
+
+  const auto settled{sourcemeta::core::maybe_canonicalize(link)};
+  return settled.has_value() &&
+         sourcemeta::core::schema_is_official(settled.value());
+}
+
+// The spellings that URI equivalence folds together name one meta-schema, so
+// the chain walk holds each link by its canonical form, and a resolver that
+// respells a link it already answered for cannot start the walk afresh
+static auto link_identity(const std::string_view link)
+    -> sourcemeta::core::JSON::String {
+  auto settled{sourcemeta::core::maybe_canonicalize(link)};
+  if (settled.has_value()) {
+    return std::move(settled).value();
+  }
+
+  return sourcemeta::core::JSON::String{link};
+}
+
+// Official meta-schemas are a finite set the module already knows, so no
+// resolver can extend a chain through them for ever, and only the links
+// beyond that set spend from the depth a chain is allowed
+static auto
+chain_depth(const std::unordered_set<sourcemeta::core::JSON::String> &visited)
+    -> std::size_t {
+  return static_cast<std::size_t>(
+      std::ranges::count_if(visited, [](const auto &link) -> bool {
+        return !link_is_official(link);
+      }));
+}
+
+static auto resolve_settled(const sourcemeta::core::SchemaResolver &resolver,
+                            const std::string_view identifier)
+    -> sourcemeta::core::SchemaResolverResult;
 
 // A meta-schema that the document embeds takes precedence over what the
 // resolver knows about, at every link of the chain, as the document pins the
@@ -325,7 +380,26 @@ auto sourcemeta::core::metaschema_try_embedded(
     return nullptr;
   }
 
-  std::unordered_set<std::string_view> visited;
+  // A link that names an official dialect a chain can end at, under whichever
+  // spelling, settles the chain before the walk takes it, even where the
+  // document embeds a copy of that schema, so the walk never reads through
+  // such a copy, however the copy chains onwards
+  auto starting_terminal{sourcemeta::core::to_base_dialect(identifier)};
+  if (!starting_terminal.has_value()) {
+    starting_terminal = base_dialect_of_settled(identifier);
+  }
+
+  if (starting_terminal.has_value()) {
+    if (!sourcemeta::core::embedded_metaschema_link_valid(
+            *(candidate.first), identifier, candidate.second,
+            starting_terminal.value())) {
+      return nullptr;
+    }
+
+    return candidate.first;
+  }
+
+  std::unordered_set<sourcemeta::core::JSON::String> visited;
   std::vector<sourcemeta::core::EmbeddedMetaschemaLink> links{
       {.schema = candidate.first,
        .identifier = identifier,
@@ -341,8 +415,12 @@ auto sourcemeta::core::metaschema_try_embedded(
   while (true) {
     // The meta-schema is present, but its chain can never terminate at an
     // official base dialect, just like a self-descriptive or cyclic
-    // meta-schema that the resolver knows about
-    if (!visited.emplace(current_identifier).second) {
+    // meta-schema that the resolver knows about. A chain that goes deeper
+    // than any document means is refused here too, as the resolver could
+    // otherwise extend this walk with fresh links for ever, though a link
+    // that is an official schema spends nothing from that depth
+    if (!visited.emplace(link_identity(current_identifier)).second ||
+        chain_depth(visited) > BASE_DIALECT_CHAIN_LIMIT) {
       throw sourcemeta::core::SchemaUnknownBaseDialectError();
     }
 
@@ -382,6 +460,10 @@ auto sourcemeta::core::metaschema_try_embedded(
 
     auto remote{resolver(dialect_uri)};
     if (!remote.has_value()) {
+      remote = resolve_settled(resolver, dialect_uri);
+    }
+
+    if (!remote.has_value()) {
       return nullptr;
     }
 
@@ -415,13 +497,12 @@ static auto resolve_settled(const sourcemeta::core::SchemaResolver &resolver,
   return resolver(settled.value());
 }
 
-static auto
-base_dialect_with_visited(const sourcemeta::core::JSON &schema,
-                          const sourcemeta::core::SchemaResolver &resolver,
-                          std::string_view default_dialect,
-                          std::unordered_set<std::string_view> &visited,
-                          const bool allow_dialect_override,
-                          const sourcemeta::core::JSON &document)
+static auto base_dialect_with_visited(
+    const sourcemeta::core::JSON &schema,
+    const sourcemeta::core::SchemaResolver &resolver,
+    std::string_view default_dialect,
+    std::unordered_set<sourcemeta::core::JSON::String> &visited,
+    const bool allow_dialect_override, const sourcemeta::core::JSON &document)
     -> std::optional<sourcemeta::core::SchemaBaseDialect> {
   assert((schema.is_object() || schema.is_boolean()));
   const std::string_view effective_dialect{sourcemeta::core::dialect(
@@ -444,8 +525,12 @@ base_dialect_with_visited(const sourcemeta::core::JSON &schema,
     return settled_result;
   }
 
-  // Detect cycles in the metaschema chain
-  if (!visited.emplace(effective_dialect).second) {
+  // Detect cycles in the metaschema chain, and refuse one that goes deeper
+  // than any document means, which no allowance a caller sets can reach. A
+  // link that is an official schema spends nothing from that depth, as the
+  // officials are a finite set no resolver can extend
+  if (!visited.emplace(link_identity(effective_dialect)).second ||
+      chain_depth(visited) > BASE_DIALECT_CHAIN_LIMIT) {
     throw sourcemeta::core::SchemaUnknownBaseDialectError();
   }
 
@@ -490,6 +575,13 @@ base_dialect_with_visited(const sourcemeta::core::JSON &schema,
         "Could not resolve the metaschema of the schema", effective_dialect);
   }
 
+  // An answer has to be a schema before it can say which dialect it is written
+  // against, so one that is neither an object nor a boolean leaves the base
+  // dialect as undeterminable as no answer at all
+  if (!metaschema.value().is_object() && !metaschema.value().is_boolean()) {
+    throw sourcemeta::core::SchemaUnknownBaseDialectError();
+  }
+
   // If the metaschema declares the same dialect (self-descriptive), and it's
   // not an official dialect, we cannot determine the base dialect
   const std::string_view metaschema_dialect{sourcemeta::core::dialect(
@@ -508,7 +600,7 @@ auto sourcemeta::core::base_dialect(
     const sourcemeta::core::SchemaResolver &resolver,
     std::string_view default_dialect, const bool allow_dialect_override)
     -> std::optional<SchemaBaseDialect> {
-  std::unordered_set<std::string_view> visited;
+  std::unordered_set<sourcemeta::core::JSON::String> visited;
   return base_dialect_with_visited(schema, resolver, default_dialect, visited,
                                    allow_dialect_override, schema);
 }

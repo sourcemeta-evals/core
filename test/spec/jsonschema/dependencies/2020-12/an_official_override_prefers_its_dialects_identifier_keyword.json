@@ -1,0 +1,41 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.sourcemeta.com/entry",
+    "$defs": {
+      "one": { "$ref": "http://json-schema.org/draft-04/schema" },
+      "two": { "$ref": "https://www.sourcemeta.com/decoy" }
+    }
+  },
+  "resolver": {
+    "http://json-schema.org/draft-04/schema": {
+      "$schema": "http://json-schema.org/draft-04/schema#",
+      "id": "http://json-schema.org/draft-04/schema#",
+      "$id": "https://www.sourcemeta.com/decoy",
+      "type": "object"
+    },
+    "https://www.sourcemeta.com/decoy": true
+  },
+  "accounted": [],
+  "accountedReported": [
+    "https://www.sourcemeta.com/entry",
+    "http://json-schema.org/draft-04/schema",
+    "https://www.sourcemeta.com/decoy"
+  ],
+  "dependencies": [
+    {
+      "origin": "https://www.sourcemeta.com/entry",
+      "pointer": "/$defs/one/$ref",
+      "destination": "http://json-schema.org/draft-04/schema"
+    },
+    {
+      "origin": "https://www.sourcemeta.com/entry",
+      "pointer": "/$defs/two/$ref",
+      "destination": "https://www.sourcemeta.com/decoy"
+    }
+  ],
+  "locations": 3,
+  "fetched": [
+    "https://www.sourcemeta.com/decoy"
+  ]
+}

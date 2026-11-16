@@ -1,0 +1,29 @@
+{
+  "schema": {
+    "selected": {
+      "$ref": "https://www.sourcemeta.com/named"
+    }
+  },
+  "defaultDialect": "https://json-schema.org/draft/2020-12/schema",
+  "paths": [
+    "/selected"
+  ],
+  "resolver": {
+    "https://www.sourcemeta.com/named": true
+  },
+  "accounted": [],
+  "accountedReported": [
+    "https://www.sourcemeta.com/named"
+  ],
+  "dependencies": [
+    {
+      "origin": "",
+      "pointer": "/selected/$ref",
+      "destination": "https://www.sourcemeta.com/named"
+    }
+  ],
+  "locations": 1,
+  "fetched": [
+    "https://www.sourcemeta.com/named"
+  ]
+}
