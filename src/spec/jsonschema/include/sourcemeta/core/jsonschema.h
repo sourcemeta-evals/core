@@ -9,6 +9,7 @@
 #include <sourcemeta/core/jsonpointer.h>
 
 // NOLINTBEGIN(misc-include-cleaner)
+#include <sourcemeta/core/jsonschema_dependencies.h>
 #include <sourcemeta/core/jsonschema_error.h>
 #include <sourcemeta/core/jsonschema_frame.h>
 #include <sourcemeta/core/jsonschema_types.h>

@@ -1,5 +1,6 @@
 sourcemeta_test(NAMESPACE sourcemeta PROJECT core NAME jsonschema
   SOURCES
+    jsonschema_dependencies_test.cc
     jsonschema_reidentify_test.cc
     jsonschema_vocabulary_test.cc
     jsonschema_walker_2020_12_test.cc
