@@ -154,6 +154,11 @@ struct SchemaDependenciesOptions {
 /// analysis to part of a document, what the rest of that document holds is
 /// none of its business, so a reference into the part left out is neither
 /// followed nor complained about.
+///
+/// Analysis asks the resolver for a given URI at most once and keeps the
+/// answer for the rest of the run, an answer handed over by reference
+/// included, so what such an answer refers to has to stay as it was handed
+/// over until analysis returns.
 SOURCEMETA_CORE_JSONSCHEMA_EXPORT
 auto schema_dependencies(const sourcemeta::core::JSON &schema,
                          const SchemaWalker &walker,

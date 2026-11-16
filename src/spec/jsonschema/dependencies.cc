@@ -221,11 +221,16 @@ auto examine(Walk &walk, const SchemaFrame &frame,
     // The name the caller gave the entry document names the document making
     // this reference, so a fragment through it lands where the raw document
     // holds what it names and nowhere otherwise, however little of the
-    // document the framing registered beside its top
+    // document the framing registered beside its top. Without a fragment the
+    // name names the whole of the document, which is right here
     if (!caller_name.empty() && reference.base == caller_name) {
       assert(entry_document != nullptr);
-      const auto landing{
-          fragment_to_pointer(URI{JSON::String{reference.destination}})};
+      const URI destination{JSON::String{reference.destination}};
+      if (!destination.fragment().has_value()) {
+        return;
+      }
+
+      const auto landing{fragment_to_pointer(destination)};
       if (!landing.has_value() ||
           try_get(*entry_document, landing.value()) == nullptr) {
         throw SchemaReferenceError("Could not resolve schema reference",

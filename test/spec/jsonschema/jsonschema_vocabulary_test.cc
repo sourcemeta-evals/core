@@ -1774,3 +1774,35 @@ TEST(base_dialect_a_declared_draft7_spelling_despite_an_overriding_answer) {
   EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
               sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_DRAFT_7);
 }
+
+TEST(base_dialect_an_embedded_chain_through_a_respelled_remote_link) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "https://www.sourcemeta.com/meta/a",
+    "$defs": {
+      "a": {
+        "$schema": "https://WWW.SOURCEMETA.COM/meta/b",
+        "$id": "https://www.sourcemeta.com/meta/a"
+      }
+    }
+  })JSON")};
+
+  const sourcemeta::core::SchemaResolver resolver{
+      [](const std::string_view identifier)
+          -> sourcemeta::core::SchemaResolverResult {
+        if (identifier == "https://www.sourcemeta.com/meta/b") {
+          return sourcemeta::core::parse_json(R"JSON({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://www.sourcemeta.com/meta/b"
+          })JSON");
+        }
+
+        return std::nullopt;
+      }};
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Root, document,
+      sourcemeta::core::schema_walker, resolver, ""};
+  EXPECT_TRUE(frame.root_location().has_value());
+  EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
+              sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_2020_12);
+}

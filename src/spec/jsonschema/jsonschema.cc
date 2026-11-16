@@ -353,6 +353,10 @@ chain_depth(const std::unordered_set<sourcemeta::core::JSON::String> &visited)
       }));
 }
 
+static auto resolve_settled(const sourcemeta::core::SchemaResolver &resolver,
+                            const std::string_view identifier)
+    -> sourcemeta::core::SchemaResolverResult;
+
 // A meta-schema that the document embeds takes precedence over what the
 // resolver knows about, at every link of the chain, as the document pins the
 // exact meta-schemas it is described by. Across every official base dialect,
@@ -436,6 +440,10 @@ auto sourcemeta::core::metaschema_try_embedded(
     }
 
     auto remote{resolver(dialect_uri)};
+    if (!remote.has_value()) {
+      remote = resolve_settled(resolver, dialect_uri);
+    }
+
     if (!remote.has_value()) {
       return nullptr;
     }
