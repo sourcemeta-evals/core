@@ -5,7 +5,7 @@
 
 #include <sourcemeta/core/uri.h>
 
-#include <array>         // std::array
+#include <array>         // std::array, std::to_array
 #include <cassert>       // assert
 #include <deque>         // std::deque
 #include <optional>      // std::optional
@@ -149,6 +149,29 @@ inline auto vocabularies_with_embedded(const sourcemeta::core::JSON &schema,
     -> SchemaVocabularies {
   return sourcemeta::core::vocabularies(
       resolver_with_embedded(schema, resolver), base_dialect, dialect);
+}
+
+constexpr auto EXTENSION_DEFINITIONS_KEYWORD{"x-definitions"sv};
+
+// Every name this module knows for a location a dialect reserves for schema
+// definitions
+constexpr auto DEFINITIONS_KEYWORDS{std::to_array<std::string_view>(
+    {"$defs", "definitions", EXTENSION_DEFINITIONS_KEYWORD})};
+
+// Which of those the dialect in force actually reserves. Asking the walker
+// rather than a table of dialects keeps a dialect this code never names, such
+// as OpenAPI 3.0, from being handed the location its base dialect would use
+inline auto definitions_keyword(const SchemaWalker &walker,
+                                const SchemaVocabularies &vocabularies)
+    -> std::string_view {
+  for (const auto candidate : DEFINITIONS_KEYWORDS) {
+    if (walker(candidate, vocabularies).type ==
+        SchemaKeywordType::LocationMembers) {
+      return candidate;
+    }
+  }
+
+  return {};
 }
 
 inline auto definitions_keyword(const SchemaBaseDialect base_dialect)

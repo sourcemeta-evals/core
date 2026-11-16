@@ -138,16 +138,21 @@ auto elevate_embedded_resources(
     std::unordered_map<JSON::String, JSON::String> &bundled,
     std::uint64_t &remaining, const SchemaBundleOptions::Callback &callback)
     -> void {
-  const auto keyword{definitions_keyword(remote_dialect)};
+  if (!remote.is_object()) {
+    return;
+  }
+
+  const auto remote_dialect_uri{declared_dialect(remote, default_dialect)};
+  const auto keyword{definitions_keyword(
+      walker, vocabularies_with_embedded(remote, resolver, remote_dialect,
+                                         remote_dialect_uri))};
   const JSON::String keyword_string{keyword};
-  if (keyword.empty() || !remote.is_object() ||
-      !remote.defines(keyword_string) ||
+  if (keyword.empty() || !remote.defines(keyword_string) ||
       !remote.at(keyword_string).is_object()) {
     return;
   }
 
   auto &defs{remote.at(keyword_string)};
-  const auto remote_dialect_uri{declared_dialect(remote, default_dialect)};
 
   // Navigate to the root container once, as it doesn't change per entry
   const JSON *root_container{&root};
@@ -437,10 +442,17 @@ auto embed_references(
     if (remote.is_object()) {
       // Otherwise the embedded resource would be re-interpreted under the
       // dialect of the schema it gets embedded into, which can differ from
-      // the default dialect that the remote was resolved with
-      if (!remote.defines("$schema")) {
-        remote.assign("$schema",
-                      JSON{declared_dialect(remote, default_dialect)});
+      // the default dialect that the remote was resolved with. A dialect that
+      // reserves no keyword for declaring itself has nowhere to put this, and
+      // writing it anyway makes a declaration the dialect cannot read
+      const auto remote_declares{declared_dialect(remote, default_dialect)};
+      if (dialect_defines(walker,
+                          vocabularies_with_embedded(remote, resolver,
+                                                     remote_base_dialect,
+                                                     remote_declares),
+                          "$schema"sv) &&
+          !remote.defines("$schema")) {
+        remote.assign("$schema", JSON{remote_declares});
       }
 
       schema_reidentify(remote, effective_id, remote_base_dialect);
@@ -542,8 +554,10 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
           walker(default_container.value().back().to_property(),
                  initial_frame.vocabularies(parent.value().get(), resolver))
                   .type != SchemaKeywordType::LocationMembers) {
-        throw SchemaError("Could not bundle to a container that the dialect "
-                          "does not reserve for schema definitions");
+        throw SchemaContainerError(
+            default_container.value(),
+            "Could not bundle to a container that the dialect does not "
+            "reserve for schema definitions");
       }
     }
 
@@ -592,7 +606,9 @@ auto bundle_internal(JSON &schema, const SchemaWalker &walker,
   const auto schema_base_dialect{
       schema_root_frame->root_location().value().get().base_dialect};
 
-  const auto container_keyword{definitions_keyword(schema_base_dialect)};
+  const auto container_keyword{definitions_keyword(
+      walker, schema_root_frame->vocabularies(
+                  schema_root_frame->root_location().value().get(), resolver))};
   if (container_keyword.empty()) {
     SchemaFrame frame{SchemaFrame::Mode::References,
                       schema,
