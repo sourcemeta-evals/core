@@ -1,0 +1,42 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.example.com/entry",
+    "items": {
+      "$ref": "http://json-schema.org/draft-07/schema#"
+    },
+    "contains": {
+      "$ref": "https://example.com/leaf"
+    }
+  },
+  "resolver": {
+    "http://json-schema.org/draft-07/schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$ref": "https://example.com/other",
+      "$id": "https://example.com/leaf"
+    },
+    "https://example.com/leaf": true
+  },
+  "accounted": [],
+  "accountedReported": [
+    "https://www.example.com/entry",
+    "https://example.com/leaf",
+    "http://json-schema.org/draft-07/schema"
+  ],
+  "dependencies": [
+    {
+      "origin": "https://www.example.com/entry",
+      "pointer": "/contains/$ref",
+      "destination": "https://example.com/leaf"
+    },
+    {
+      "origin": "https://www.example.com/entry",
+      "pointer": "/items/$ref",
+      "destination": "http://json-schema.org/draft-07/schema"
+    }
+  ],
+  "locations": 3,
+  "fetched": [
+    "https://example.com/leaf"
+  ]
+}

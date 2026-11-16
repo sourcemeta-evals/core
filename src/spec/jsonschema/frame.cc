@@ -1339,9 +1339,14 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
                   entry.id.value());
             }
 
-            maybe_relative.resolve_from(base).canonicalize();
-            const sourcemeta::core::JSON::String new_id{
-                maybe_relative.recompose()};
+            sourcemeta::core::JSON::String new_id;
+            if (common_pointer_weak.empty() && root_id.has_value() &&
+                base_string == root_id.value()) {
+              new_id = root_id.value();
+            } else {
+              maybe_relative.resolve_from(base).canonicalize();
+              new_id = maybe_relative.recompose();
+            }
 
             const auto maybe_match{
                 this->locations_.find({SchemaReferenceType::Static, new_id})};
@@ -1825,7 +1830,18 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
       const auto base_entry{this->locations_.find(
           {SchemaReferenceType::Static,
            sourcemeta::core::JSON::String{reference.second.base}})};
-      if (base_entry == this->locations_.cend()) {
+      // A reference through the base the document was retrieved from stands
+      // even where the caller's paths leave the document's top out and that
+      // base holds no location of its own: the base still names the whole
+      // document, so the fragment resolves against its root, though only a
+      // target within a selected path is one this frame holds. An anonymous
+      // document retrieved from no base at all reads the same way: its
+      // fragment-only references carry an empty base, which is the base it
+      // was retrieved from
+      const auto through_retrieval{base_entry == this->locations_.cend() &&
+                                   reference.second.base ==
+                                       this->cache_->default_base};
+      if (base_entry == this->locations_.cend() && !through_retrieval) {
         continue;
       }
 
@@ -1838,8 +1854,18 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
         continue;
       }
 
-      auto absolute{sourcemeta::core::to_pointer(base_entry->second.pointer)
-                        .concat(relative.value())};
+      auto absolute{through_retrieval ? relative.value()
+                                      : sourcemeta::core::to_pointer(
+                                            base_entry->second.pointer)
+                                            .concat(relative.value())};
+      if (through_retrieval &&
+          !std::ranges::any_of(paths, [&absolute](const auto &path) -> bool {
+            return sourcemeta::core::to_weak_pointer(absolute).starts_with(
+                path);
+          })) {
+        continue;
+      }
+
       if (sourcemeta::core::try_get(root, absolute) == nullptr) {
         continue;
       }
@@ -1850,8 +1876,19 @@ SchemaFrame::SchemaFrame(const Mode mode, const sourcemeta::core::JSON &root,
       const auto combined{
           find_dialect_and_all_bases(base_dialects, base_uris, pointer_weak)};
 
-      std::size_t nearest_base_depth{base_entry->second.pointer.size()};
-      std::string_view nearest_base_view{base_entry->first.second};
+      // Without a location for the base, the dialect in effect can only come
+      // from one declared along the way, and a target the walk found no
+      // dialect for is not one this frame can describe
+      if (through_retrieval && !combined.dialect_match.has_value()) {
+        this->reference_pointers_.pop_back();
+        continue;
+      }
+
+      std::size_t nearest_base_depth{
+          through_retrieval ? 0 : base_entry->second.pointer.size()};
+      std::string_view nearest_base_view{
+          through_retrieval ? std::string_view{this->cache_->default_base}
+                            : std::string_view{base_entry->first.second}};
       for (const auto &candidate : combined.every_base) {
         if (candidate.first.empty()) {
           continue;
