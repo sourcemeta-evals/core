@@ -380,6 +380,25 @@ auto sourcemeta::core::metaschema_try_embedded(
     return nullptr;
   }
 
+  // A link that names an official dialect a chain can end at, under whichever
+  // spelling, settles the chain before the walk takes it, even where the
+  // document embeds a copy of that schema, so the walk never reads through
+  // such a copy, however the copy chains onwards
+  auto starting_terminal{sourcemeta::core::to_base_dialect(identifier)};
+  if (!starting_terminal.has_value()) {
+    starting_terminal = base_dialect_of_settled(identifier);
+  }
+
+  if (starting_terminal.has_value()) {
+    if (!sourcemeta::core::embedded_metaschema_link_valid(
+            *(candidate.first), identifier, candidate.second,
+            starting_terminal.value())) {
+      return nullptr;
+    }
+
+    return candidate.first;
+  }
+
   std::unordered_set<sourcemeta::core::JSON::String> visited;
   std::vector<sourcemeta::core::EmbeddedMetaschemaLink> links{
       {.schema = candidate.first,

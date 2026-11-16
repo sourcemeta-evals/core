@@ -1806,3 +1806,33 @@ TEST(base_dialect_an_embedded_chain_through_a_respelled_remote_link) {
   EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
               sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_2020_12);
 }
+
+// A spelling that settles the chain is never taken as a link, so a copy of
+// that schema the document embeds is never read through, and however its own
+// chain cycles onwards, the official dialect the spelling names still settles
+TEST(base_dialect_a_respelled_official_root_with_an_embedded_cyclic_copy) {
+  const auto document{sourcemeta::core::parse_json(R"JSON({
+    "$schema": "HTTPS://JSON-SCHEMA.ORG/draft/2020-12/schema",
+    "$defs": {
+      "copy": {
+        "$id": "https://json-schema.org/draft/2020-12/schema",
+        "$schema": "https://www.sourcemeta.com/custom-a"
+      },
+      "a": {
+        "$id": "https://www.sourcemeta.com/custom-a",
+        "$schema": "https://www.sourcemeta.com/custom-b"
+      },
+      "b": {
+        "$id": "https://www.sourcemeta.com/custom-b",
+        "$schema": "https://www.sourcemeta.com/custom-a"
+      }
+    }
+  })JSON")};
+
+  const sourcemeta::core::SchemaFrame frame{
+      sourcemeta::core::SchemaFrame::Mode::Root, document,
+      sourcemeta::core::schema_walker, sourcemeta::core::schema_resolver, ""};
+  EXPECT_TRUE(frame.root_location().has_value());
+  EXPECT_TRUE(frame.root_location().value().get().base_dialect ==
+              sourcemeta::core::SchemaBaseDialect::JSON_SCHEMA_2020_12);
+}
