@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "selected": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/selected/missing"
+    }
+  },
+  "paths": [
+    "/selected"
+  ],
+  "accounted": [],
+  "accountedReported": [],
+  "dependencies": [],
+  "fetched": [],
+  "error": {
+    "type": "SchemaReferenceError",
+    "message": "Could not resolve schema reference",
+    "identifier": "#/selected/missing",
+    "location": "/selected/$ref"
+  }
+}

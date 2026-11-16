@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$ref": "https://json-schema.org/draft/2020-12/schema#/$defs/missing"
+  },
+  "maxLocations": 1,
+  "accounted": [],
+  "accountedReported": [
+    "https://json-schema.org/draft/2020-12/schema"
+  ],
+  "dependencies": [
+    {
+      "origin": "",
+      "pointer": "/$ref",
+      "destination": "https://json-schema.org/draft/2020-12/schema"
+    }
+  ],
+  "locations": 1,
+  "fetched": []
+}

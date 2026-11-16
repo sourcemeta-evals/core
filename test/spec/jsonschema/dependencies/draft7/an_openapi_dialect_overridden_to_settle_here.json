@@ -1,0 +1,30 @@
+{
+  "schema": {
+    "$schema": "https://spec.openapis.org/oas/3.1/dialect/base",
+    "dependencies": {
+      "alpha": {
+        "type": "string"
+      }
+    }
+  },
+  "resolver": {
+    "https://spec.openapis.org/oas/3.1/dialect/base": {
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  "accounted": [],
+  "accountedReported": [
+    "https://spec.openapis.org/oas/3.1/dialect/base"
+  ],
+  "dependencies": [
+    {
+      "origin": "",
+      "pointer": "/$schema",
+      "destination": "https://spec.openapis.org/oas/3.1/dialect/base"
+    }
+  ],
+  "fetched": [
+    "https://spec.openapis.org/oas/3.1/dialect/base"
+  ],
+  "locations": 3
+}

@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "selected": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/selected/x-extra",
+      "x-extra": {}
+    }
+  },
+  "defaultBase": "https://example.com/doc",
+  "paths": [
+    "/selected"
+  ],
+  "accounted": [],
+  "accountedReported": [
+    "https://example.com/doc"
+  ],
+  "dependencies": [],
+  "locations": 2,
+  "fetched": []
+}

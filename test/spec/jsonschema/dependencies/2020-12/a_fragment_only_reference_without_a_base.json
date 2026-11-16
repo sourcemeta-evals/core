@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "items": {
+      "$ref": "#/$defs/missing"
+    }
+  },
+  "accounted": [],
+  "accountedReported": [],
+  "dependencies": [],
+  "fetched": [],
+  "error": {
+    "type": "SchemaReferenceError",
+    "message": "Could not resolve schema reference",
+    "identifier": "#/$defs/missing",
+    "location": "/items/$ref"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "$ref": "#/definitions/missing"
+  },
+  "defaultDialect": "http://json-schema.org/draft-07/schema#",
+  "defaultId": "https://www.example.com/entry",
+  "accounted": [],
+  "accountedReported": [
+    "https://www.example.com/entry"
+  ],
+  "dependencies": [],
+  "fetched": [],
+  "error": {
+    "type": "SchemaReferenceError",
+    "message": "Could not resolve schema reference",
+    "identifier": "https://www.example.com/entry#/definitions/missing",
+    "location": "/$ref"
+  }
+}

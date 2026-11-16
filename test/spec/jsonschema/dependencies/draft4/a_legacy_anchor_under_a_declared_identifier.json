@@ -1,0 +1,27 @@
+{
+  "schema": {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://www.sourcemeta.com/declared",
+    "properties": {
+      "self": { "$ref": "https://www.sourcemeta.com/declared#name" },
+      "stale": { "$ref": "https://www.sourcemeta.com/retrieved#name" }
+    },
+    "definitions": {
+      "thing": { "id": "#name", "type": "string" }
+    }
+  },
+  "defaultBase": "https://www.sourcemeta.com/retrieved",
+  "accounted": [],
+  "accountedReported": [
+    "https://www.sourcemeta.com/retrieved",
+    "https://www.sourcemeta.com/declared"
+  ],
+  "dependencies": [],
+  "fetched": [],
+  "error": {
+    "type": "SchemaReferenceError",
+    "message": "Could not resolve schema reference",
+    "identifier": "https://www.sourcemeta.com/retrieved#name",
+    "location": "/properties/stale/$ref"
+  }
+}

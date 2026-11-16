@@ -1,0 +1,40 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.example.com/entry",
+    "items": {
+      "$ref": "https://www.example.com/fetched"
+    }
+  },
+  "resolver": {
+    "https://www.example.com/fetched": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://www.example.com/declared",
+      "items": {
+        "$ref": "https://www.example.com/fetched#missing"
+      }
+    }
+  },
+  "accounted": [],
+  "accountedReported": [
+    "https://www.example.com/entry",
+    "https://www.example.com/fetched",
+    "https://www.example.com/declared"
+  ],
+  "dependencies": [
+    {
+      "origin": "https://www.example.com/entry",
+      "pointer": "/items/$ref",
+      "destination": "https://www.example.com/fetched"
+    }
+  ],
+  "fetched": [
+    "https://www.example.com/fetched"
+  ],
+  "error": {
+    "type": "SchemaReferenceError",
+    "message": "Could not resolve schema reference",
+    "identifier": "https://www.example.com/fetched#missing",
+    "location": "/items/$ref"
+  }
+}
