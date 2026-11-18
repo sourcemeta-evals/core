@@ -3701,7 +3701,7 @@ TEST(graph_index_container_keeps_an_index_the_value_already_carries) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
-TEST(graph_id_container_leaves_a_keyword_form_key_unnamed) {
+TEST(graph_id_container_names_a_keyword_form_key_null) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {
       "g": {
@@ -3714,16 +3714,20 @@ TEST(graph_id_container_leaves_a_keyword_form_key_unnamed) {
     }
   })");
 
-  // The name comes out of expanding the key, which yields nothing for a key
-  // shaped like a keyword, so the graph is left unnamed rather than named
-  // after a key that named nothing
+  // The name comes out of expanding the key, and a key shaped like a keyword
+  // expands to null, which is what the step adds, the way the official suite
+  // keeps a null identifier in expanded form (JSON-LD 1.1 API Section 5.1.2,
+  // suite entry #t0122). Like that entry's output, the result is correct
+  // expansion output yet not a valid expanded document, which the validator
+  // rejects
   const auto expected = sourcemeta::core::parse_json(R"([
     {
       "http://example.com/g": [
         {
           "@graph": [
             { "http://example.com/p": [ { "@value": "v" } ] }
-          ]
+          ],
+          "@id": null
         }
       ]
     }
@@ -3731,7 +3735,35 @@ TEST(graph_id_container_leaves_a_keyword_form_key_unnamed) {
 
   const auto result{sourcemeta::core::jsonld_expand(input)};
   EXPECT_EQ(result, expected);
-  EXPECT_TRUE(sourcemeta::core::jsonld_is_expanded(result));
+  EXPECT_FALSE(sourcemeta::core::jsonld_is_expanded(result));
+}
+
+TEST(id_container_names_a_keyword_form_key_null) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "m": { "@id": "http://example.com/m", "@container": "@id" }
+    },
+    "m": {
+      "@unknown": { "http://example.com/p": "v" }
+    }
+  })");
+
+  // As above, outside any graph wrapping: the member takes the null
+  // identifier the key expanded to
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/m": [
+        {
+          "http://example.com/p": [ { "@value": "v" } ],
+          "@id": null
+        }
+      ]
+    }
+  ])");
+
+  const auto result{sourcemeta::core::jsonld_expand(input)};
+  EXPECT_EQ(result, expected);
+  EXPECT_FALSE(sourcemeta::core::jsonld_is_expanded(result));
 }
 
 TEST(index_container_with_a_keyword_form_key) {

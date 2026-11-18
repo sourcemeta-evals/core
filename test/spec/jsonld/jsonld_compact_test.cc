@@ -1412,9 +1412,9 @@ TEST(graph_container_keeps_an_array_when_arrays_are_not_compacted) {
 }
 
 TEST(language_container_over_a_node_object) {
-  // A language map keys value objects by their language, so a node object
-  // under the same term takes the ordinary path instead (JSON-LD 1.1 API
-  // Section 6.1.2)
+  // Term selection offers a node object no language entry to match, so the
+  // language container term is never selected and the node stands under the
+  // property IRI itself, outside any map (JSON-LD 1.1 API Section 6.1.2)
   const auto input = sourcemeta::core::parse_json(R"([
     {
       "http://example.com/label": [ { "@id": "http://example.com/other" } ]
@@ -2300,8 +2300,8 @@ TEST(a_set_container_on_a_self_named_term_over_a_list_object) {
 
 TEST(a_language_container_on_a_self_named_term_over_a_node_reference) {
   // As above, so a language container may be in hand for something that
-  // carries no value and therefore no language to key by, which leaves the
-  // member standing under the property itself
+  // carries no value and therefore no language to key by, which stands in
+  // the map under the none label (JSON-LD 1.1 API Section 6.1.2)
   const auto input = sourcemeta::core::parse_json(
       R"([ { "http://e/p": [ { "@id": "http://e/n" } ] } ])");
 
@@ -2309,7 +2309,7 @@ TEST(a_language_container_on_a_self_named_term_over_a_node_reference) {
       R"({ "http://e/p": { "@container": "@language" } })");
 
   const auto expected = sourcemeta::core::parse_json(R"({
-    "http://e/p": { "@id": "http://e/n" },
+    "http://e/p": { "@none": { "@id": "http://e/n" } },
     "@context": { "http://e/p": { "@container": "@language" } }
   })");
 
@@ -2563,5 +2563,33 @@ TEST(an_identifier_declines_a_prefix_whose_term_maps_elsewhere) {
       { "a": "http://other.example/" }
     ]
   })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_identifier_map_keys_under_a_property_scoped_base) {
+  // The key is the identifier the member carries once compacted, and the
+  // property's scoped context supplies the base that compaction relativises
+  // it against, so the map keys by the scoped reading and consumes the
+  // identifier entry (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/m": [
+      { "@id": "https://example.com/inner/n",
+        "http://example.com/p": [ { "@value": 1 } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "m": { "@id": "http://example.com/m", "@container": "@id",
+           "@context": { "@base": "https://example.com/inner/" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "m": { "n": { "http://example.com/p": 1 } },
+    "@context": {
+      "m": { "@id": "http://example.com/m", "@container": "@id",
+             "@context": { "@base": "https://example.com/inner/" } }
+    }
+  })");
+
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }

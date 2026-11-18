@@ -1036,16 +1036,17 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
           }
           if (!none_key) {
             if (by_id) {
-              // The name comes out of expanding the key, and a key shaped like
-              // a keyword expands to nothing, leaving the algorithm with
-              // nothing to add rather than a name of its own invention. An
-              // index container keys by the key as written instead, which is
-              // why only this one goes through expansion (JSON-LD 1.1 API
-              // Section 5.1.2)
-              if (!graph.defines(KEYWORD_ID, KEYWORD_ID_HASH) &&
-                  expanded_key.has_value()) {
+              // The name comes out of expanding the key, and a key shaped
+              // like a keyword expands to null, which is what the step adds,
+              // the way the official suite keeps a null identifier in
+              // expanded form (JSON-LD 1.1 API Section 5.1.2, suite entry
+              // #t0122). An index container keys by the key as written
+              // instead, which is why only this one goes through expansion
+              if (!graph.defines(KEYWORD_ID, KEYWORD_ID_HASH)) {
                 graph.assign_assume_new(JSON::String{KEYWORD_ID},
-                                        JSON{expanded_key.value()},
+                                        expanded_key.has_value()
+                                            ? JSON{expanded_key.value()}
+                                            : JSON{nullptr},
                                         KEYWORD_ID_HASH);
               }
             } else if (property_valued) {
@@ -1196,15 +1197,20 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
       for (const auto &[map_key, map_value] : sorted_entries(entry.second)) {
         const JSON::String &index{*map_key};
         std::optional<JSON::String> expanded_index;
-        if (index != KEYWORD_NONE) {
+        // The key may be an alias of @none, which stands apart from a key
+        // that expands to null: the none label adds nothing, while a key
+        // shaped like a keyword names a null identifier (JSON-LD 1.1 API
+        // Section 5.1.2)
+        bool none_index{index == KEYWORD_NONE};
+        if (!none_index) {
           expanded_index =
               expand_iri(state, active_context, index, by_id, !by_id, nullptr,
                          nullptr, EMPTY_WEAK_POINTER);
-        }
-        // The key may be an alias of @none, which carries no identifier.
-        if (expanded_index.has_value() &&
-            expanded_index.value() == KEYWORD_NONE) {
-          expanded_index = std::nullopt;
+          if (expanded_index.has_value() &&
+              expanded_index.value() == KEYWORD_NONE) {
+            none_index = true;
+            expanded_index = std::nullopt;
+          }
         }
         // A type map key may carry a type-scoped context for its values.
         // Type-scoped contexts do not propagate, so the values are resolved
@@ -1280,14 +1286,16 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
           }
         }
         for (auto &item : entries.as_array()) {
-          if (expanded_index.has_value()) {
-            if (by_id) {
-              if (!item.defines(KEYWORD_ID, KEYWORD_ID_HASH)) {
-                item.assign_assume_new(JSON::String{KEYWORD_ID},
-                                       JSON{expanded_index.value()},
-                                       KEYWORD_ID_HASH);
-              }
-            } else {
+          if (by_id) {
+            if (!none_index && !item.defines(KEYWORD_ID, KEYWORD_ID_HASH)) {
+              item.assign_assume_new(JSON::String{KEYWORD_ID},
+                                     expanded_index.has_value()
+                                         ? JSON{expanded_index.value()}
+                                         : JSON{nullptr},
+                                     KEYWORD_ID_HASH);
+            }
+          } else {
+            if (expanded_index.has_value()) {
               auto types{JSON::make_array()};
               types.push_back(JSON{expanded_index.value()});
               if (item.defines(KEYWORD_TYPE, KEYWORD_TYPE_HASH)) {

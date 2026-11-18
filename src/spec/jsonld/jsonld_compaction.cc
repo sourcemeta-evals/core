@@ -504,18 +504,27 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
                                       JSON::String{KEYWORD_NONE}, nullptr, true,
                                       false)};
 
-      // @language map container: index value objects by their language.
-      if (container_includes(item_definition, KEYWORD_LANGUAGE) &&
-          item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
+      // @language map container: the map gathers every member, value objects
+      // keyed by their language and reduced to their value, and anything
+      // else standing under the none label, as a member carrying no value
+      // carries no language to key by (JSON-LD 1.1 API Section 6.1.2)
+      if (container_includes(item_definition, KEYWORD_LANGUAGE)) {
         if (!target.defines(item_property)) {
           target.assign_assume_new(item_property, JSON::make_object());
         }
-        const JSON::String key{
-            item.defines(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH)
-                ? item.at(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH).to_string()
-                : none_key};
-        add_value(target.at(item_property), key,
-                  JSON{item.at(KEYWORD_VALUE, KEYWORD_VALUE_HASH)}, as_array);
+        if (item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
+          const JSON::String key{
+              item.defines(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH)
+                  ? item.at(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH).to_string()
+                  : none_key};
+          add_value(target.at(item_property), key,
+                    JSON{item.at(KEYWORD_VALUE, KEYWORD_VALUE_HASH)}, as_array);
+        } else {
+          add_value(target.at(item_property), none_key,
+                    compact(state, node_context, node_inverse, item_property,
+                            item, compact_arrays),
+                    as_array);
+        }
         continue;
       }
 
