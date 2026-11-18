@@ -313,15 +313,14 @@ auto compact_iri(const ActiveContext &active_context,
         const auto compacted_id{compact_iri(active_context, inverse_context,
                                             identifier.to_string(), nullptr,
                                             true, false)};
-        // A term whose name carries a colon must expand onto the very IRI it
-        // maps, so a term found under a name settled on above maps that IRI
-        // where it maps anything at all (JSON-LD 1.1 API Section 4.2.2 step 16)
         const auto iterator{active_context.terms.find(compacted_id)};
-        assert(iterator == active_context.terms.cend() ||
-               !iterator->second.iri.has_value() ||
-               iterator->second.iri.value() == identifier.to_string());
+        // A term found under the compacted spelling vouches for the
+        // identifier only where it maps that very IRI: a relative identifier
+        // can share its spelling with a term naming elsewhere (JSON-LD 1.1
+        // API Section 6.2.2 step 16.1)
         if (iterator != active_context.terms.cend() &&
-            iterator->second.iri.has_value()) {
+            iterator->second.iri.has_value() &&
+            iterator->second.iri.value() == identifier.to_string()) {
           preferred.emplace_back(KEYWORD_VOCAB);
           preferred.emplace_back(KEYWORD_ID);
           preferred.emplace_back(KEYWORD_NONE);
@@ -390,14 +389,14 @@ auto compact_iri(const ActiveContext &active_context,
     auto compact{term};
     compact += ":";
     compact += variable.substr(definition.iri.value().size());
-    // As above, a term standing under this very name maps this very IRI
-    // where it maps anything at all
     const auto existing{active_context.terms.find(compact)};
-    assert(existing == active_context.terms.cend() ||
-           !existing->second.iri.has_value() ||
-           existing->second.iri.value() == variable);
+    // A term already answering to the candidate spelling stands in its way
+    // unless it maps this very IRI and no value narrows the choice: a prefix
+    // redefined by a later context leaves such terms behind (JSON-LD 1.1 API
+    // Section 6.2.2 step 7.3)
     const bool usable{existing == active_context.terms.cend() ||
-                      (value == nullptr && existing->second.iri.has_value())};
+                      (value == nullptr && existing->second.iri.has_value() &&
+                       existing->second.iri.value() == variable)};
     // The shorter candidate wins, and of two the same length the one that
     // sorts first, which is what the algorithm asks for (JSON-LD 1.1 API
     // Section 6.2.2)

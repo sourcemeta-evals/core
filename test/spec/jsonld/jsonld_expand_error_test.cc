@@ -3662,3 +3662,27 @@ TEST(an_identifier_mapping_that_parts_from_its_term_is_refused) {
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid IRI mapping", "/@context/a:b/@id");
 }
+
+TEST(list_of_lists_through_a_container_narrows_to_the_enclosing_member) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "http://example.com/p", "@container": "@list" } },
+    "p": [ [ 1 ] ]
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "List of lists", "/p/0");
+}
+
+TEST(
+    a_colon_free_mapping_from_an_earlier_context_is_refused_under_a_vocabulary) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      { "a/b": "a/b" },
+      { "@vocab": "https://example.com/", "p": "a/b" }
+    ],
+    "p": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/1/p");
+}

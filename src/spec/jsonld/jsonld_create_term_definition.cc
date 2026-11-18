@@ -90,11 +90,6 @@ auto check_iri_mapping([[maybe_unused]] const ActiveContext &active_context,
                        const WeakPointer &term_pointer,
                        const std::initializer_list<JSON::StringView> children)
     -> void {
-  // A vocabulary is itself an IRI, so whatever it prefixes carries its colon,
-  // and a mapping that carries none was therefore made without one
-  assert(!mapping.has_value() || is_keyword(mapping.value()) ||
-         mapping.value().contains(':') ||
-         !active_context.vocabulary.has_value());
   if (!mapping.has_value() ||
       (!is_keyword(mapping.value()) && !mapping.value().contains(':'))) {
     throw JSONLDError("Invalid IRI mapping", term_pointer, children);

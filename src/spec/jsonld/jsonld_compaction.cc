@@ -118,16 +118,12 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
     // the set keyword is weighed here and a named graph is given its array
     // back where it is compacted (JSON-LD 1.1 API Section 6.1.2 step 3, suite
     // entries #t0090, #t0092 and #t0094)
-    // The step names the graph keyword and the set one as active properties
-    // that keep an array. Every call made here hands down a compacted property
-    // name, the reverse keyword, the graph keyword or nothing, so the set
-    // keyword never arrives, and a graph object carrying no name of its own
-    // lets its lone node stand on its own, which three suite entries require
-    // (JSON-LD 1.1 API Section 6.1.2 step 3, suite entries #t0090, #t0092 and
-    // #t0094)
-    assert(!active_property.has_value() ||
-           active_property.value() != KEYWORD_SET);
+    // The set keyword does arrive here: a set object carrying a list hands
+    // that list down under the set keyword itself (JSON-LD 1.1 API Section
+    // 6.1.2 step 3.3)
     const bool force_array{!compact_arrays ||
+                           (active_property.has_value() &&
+                            active_property.value() == KEYWORD_SET) ||
                            container_includes(definition, KEYWORD_SET) ||
                            container_includes(definition, KEYWORD_LIST)};
     if (result.size() == 1 && !force_array) {
@@ -347,13 +343,21 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       const auto item_property{compact_iri(node_context, node_inverse,
                                            expanded_property, &expanded_value,
                                            true, inside_reverse)};
-      // An empty array stays empty rather than being wrapped into one. Two
-      // properties never settle on the same name: a name shaped like an IRI
-      // must expand onto the very IRI it maps, and a name taken from the
-      // vocabulary is only taken where it is no term already (JSON-LD 1.1 API
-      // Section 4.2.2 step 16, Section 6.2.2)
-      assert(!result.defines(item_property));
-      result.assign_assume_new(item_property, JSON::make_array());
+      // An empty array stays empty, landing in the nest its term names and
+      // joining whatever already stands under the same compacted name, as two
+      // properties can settle on one name through a legacy mapping or a
+      // reverse alias (JSON-LD 1.1 API Section 6.1.2 step 12.7.4)
+      const auto *empty_definition{definition_for(node_context, item_property)};
+      JSON &empty_target{
+          nest_target(result, empty_definition, node_context, node_inverse)};
+      if (!empty_target.defines(item_property)) {
+        empty_target.assign_assume_new(item_property, JSON::make_array());
+      } else if (auto &standing{empty_target.at(item_property)};
+                 !standing.is_array()) {
+        auto array{JSON::make_array()};
+        array.push_back(standing);
+        standing = std::move(array);
+      }
       continue;
     }
 
@@ -637,15 +641,16 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
                                           JSON::String{KEYWORD_ID}, nullptr,
                                           true, false)};
           // A node left with only an @id reduces to that identifier, compacted
-          // with vocab when the term coerces @vocab. The entry it was left
-          // with was compacted from the item's own, so the item carries one
-          // too, and the container test above answers false for a definition
-          // that is not there, which a type container also gives a type
-          // mapping (JSON-LD 1.1 API Section 4.2.2 step 21.4.1)
-          assert(
-              !(compacted.object_size() == 1 && compacted.defines(id_alias)) ||
-              item.defines(KEYWORD_ID, KEYWORD_ID_HASH));
-          if (compacted.object_size() == 1 && compacted.defines(id_alias)) {
+          // with vocab when the term coerces @vocab. The reduction asks for a
+          // key expanding to the id keyword, which a property-scoped context
+          // can take away by redefining the alias, so the item must carry the
+          // identifier itself (JSON-LD 1.1 API Section 6.1.2 step 12.9.8.4)
+          if (compacted.object_size() == 1 && compacted.defines(id_alias) &&
+              item.defines(KEYWORD_ID, KEYWORD_ID_HASH)) {
+            // A type container settles a type mapping at term creation, with
+            // the id keyword standing in where none was declared, and the
+            // container test above answers false for a definition that is not
+            // there (JSON-LD 1.1 API Section 4.2.2 step 21.4)
             assert(item_definition != nullptr &&
                    item_definition->type_mapping.has_value());
             const bool vocab{item_definition->type_mapping.value() ==

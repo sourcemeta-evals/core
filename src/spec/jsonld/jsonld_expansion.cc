@@ -163,7 +163,12 @@ auto forbidden_member_pointer(
             expand(state, active_context, active_property, candidate, pointer),
             forbidden);
       })};
-      assert(match != items.cend());
+      // The search can come back empty, as what the whole expands to is not
+      // always what any single item expands to, an array nested under a list
+      // container among them, and the enclosing position stands then
+      if (match == items.cend()) {
+        return to_pointer(pointer);
+      }
       const WeakPointer item_pointer{pointer.concat(
           static_cast<std::size_t>(std::distance(items.cbegin(), match)))};
       return forbidden_member_pointer(state, active_context, active_property,

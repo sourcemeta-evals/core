@@ -2390,3 +2390,178 @@ TEST(an_identifier_naming_a_term_that_gave_up_its_mapping) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
+
+TEST(a_relative_identifier_sharing_a_term_name_stays_itself) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/p": [ { "@id": "foo" } ] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "foo": "http://example.com/other",
+    "p": { "@id": "http://example.com/p", "@type": "@id" }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": "foo",
+    "@context": {
+      "foo": "http://example.com/other",
+      "p": { "@id": "http://example.com/p", "@type": "@id" }
+    }
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_term_that_gave_up_its_mapping_does_not_vouch_for_an_identifier) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/p": [ { "@id": "foo" } ] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"([
+    { "foo": "http://example.com/other" },
+    { "foo": null, "p": { "@id": "http://example.com/p", "@type": "@id" } }
+  ])");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": "foo",
+    "@context": [
+      { "foo": "http://example.com/other" },
+      { "foo": null, "p": { "@id": "http://example.com/p", "@type": "@id" } }
+    ]
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_prefix_redefined_by_a_later_context_leaves_its_compact_iris_behind) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://other.example/b": [ { "@value": 1 } ] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"([
+    { "a": "http://first.example/", "a:b": "http://first.example/b" },
+    { "a": "http://other.example/" }
+  ])");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "http://other.example/b": 1,
+    "@context": [
+      { "a": "http://first.example/", "a:b": "http://first.example/b" },
+      { "a": "http://other.example/" }
+    ]
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_set_object_holding_a_list_keeps_the_list_array) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/p": [ { "@set": [ { "@list": [ { "@value": 1 } ] } ] } ] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": "http://example.com/p"
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "@set": { "@list": [ 1 ] } },
+    "@context": { "p": "http://example.com/p" }
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_empty_property_joins_the_name_it_shares_through_a_legacy_mapping) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": 1 } ], "urn:q": [] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": "urn:q"
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": [ 1 ],
+    "@context": { "urn:p": "urn:q" }
+  })");
+  EXPECT_EQ(
+      sourcemeta::core::jsonld_compact(input, context, "", nullptr,
+                                       sourcemeta::core::JSONLDVersion::V1_0),
+      expected);
+}
+
+TEST(an_empty_property_lands_in_the_nest_its_term_names) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/p": [] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": { "@id": "http://example.com/p", "@nest": "@nest" }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@nest": { "p": [] },
+    "@context": { "p": { "@id": "http://example.com/p", "@nest": "@nest" } }
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_scoped_context_taking_the_identifier_alias_blocks_the_reduction) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/t": [
+      { "@type": [ "http://example.com/T" ],
+        "urn:q": [ { "@value": 1 } ] }
+    ] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "id": "@id",
+    "t": { "@id": "http://example.com/t", "@container": "@type",
+           "@context": { "id": "urn:q" } }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "t": { "http://example.com/T": { "id": 1 } },
+    "@context": {
+      "id": "@id",
+      "t": { "@id": "http://example.com/t", "@container": "@type",
+             "@context": { "id": "urn:q" } }
+    }
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_empty_property_joins_an_array_already_standing_under_its_name) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": 1 }, { "@value": 2 } ], "urn:q": [] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": "urn:q"
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": [ 1, 2 ],
+    "@context": { "urn:p": "urn:q" }
+  })");
+  EXPECT_EQ(
+      sourcemeta::core::jsonld_compact(input, context, "", nullptr,
+                                       sourcemeta::core::JSONLDVersion::V1_0),
+      expected);
+}
+
+TEST(an_identifier_compacts_through_a_prefix_whose_term_maps_it) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "@id": "http://first.example/b" }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "a": "http://first.example/",
+    "a:b": "http://first.example/b"
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@id": "a:b",
+    "@context": {
+      "a": "http://first.example/",
+      "a:b": "http://first.example/b"
+    }
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_identifier_declines_a_prefix_whose_term_maps_elsewhere) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "@id": "http://other.example/b" }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"([
+    { "a": "http://first.example/", "a:b": "http://first.example/b" },
+    { "a": "http://other.example/" }
+  ])");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@id": "http://other.example/b",
+    "@context": [
+      { "a": "http://first.example/", "a:b": "http://first.example/b" },
+      { "a": "http://other.example/" }
+    ]
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
