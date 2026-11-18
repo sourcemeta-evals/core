@@ -16,4 +16,3 @@ Brewfile.lock.json
 .cache
 /out/
 CMakeSettings.json
-*.profraw
