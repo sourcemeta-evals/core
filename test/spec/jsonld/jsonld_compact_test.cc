@@ -2638,6 +2638,101 @@ TEST(a_scoped_identifier_alias_blocks_the_reduction_of_an_identified_node) {
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
 
+TEST(a_scoped_prefix_spells_the_key_and_identifier_of_a_type_map) {
+  // The key of a type map is the first type the member carries once
+  // compacted, and a lone identifier reduces by compacting a bare reference
+  // under the member's own property, so a prefix the property's scoped
+  // context declares reaches both
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@id": "http://example.org/n", "@type": [ "http://example.org/x" ] }
+      ]
+    }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": { "@id": "urn:p", "@container": "@type",
+           "@context": { "ex": "http://example.org/" } }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "ex:x": "ex:n" },
+    "@context": {
+      "p": { "@id": "urn:p", "@container": "@type",
+             "@context": { "ex": "http://example.org/" } }
+    }
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_type_container_term_named_by_its_iri_holding_a_typed_value) {
+  // A typed value carries its datatype as a lone string, which becomes the
+  // key of the type map its term gathers, leaving the value on its own
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "v", "@type": "urn:dt" } ] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@type" }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "urn:dt": { "@value": "v" } },
+    "@context": { "urn:p": { "@container": "@type" } }
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_ordinary_property_compacting_onto_the_type_alias) {
+  // The map key is read from the types the member carries once compacted,
+  // and this member carries none: its one property compacts through the
+  // vocabulary onto the type alias spelling, looks nothing like types, and
+  // survives under the none label (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/m": [
+      { "http://example.com/@type": [ { "@value": 42 } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "m": { "@id": "http://example.com/m", "@container": "@type" },
+    "@vocab": "http://example.com/"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "m": { "@none": { "@type": 42 } },
+    "@context": {
+      "m": { "@id": "http://example.com/m", "@container": "@type" },
+      "@vocab": "http://example.com/"
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_ordinary_array_property_compacting_onto_the_type_alias) {
+  // As above, with several values: the entry under the type alias spelling
+  // is an array holding no strings, so it is no types to key by and stays
+  // whole under the none label (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/m": [
+      { "http://example.com/@type": [ { "@value": 1 }, { "@value": 2 } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "m": { "@id": "http://example.com/m", "@container": "@type" },
+    "@vocab": "http://example.com/"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "m": { "@none": { "@type": [ 1, 2 ] } },
+    "@context": {
+      "m": { "@id": "http://example.com/m", "@container": "@type" },
+      "@vocab": "http://example.com/"
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
 TEST(an_empty_property_joins_an_array_already_standing_under_its_name) {
   const auto input = sourcemeta::core::parse_json(R"([
     { "urn:p": [ { "@value": 1 }, { "@value": 2 } ], "urn:q": [] }

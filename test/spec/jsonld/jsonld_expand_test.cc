@@ -2916,9 +2916,10 @@ TEST(null_redefined_index_term_graph_container) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
-// The key of a graph index map joins whatever the graph object already says
-// under the property the term names its index with, rather than replacing it
-TEST(property_indexed_graph_container_prepends_to_its_own_index_property) {
+// A map with an @graph entry in the company of any other property is a node
+// object rather than a graph object, so the container wraps it whole and the
+// key lands on the wrapper, leaving what the node said untouched
+TEST(property_indexed_graph_container_wraps_a_node_carrying_its_own_data) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {
       "@version": 1.1,
@@ -2938,8 +2939,13 @@ TEST(property_indexed_graph_container_prepends_to_its_own_index_property) {
     {
       "urn:p": [
         {
-          "@graph": [ { "@id": "urn:n", "urn:q": [ { "@value": "y" } ] } ],
-          "urn:i": [ { "@value": "x" }, { "@value": "own" } ]
+          "@graph": [
+            {
+              "@graph": [ { "@id": "urn:n", "urn:q": [ { "@value": "y" } ] } ],
+              "urn:i": [ { "@value": "own" } ]
+            }
+          ],
+          "urn:i": [ { "@value": "x" } ]
         }
       ]
     }

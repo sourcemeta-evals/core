@@ -83,8 +83,7 @@ auto finalize_definition(ExpansionState &state, ActiveContext &active_context,
 // Section 4.2.2 step 16.2.3). Both refusals are live: a value leaning on a
 // term that gave up its own mapping expands to nothing and arrives absent,
 // and a value that stays a relative reference carries no colon
-auto check_iri_mapping([[maybe_unused]] const ActiveContext &active_context,
-                       const std::optional<JSON::String> &mapping,
+auto check_iri_mapping(const std::optional<JSON::String> &mapping,
                        const WeakPointer &term_pointer,
                        const std::initializer_list<JSON::StringView> children)
     -> void {
@@ -274,7 +273,7 @@ auto create_term_definition(ExpansionState &state,
       // the same account as the spelled-out form, and before the term shape
       // is weighed, so that a forbidden keyword alias is named as such
       // whichever form declared it
-      check_iri_mapping(active_context, definition.iri, term_pointer, {});
+      check_iri_mapping(definition.iri, term_pointer, {});
       // Holding an IRI-like term to re-expanding onto its own IRI mapping
       // arrived with 1.1 and is asked for whatever mode is in force (JSON-LD
       // 1.1 API Section 4.2.2), while 1.0 knew no such step (JSON-LD 1.0 API
@@ -406,7 +405,7 @@ auto create_term_definition(ExpansionState &state,
       definition.iri = expand_iri(state, active_context, id_value, false, true,
                                   &local_context, &defined, context_pointer);
       const auto &mapping{definition.iri};
-      check_iri_mapping(active_context, mapping, term_pointer, {KEYWORD_ID});
+      check_iri_mapping(mapping, term_pointer, {KEYWORD_ID});
       // A term shaped like an IRI, carrying a colon other than at its edges
       // or carrying a slash, must re-expand onto its own IRI mapping. The
       // step arrived with 1.1 and the earlier mode withholds it, for the

@@ -103,6 +103,25 @@ auto is_list_object(const JSON &item) -> bool {
   return item.is_object() && item.defines(KEYWORD_LIST, KEYWORD_LIST_HASH);
 }
 
+// A graph object stops at its graph, its name, and its label: "node objects
+// may have an @graph entry, but are not considered graph objects if they
+// include any other entries" (JSON-LD 1.1 API Section 2)
+auto is_graph_object(const JSON &item) -> bool {
+  assert(item.is_object());
+  if (!item.defines(KEYWORD_GRAPH, KEYWORD_GRAPH_HASH)) {
+    return false;
+  }
+
+  for (const auto &entry : item.as_object()) {
+    if (entry.first != KEYWORD_GRAPH && entry.first != KEYWORD_ID &&
+        entry.first != KEYWORD_INDEX) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 using ForbiddenMember = bool (*)(const JSON &);
 
 // Whether an expansion holds a member its position forbids. A null expansion
@@ -1027,7 +1046,7 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
           // over just above
           JSON graph{nullptr};
           assert(item.is_object());
-          if (item.defines(KEYWORD_GRAPH, KEYWORD_GRAPH_HASH)) {
+          if (is_graph_object(item)) {
             graph = std::move(item);
           } else {
             graph = JSON::make_object();
@@ -1054,15 +1073,18 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
               // A term that no longer names anything carries no metadata
               // (JSON-LD 1.1 API Section 5.1.2 step 13.8.3.7.2)
               if (index_property.has_value()) {
-                auto combined{into_array(expand_value(
-                    state, active_context, definition->index, JSON{index}))};
-                if (graph.defines(index_property.value())) {
-                  for (auto &existing :
-                       graph.at(index_property.value()).as_array()) {
-                    combined.push_back(existing);
-                  }
-                }
-                graph.assign(index_property.value(), std::move(combined));
+                // The step prepends the key to whatever already stands under
+                // the index property, yet nothing ever does: what holds it is
+                // either a graph object proper, whose entries stop at the
+                // graph, its name, and its label, or a wrapper made just
+                // above, and an index mapping is held to an IRI that is no
+                // keyword when the term is made (JSON-LD 1.1 API Section
+                // 4.2.2 step 21.2)
+                assert(!graph.defines(index_property.value()));
+                graph.assign(
+                    index_property.value(),
+                    into_array(expand_value(state, active_context,
+                                            definition->index, JSON{index})));
               }
             } else if (!graph.defines(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
               graph.assign_assume_new(JSON::String{KEYWORD_INDEX}, JSON{index},

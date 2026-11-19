@@ -685,63 +685,70 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
         continue;
       }
 
-      // @type map container: index node objects by their first type.
+      // @type map container: the key is the first type the member carries
+      // once compacted, which is where the step reads it from, so a
+      // property-scoped context has its say over the spelling (JSON-LD 1.1
+      // API Section 6.1.2)
       if (container_includes(item_definition, KEYWORD_TYPE)) {
         if (!target.defines(item_property)) {
           target.assign_assume_new(item_property, JSON::make_object());
         }
-        JSON::String key{none_key};
-        if (item.defines(KEYWORD_TYPE, KEYWORD_TYPE_HASH) &&
-            !item.at(KEYWORD_TYPE, KEYWORD_TYPE_HASH).empty()) {
-          key = compact_iri(
-              node_context, node_inverse,
-              item.at(KEYWORD_TYPE, KEYWORD_TYPE_HASH).front().to_string(),
-              nullptr, true, false);
-        }
         auto compacted{compact(state, node_context, node_inverse, item_property,
                                item, compact_arrays)};
+        JSON::String key{none_key};
         if (compacted.is_object()) {
           const auto type_alias{compact_iri(node_context, node_inverse,
                                             JSON::String{KEYWORD_TYPE}, nullptr,
                                             true, false)};
+          // The alias is spelled with the context in force here, and what the
+          // compacted member holds under it is read as the types only where
+          // it looks like them, as an ordinary property can compact onto the
+          // same spelling (JSON-LD 1.1 API Section 6.1.2)
           if (compacted.defines(type_alias)) {
             auto &types{compacted.at(type_alias)};
-            if (!types.is_array() || types.size() <= 1) {
+            if (types.is_string()) {
+              key = types.to_string();
               compacted.erase(type_alias);
-            } else {
-              types.erase(types.as_array().cbegin());
-              // A lone remaining type collapses to a scalar only when arrays
-              // are being compacted.
-              if (compact_arrays && types.size() == 1) {
-                auto remaining{types.front()};
-                types = std::move(remaining);
+            } else if (types.is_array() && !types.empty() &&
+                       types.front().is_string()) {
+              key = types.front().to_string();
+              if (types.size() == 1) {
+                compacted.erase(type_alias);
+              } else {
+                types.erase(types.as_array().cbegin());
+                // A lone remaining type collapses to a scalar only when arrays
+                // are being compacted.
+                if (compact_arrays && types.size() == 1) {
+                  auto remaining{types.front()};
+                  types = std::move(remaining);
+                }
               }
+            } else if (types.is_array() && types.empty()) {
+              // A type entry with nothing left goes, the way the step removes
+              // it when no values remain, and the member stands under the
+              // none label (JSON-LD 1.1 API Section 6.1.2)
+              compacted.erase(type_alias);
             }
           }
-          // A node left with only an @id reduces to that identifier, compacted
-          // with vocab when the term coerces @vocab.
           const auto id_alias{compact_iri(node_context, node_inverse,
                                           JSON::String{KEYWORD_ID}, nullptr,
                                           true, false)};
-          // A node left with only an @id reduces to that identifier, compacted
-          // with vocab when the term coerces @vocab. The reduction asks for a
-          // key expanding to the id keyword, which a property-scoped context
-          // can take away by redefining the alias, so the item must carry the
-          // identifier itself (JSON-LD 1.1 API Section 6.1.2 step 12.9.8.4)
+          // A member left with only an @id reduces to that identifier by
+          // compacting a bare reference under its own property, where value
+          // compaction reads the type mapping a type container settled at
+          // term creation and a property-scoped context has its say over the
+          // name. The reduction asks for a key expanding to the id keyword,
+          // which a property-scoped context can take away by redefining the
+          // alias, so the item must carry the identifier itself (JSON-LD 1.1
+          // API Section 6.1.2 step 12.9.8.4)
           if (compacted.object_size() == 1 && compacted.defines(id_alias) &&
               item.defines(KEYWORD_ID, KEYWORD_ID_HASH)) {
-            // A type container settles a type mapping at term creation, with
-            // the id keyword standing in where none was declared, and the
-            // container test above answers false for a definition that is not
-            // there (JSON-LD 1.1 API Section 4.2.2 step 21.4)
-            assert(item_definition != nullptr &&
-                   item_definition->type_mapping.has_value());
-            const bool vocab{item_definition->type_mapping.value() ==
-                             KEYWORD_VOCAB};
-            compacted = JSON{
-                compact_iri(node_context, node_inverse,
-                            item.at(KEYWORD_ID, KEYWORD_ID_HASH).to_string(),
-                            nullptr, vocab, false)};
+            auto reference{JSON::make_object()};
+            reference.assign_assume_new(
+                JSON::String{KEYWORD_ID},
+                JSON{item.at(KEYWORD_ID, KEYWORD_ID_HASH)}, KEYWORD_ID_HASH);
+            compacted = compact(state, node_context, node_inverse,
+                                item_property, reference, compact_arrays);
           }
         }
         add_value(target.at(item_property), key, std::move(compacted),
