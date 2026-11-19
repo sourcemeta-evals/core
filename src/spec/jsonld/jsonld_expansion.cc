@@ -152,11 +152,12 @@ auto forbidden_member_pointer(
     assert(active_property.has_value());
     if (member.is_array()) {
       // What an array expands to is what its items expand to gathered
-      // together, so the offending member found in the whole stands in one of
-      // them and the search below always settles on one. Each item is expanded
-      // again only to find which, and the position it is told of does not bear
-      // on the answer, since reporting is suspended for this walk and whatever
-      // an expansion runs into is caught below
+      // together, though not every boundary the whole carries shows in any
+      // single item, an array nested under a list container among them, so
+      // the search below may settle on one or come back empty. Each item is
+      // expanded again only to find which, and the position it is told of
+      // does not bear on the answer, since reporting is suspended for this
+      // walk and whatever an expansion runs into is caught below
       const auto &items{member.as_array()};
       const auto match{std::ranges::find_if(items, [&](const JSON &candidate) {
         return holds_forbidden_member(

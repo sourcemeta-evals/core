@@ -3684,5 +3684,32 @@ TEST(
     "p": "x"
   })");
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Invalid IRI mapping", "/@context/1/p");
+                             "Invalid IRI mapping", "/@context/0/a~1b");
+}
+
+TEST(a_slash_term_without_a_vocabulary_stays_relative_and_is_refused) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "foo/bar": "foo/bar" },
+    "foo/bar": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/foo~1bar");
+}
+
+TEST(a_shorthand_alias_of_the_context_keyword_is_refused_as_an_alias) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "a:b": "@context" },
+    "a:b": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid keyword alias", "/@context/a:b");
+}
+
+TEST(an_object_alias_of_the_context_keyword_is_refused_as_an_alias) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "a:b": { "@id": "@context" } },
+    "a:b": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid keyword alias", "/@context/a:b/@id");
 }

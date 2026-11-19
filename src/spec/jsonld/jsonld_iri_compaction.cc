@@ -228,7 +228,10 @@ auto compact_iri(const ActiveContext &active_context,
       if (list.empty()) {
         type_language = KEYWORD_ANY;
       }
-      // Fall back to an exact-match term when no list-container term applies.
+      // A set container stands in where no list container term applies, and
+      // an exact-match term after that (JSON-LD 1.1 API Section 6.2.2, the
+      // set and none containers are appended for every value)
+      containers.emplace_back(KEYWORD_SET);
       containers.emplace_back(KEYWORD_NONE);
     } else if (is_object && value->defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
       const bool has_language{

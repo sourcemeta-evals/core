@@ -251,8 +251,12 @@ auto create_term_definition(ExpansionState &state,
           definition.iri = term;
         }
       } else if (term.contains('/')) {
+        // A slash term is a relative IRI reference, and the slash step
+        // aborts when the resulting IRI mapping is not an IRI (JSON-LD 1.1
+        // API Section 4.2.2)
         definition.iri = expand_iri(state, active_context, term, false, true,
                                     nullptr, nullptr, EMPTY_WEAK_POINTER);
+        check_iri_mapping(active_context, definition.iri, term_pointer, {});
       } else if (active_context.vocabulary.has_value()) {
         definition.iri = active_context.vocabulary.value() + term;
       }
@@ -260,14 +264,21 @@ auto create_term_definition(ExpansionState &state,
       definition.iri =
           expand_iri(state, active_context, string_value, false, true,
                      &local_context, &defined, context_pointer);
+      // A string definition stands for a map carrying that value under @id
+      // (JSON-LD 1.1 API Section 4.2.2 step 10), so its mapping is held to
+      // the same account as the spelled-out form, and before the term shape
+      // is weighed, so that a forbidden keyword alias is named as such
+      // whichever form declared it
+      check_iri_mapping(active_context, definition.iri, term_pointer, {});
       // Holding an IRI-like term to re-expanding onto its own IRI mapping
       // arrived with 1.1 and is asked for whatever mode is in force (JSON-LD
       // 1.1 API Section 4.2.2), while 1.0 knew no such step (JSON-LD 1.0 API
       // Section 6.2). Standing in for a 1.0 processor therefore means
       // withholding it, which is what the earlier mode does here and what two
-      // suite cases declaring that version rest on. The mapping always holds
-      // something by now, for the reason given where it is checked
-      if (!state.processing_1_0 && definition.iri.has_value()) {
+      // suite cases declaring that version rest on. The mapping check above
+      // refused an absent mapping already
+      assert(definition.iri.has_value());
+      if (!state.processing_1_0) {
         const auto colon_position{term.find(':')};
         const bool iri_like_colon{colon_position != JSON::String::npos &&
                                   colon_position != 0 &&
@@ -277,9 +288,6 @@ auto create_term_definition(ExpansionState &state,
           const auto expanded_term{expand_iri(state, probe, term, false, true,
                                               nullptr, nullptr,
                                               EMPTY_WEAK_POINTER)};
-          // A term is only weighed here for carrying a colon or a slash,
-          // neither of which a name of keyword form may hold, and that shape
-          // is the only one expanding to nothing
           // A name of keyword form carries nothing but letters after its
           // sign, so a term weighed here for its colon or its slash is of no
           // such form, and that form is the only one expansion answers
@@ -290,11 +298,6 @@ auto create_term_definition(ExpansionState &state,
           }
         }
       }
-
-      // A string definition stands for a map carrying that value under @id
-      // (JSON-LD 1.1 API Section 4.2.2 step 10), so its mapping is held to the
-      // same account as the spelled-out form
-      check_iri_mapping(active_context, definition.iri, term_pointer, {});
     }
   } else if (value.is_object()) {
     const bool has_id{id_entry != nullptr};
@@ -410,8 +413,6 @@ auto create_term_definition(ExpansionState &state,
                                               EMPTY_WEAK_POINTER)};
           // As above, a name carrying a colon or a slash is of no keyword
           // form, so it never expands to nothing
-          // As above, a name carrying a colon or a slash is of no keyword
-          // form
           assert(expanded_term.has_value());
           if (expanded_term != mapping) {
             throw JSONLDError("Invalid IRI mapping", term_pointer,
@@ -445,8 +446,11 @@ auto create_term_definition(ExpansionState &state,
         definition.iri = term;
       }
     } else if (term.contains('/')) {
+      // As above, the slash step aborts when the resulting IRI mapping is
+      // not an IRI (JSON-LD 1.1 API Section 4.2.2)
       definition.iri = expand_iri(state, active_context, term, false, true,
                                   nullptr, nullptr, EMPTY_WEAK_POINTER);
+      check_iri_mapping(active_context, definition.iri, term_pointer, {});
     } else if (active_context.vocabulary.has_value()) {
       definition.iri = active_context.vocabulary.value() + term;
     }

@@ -1919,10 +1919,11 @@ TEST(property_index_keys_under_none_where_the_property_holds_an_object) {
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
 
-TEST(a_set_container_term_is_declined_for_a_list_object) {
-  // Term selection asks for a term whose container suits the value, and a list
-  // object asks for a list container, so a term offering a set container is no
-  // candidate and the property stands as the IRI it names (Section 4.4.2)
+TEST(a_set_container_term_stands_in_for_a_list_object) {
+  // Term selection asks for a term whose container suits the value, and past
+  // the list container a list object falls back to the set container, which
+  // every value may stand under, before the exact match (JSON-LD 1.1 API
+  // Section 6.2.2, the set and none containers are appended for every value)
   const auto input = sourcemeta::core::parse_json(R"([
     { "http://example.com/p": [ { "@list": [ { "@value": "a" } ] } ] }
   ])");
@@ -1932,7 +1933,7 @@ TEST(a_set_container_term_is_declined_for_a_list_object) {
   })");
 
   const auto expected = sourcemeta::core::parse_json(R"({
-    "http://example.com/p": { "@list": [ "a" ] },
+    "p": [ { "@list": [ "a" ] } ],
     "@context": {
       "p": { "@id": "http://example.com/p", "@container": "@set" }
     }
@@ -1958,10 +1959,11 @@ TEST(property_index_over_an_empty_array_keys_under_none) {
     "label": { "@id": "http://example.com/label" }
   })");
   // The key comes from the first value the indexing property holds, and an
-  // empty array holds none, so the member stands under the none label with
-  // that property left as it was (Section 6.1.2)
+  // empty array holds none, so the member stands under the none label and
+  // the exhausted property goes, the way the step removes the entry when no
+  // values remain (JSON-LD 1.1 API Section 6.1.2)
   const auto expected = sourcemeta::core::parse_json(R"({
-    "p": { "@none": { "@id": "http://example.com/x", "label": [] } },
+    "p": { "@none": { "@id": "http://example.com/x" } },
     "@context": {
       "p": {
         "@id": "http://example.com/p",
@@ -2352,8 +2354,10 @@ TEST(a_type_container_over_a_member_carrying_no_type) {
 
 TEST(a_list_container_over_something_that_is_no_list_object_in_1_0) {
   // A list container gathers whatever stands under it, and what it gathers
-  // here is no list object, so the refusal JSON-LD 1.0 makes of a list among
-  // list items has nothing to weigh
+  // here is no list object, so it compacts like any other value, a scalar
+  // with nothing asking for an array, and the refusal JSON-LD 1.0 makes of a
+  // list among list items has nothing to weigh (JSON-LD 1.1 API Section
+  // 6.1.2, the list steps gate on the item being a list object)
   const auto input = sourcemeta::core::parse_json(
       R"([ { "http://e/p": [ { "@value": "a" } ] } ])");
 
@@ -2361,7 +2365,7 @@ TEST(a_list_container_over_something_that_is_no_list_object_in_1_0) {
       R"({ "http://e/p": { "@container": "@list" } })");
 
   const auto expected = sourcemeta::core::parse_json(R"({
-    "http://e/p": [ "a" ],
+    "http://e/p": "a",
     "@context": { "http://e/p": { "@container": "@list" } }
   })");
 
@@ -2588,6 +2592,147 @@ TEST(an_identifier_map_keys_under_a_property_scoped_base) {
     "@context": {
       "m": { "@id": "http://example.com/m", "@container": "@id",
              "@context": { "@base": "https://example.com/inner/" } }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_singleton_list_inside_a_list_keeps_its_array) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@list": [ { "@value": 1 } ] } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({})");
+
+  // The items of a list keyword entry keep their array however few they are
+  // (JSON-LD 1.1 API Section 6.1.2)
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@list": [ { "@list": [ 1 ] } ] }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_singleton_list_three_levels_down_keeps_every_array) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [
+      { "@list": [ { "@list": [ { "@list": [ { "@value": 1 } ] } ] } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({})");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@list": [ { "@list": [ { "@list": [ 1 ] } ] } ] }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_singleton_list_under_an_aliased_list_keyword_keeps_its_array) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@list": [ { "@value": 1 } ] } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "l": "@list"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "l": [ { "l": [ 1 ] } ] },
+    "@context": { "l": "@list" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_singleton_list_keeps_its_array_with_array_compaction_off) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@list": [ { "@value": 1 } ] } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({})");
+
+  // With array compaction off the single top node keeps the graph array it
+  // arrived in, and every list below keeps its own
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@graph": [
+      { "urn:p": [ { "@list": [ { "@list": [ 1 ] } ] } ] }
+    ]
+  })");
+
+  const auto result{sourcemeta::core::jsonld_compact(
+      input, context, "", nullptr, sourcemeta::core::JSONLDVersion::V1_1,
+      false)};
+  EXPECT_EQ(result, expected);
+}
+
+TEST(a_language_map_term_holding_a_graph_object_keeps_the_graph_shape) {
+  // The graph steps come before the map container ones and consume a graph
+  // object whole, so a language container in hand wraps nothing around it
+  // (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://e/p": [ { "@graph": [ { "@id": "http://e/n" } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "http://e/p": { "@container": "@language" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "http://e/p": { "@graph": { "@id": "http://e/n" } },
+    "@context": { "http://e/p": { "@container": "@language" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_named_graph_under_a_plain_term_keeps_its_ordinary_properties) {
+  // A node stating more than its graph is compacted whole: the identifier,
+  // the graph array, and every ordinary property beside them survive
+  // (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [
+      { "@id": "urn:g", "@graph": [ { "@id": "urn:n" } ],
+        "urn:q": [ { "@value": 1 } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": "urn:p",
+    "q": "urn:q"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "@id": "urn:g", "@graph": [ { "@id": "urn:n" } ], "q": 1 },
+    "@context": { "p": "urn:p", "q": "urn:q" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_ordinary_property_compacting_onto_the_identifier_alias) {
+  // The map key is read from the member's own identifier alone, and this
+  // member carries none: its one property compacts through the vocabulary
+  // onto the identifier alias spelling, names nothing, and survives under
+  // the none label (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/m": [
+      { "http://example.com/@id": [ { "@value": 42 } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "m": { "@id": "http://example.com/m", "@container": "@id" },
+    "@vocab": "http://example.com/"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "m": { "@none": { "@id": 42 } },
+    "@context": {
+      "m": { "@id": "http://example.com/m", "@container": "@id" },
+      "@vocab": "http://example.com/"
     }
   })");
 

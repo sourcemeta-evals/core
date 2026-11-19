@@ -3106,15 +3106,19 @@ TEST(context_defines_a_compact_iri_term_whose_prefix_has_no_term) {
 }
 
 // A term that maps to itself and carries a slash is not a prefix of itself, so
-// resolving it must stop rather than recur
-TEST(context_defines_a_self_referential_term_holding_a_slash) {
+// resolving it must stop rather than recur, and under a vocabulary the
+// expansion lands on an IRI the slash step accepts (JSON-LD 1.1 API Section
+// 4.2.2)
+TEST(a_self_referential_slash_term_expands_through_the_vocabulary) {
   const auto input = sourcemeta::core::parse_json(R"({
-    "@context": { "foo/bar": "foo/bar" },
+    "@context": { "@vocab": "http://example.com/", "foo/bar": "foo/bar" },
     "foo/bar": "x"
   })");
 
   const auto result{sourcemeta::core::jsonld_expand(input)};
-  const auto expected = sourcemeta::core::parse_json("[]");
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/foo/bar": [ { "@value": "x" } ] }
+  ])");
   EXPECT_EQ(result, expected);
 }
 
@@ -4255,4 +4259,40 @@ TEST(a_set_object_under_a_list_container_is_gathered_into_a_list) {
   ])");
 
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(a_compact_iri_term_matching_its_prefix_from_the_same_context) {
+  // The same context declares the prefix beside the term, and per-context
+  // term creation reads names in order, the prefix before the compact IRIs
+  // it serves, so the consistency reading settles on the declared mapping
+  // (JSON-LD 1.1 API Section 4.2.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": "http://first.example/",
+      "a:b": "http://first.example/b"
+    },
+    "a:b": "x"
+  })");
+
+  const auto result{sourcemeta::core::jsonld_expand(input)};
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://first.example/b": [ { "@value": "x" } ] }
+  ])");
+  EXPECT_EQ(result, expected);
+}
+
+TEST(an_object_compact_iri_term_matching_its_prefix_from_the_same_context) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": "http://first.example/",
+      "a:b": { "@id": "http://first.example/b" }
+    },
+    "a:b": "x"
+  })");
+
+  const auto result{sourcemeta::core::jsonld_expand(input)};
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://first.example/b": [ { "@value": "x" } ] }
+  ])");
+  EXPECT_EQ(result, expected);
 }
