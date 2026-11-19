@@ -82,8 +82,7 @@ auto finalize_definition(ExpansionState &state, ActiveContext &active_context,
 // and may not stand in for the keyword that carries a context (JSON-LD 1.1 API
 // Section 4.2.2 step 16.2.3). Both refusals are live: a value leaning on a
 // term that gave up its own mapping expands to nothing and arrives absent,
-// and a slash term with no vocabulary behind it stays a relative reference,
-// carrying no colon
+// and a value that stays a relative reference carries no colon
 auto check_iri_mapping([[maybe_unused]] const ActiveContext &active_context,
                        const std::optional<JSON::String> &mapping,
                        const WeakPointer &term_pointer,
@@ -213,10 +212,11 @@ auto create_term_definition(ExpansionState &state,
 
   TermDefinition definition;
   definition.is_protected = state.context_protected;
-  bool simple_term{false};
+  // A simple term taking an identifier spelled differently from itself
+  // (JSON-LD 1.1 API Section 4.2.2 step 14)
+  bool distinct_simple_term{false};
 
   if (value.is_string()) {
-    simple_term = true;
     const auto &string_value{value.to_string()};
     if (!is_keyword(string_value) && has_keyword_form(string_value)) {
       defined[term] = true;
@@ -250,16 +250,22 @@ auto create_term_definition(ExpansionState &state,
           definition.iri = term;
         }
       } else if (term.contains('/')) {
-        // A slash term is a relative IRI reference, and the slash step
-        // aborts when the resulting IRI mapping is not an IRI (JSON-LD 1.1
-        // API Section 4.2.2)
+        // "Term is a relative IRI reference" and the slash step aborts when
+        // "the resulting IRI mapping is not an IRI", a bar a blank node
+        // mapping does not clear (JSON-LD 1.1 API Section 4.2.2 step 16)
         definition.iri = expand_iri(state, active_context, term, false, true,
                                     nullptr, nullptr, EMPTY_WEAK_POINTER);
-        check_iri_mapping(active_context, definition.iri, term_pointer, {});
+        // A slash term is of no keyword form, the only shape expansion
+        // answers nothing for, so the mapping always holds something here
+        assert(definition.iri.has_value());
+        if (!URI::is_iri(definition.iri.value())) {
+          throw JSONLDError("Invalid IRI mapping", term_pointer);
+        }
       } else if (active_context.vocabulary.has_value()) {
         definition.iri = active_context.vocabulary.value() + term;
       }
     } else {
+      distinct_simple_term = true;
       definition.iri =
           expand_iri(state, active_context, string_value, false, true,
                      &local_context, &defined, context_pointer);
@@ -458,11 +464,17 @@ auto create_term_definition(ExpansionState &state,
         definition.iri = term;
       }
     } else if (term.contains('/')) {
-      // As above, the slash step aborts when the resulting IRI mapping is
-      // not an IRI (JSON-LD 1.1 API Section 4.2.2)
+      // As above, the slash step aborts when "the resulting IRI mapping is
+      // not an IRI", a bar a blank node mapping does not clear (JSON-LD 1.1
+      // API Section 4.2.2 step 16)
       definition.iri = expand_iri(state, active_context, term, false, true,
                                   nullptr, nullptr, EMPTY_WEAK_POINTER);
-      check_iri_mapping(active_context, definition.iri, term_pointer, {});
+      // As above, a slash term is of no keyword form, so the mapping always
+      // holds something here
+      assert(definition.iri.has_value());
+      if (!URI::is_iri(definition.iri.value())) {
+        throw JSONLDError("Invalid IRI mapping", term_pointer);
+      }
     } else if (active_context.vocabulary.has_value()) {
       definition.iri = active_context.vocabulary.value() + term;
     }
@@ -771,8 +783,19 @@ auto create_term_definition(ExpansionState &state,
     throw JSONLDError("Invalid term definition", term_pointer);
   }
 
-  if (simple_term && !term.contains(':') && !term.contains('/') &&
-      definition.iri.has_value() &&
+  // The prefix flag of a simple term is inferred inside the step taking an
+  // identifier spelled differently from the term: "If value contains the
+  // entry @id and its value does not equal term", then "If term contains
+  // neither a colon (:) nor a slash (/), simple term is true, and if the IRI
+  // mapping of definition is either an IRI ending with a gen-delim character,
+  // or a blank node identifier, set the prefix flag in definition to true",
+  // so a term standing on its own spelling infers no such flag (JSON-LD 1.1
+  // API Section 4.2.2 steps 14 and 14.5)
+  // The identifier of a distinct simple term was already held to name
+  // something by the mapping check of its branch, so a mapping always stands
+  // behind the flag weighed here
+  assert(!distinct_simple_term || definition.iri.has_value());
+  if (distinct_simple_term && !term.contains(':') && !term.contains('/') &&
       (ends_with_gen_delim(definition.iri.value()) ||
        definition.iri.value().starts_with("_:"))) {
     definition.prefix = true;

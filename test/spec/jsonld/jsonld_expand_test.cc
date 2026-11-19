@@ -3191,6 +3191,55 @@ TEST(a_self_referential_slash_term_expands_through_the_vocabulary) {
   EXPECT_EQ(result, expected);
 }
 
+// The prefix flag of a simple term is inferred inside the step taking an
+// identifier spelled differently from the term, so a term standing on its
+// own spelling never becomes a prefix and a name leaning on it goes through
+// the vocabulary whole (JSON-LD 1.1 API Section 4.2.2 steps 14 and 14.5)
+TEST(a_self_referential_term_ending_in_a_delimiter_is_not_a_prefix) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "http://example.com/", "self#": "self#" },
+    "self#:a": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/self#:a": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(an_explicitly_mapped_term_ending_in_a_delimiter_is_a_prefix) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "named#": "http://example.com/named#" },
+    "named#:a": "y"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/named#a": [ { "@value": "y" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+// The inference asks for a term carrying neither a colon nor a slash, so a
+// slash term spelled onto its own expansion expands fine and still infers no
+// prefix flag (JSON-LD 1.1 API Section 4.2.2 step 14.5)
+TEST(an_explicitly_mapped_slash_term_is_not_a_prefix) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@vocab": "http://example.com/",
+      "a/b": "http://example.com/a/b"
+    },
+    "a/b": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/a/b": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 // JSON-LD 1.1 API Section 5.2 step 4 leaves a prefix of a single
 // underscore alone, so the term stands for the blank node it spells
 TEST(a_self_referential_blank_node_term) {

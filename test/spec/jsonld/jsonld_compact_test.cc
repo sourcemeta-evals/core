@@ -1306,6 +1306,60 @@ TEST(list_compacted_under_1_0) {
   EXPECT_EQ(result, expected);
 }
 
+// "Otherwise, set the value of the item active property entry in nest result
+// to compacted item" (JSON-LD 1.1 API Section 6.1.2 step 12.8.7.3): an
+// assignment, so of several lists arriving under one list container the last
+// one stands alone
+TEST(later_list_replaces_an_earlier_one_under_a_term_that_holds_lists) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [
+        { "@list": [ { "@value": "a" } ] },
+        { "@list": [ { "@value": "b" } ] }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": { "@id": "http://example.com/p", "@container": "@list" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": [ "b" ],
+    "@context": {
+      "p": { "@id": "http://example.com/p", "@container": "@list" }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// As above, the assignment holds for an empty list as well, clearing what the
+// earlier one left
+TEST(an_empty_later_list_clears_what_an_earlier_one_left) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [
+        { "@list": [ { "@value": "a" } ] },
+        { "@list": [] }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": { "@id": "http://example.com/p", "@container": "@list" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": [],
+    "@context": {
+      "p": { "@id": "http://example.com/p", "@container": "@list" }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
 // Compaction walks the same nesting that expansion does, so it is held to the
 // same bound on how deep that nesting may run
 TEST(deeply_nested_input_is_rejected) {
@@ -2200,6 +2254,27 @@ TEST(a_named_graph_holding_several_nodes_keeps_its_array) {
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
 
+// As above, through the node object route: the graph entry of a named node
+// compacts to an array of compacted node objects, and one already holding
+// several nodes is carried over as the array it is
+TEST(a_top_level_named_graph_holding_several_nodes_keeps_its_array) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://e/g",
+      "@graph": [ { "@id": "http://e/n1" }, { "@id": "http://e/n2" } ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json("{}");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@id": "http://e/g",
+    "@graph": [ { "@id": "http://e/n1" }, { "@id": "http://e/n2" } ]
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
 TEST(a_term_named_by_the_iri_it_maps_is_found_whatever_the_value_holds) {
   // A term whose name is the very IRI it maps is settled on without weighing
   // the value, so a container it carries says nothing about the shape in hand
@@ -2537,6 +2612,27 @@ TEST(a_scoped_context_taking_the_identifier_alias_blocks_the_reduction) {
       "id": "@id",
       "t": { "@id": "http://example.com/t", "@container": "@type",
              "@context": { "id": "urn:q" } }
+    }
+  })");
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_scoped_identifier_alias_blocks_the_reduction_of_an_identified_node) {
+  // The reduction that drops a lone identifier member under a type map minds
+  // the alias the scoped context hands the identifier keyword, so a node
+  // keeping its identifier under that alias stays an object
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@id": "urn:n", "@type": [ "urn:T" ] } ] }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": { "@id": "urn:p", "@container": "@type",
+           "@context": { "i": "@id" } }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "urn:T": { "i": "urn:n" } },
+    "@context": {
+      "p": { "@id": "urn:p", "@container": "@type",
+             "@context": { "i": "@id" } }
     }
   })");
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);

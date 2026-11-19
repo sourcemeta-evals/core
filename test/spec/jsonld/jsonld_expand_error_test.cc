@@ -3696,6 +3696,27 @@ TEST(a_slash_term_without_a_vocabulary_stays_relative_and_is_refused) {
                              "Invalid IRI mapping", "/@context/foo~1bar");
 }
 
+// "Term is a relative IRI reference" and the slash step aborts when "the
+// resulting IRI mapping is not an IRI", a bar a blank node mapping does not
+// clear in either spelling (JSON-LD 1.1 API Section 4.2.2 step 16)
+TEST(a_slash_term_expanding_to_a_blank_node_is_refused) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "_:b", "a/b": "a/b" },
+    "a/b": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/a~1b");
+}
+
+TEST(an_object_slash_term_expanding_to_a_blank_node_is_refused) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "_:b", "a/b": {} },
+    "a/b": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/a~1b");
+}
+
 TEST(a_shorthand_alias_of_the_context_keyword_is_refused_as_an_alias) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": { "a:b": "@context" },

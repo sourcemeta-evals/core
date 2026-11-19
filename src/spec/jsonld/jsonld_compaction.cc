@@ -481,8 +481,11 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
           compacted = std::move(array);
         }
         if (container_includes(item_definition, KEYWORD_LIST)) {
-          add_value(target, item_property, std::move(compacted),
-                    container_includes(item_definition, KEYWORD_SET));
+          // "Otherwise, set the value of the item active property entry in
+          // nest result to compacted item" (JSON-LD 1.1 API Section 6.1.2
+          // step 12.8.7.3): an assignment, so a later list carried by the
+          // same term replaces what an earlier one left
+          target.assign(item_property, std::move(compacted));
         } else {
           const auto list_alias{compact_iri(node_context, node_inverse,
                                             JSON::String{KEYWORD_LIST}, nullptr,
