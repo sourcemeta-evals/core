@@ -513,14 +513,59 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
                                       JSON::String{KEYWORD_NONE}, nullptr, true,
                                       false)};
 
+      // A graph object proper holds nothing beyond its graph, its name and
+      // its index, and the graph steps consume one whole before any map
+      // container is weighed. Under a term whose container names no graph,
+      // its contents compact under the term itself and are wrapped back, the
+      // name and the index coming along ("Otherwise, container does not
+      // include @graph ... Set compacted item to a new map containing the key
+      // from IRI compacting @graph using the original compacted item as a
+      // value", JSON-LD 1.1 API Section 6.1.2)
+      if (is_graph_object) {
+        bool graph_object_proper{true};
+        for (const auto &member : item.as_object()) {
+          if (!member.key_equals(KEYWORD_GRAPH, KEYWORD_GRAPH_HASH) &&
+              !member.key_equals(KEYWORD_ID, KEYWORD_ID_HASH) &&
+              !member.key_equals(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
+            graph_object_proper = false;
+            break;
+          }
+        }
+        if (graph_object_proper) {
+          auto wrapper{JSON::make_object()};
+          wrapper.assign_assume_new(
+              compact_iri(node_context, node_inverse,
+                          JSON::String{KEYWORD_GRAPH}, nullptr, true, false),
+              compact(state, node_context, node_inverse, item_property,
+                      item.at(KEYWORD_GRAPH, KEYWORD_GRAPH_HASH),
+                      compact_arrays));
+          if (item.defines(KEYWORD_ID, KEYWORD_ID_HASH)) {
+            wrapper.assign_assume_new(
+                compact_iri(node_context, node_inverse,
+                            JSON::String{KEYWORD_ID}, nullptr, true, false),
+                JSON{compact_iri(
+                    node_context, node_inverse,
+                    item.at(KEYWORD_ID, KEYWORD_ID_HASH).to_string(), nullptr,
+                    false, false)});
+          }
+          if (item.defines(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
+            wrapper.assign_assume_new(
+                compact_iri(node_context, node_inverse,
+                            JSON::String{KEYWORD_INDEX}, nullptr, true, false),
+                JSON{item.at(KEYWORD_INDEX, KEYWORD_INDEX_HASH)});
+          }
+          add_value(target, item_property, std::move(wrapper), as_array);
+          continue;
+        }
+      }
+
       // @language map container: the map gathers every member, value objects
       // keyed by their language and reduced to their value, and anything
       // else standing under the none label, as a member carrying no value
-      // carries no language to key by. A graph object stands apart: the
-      // graph steps come before the map container ones and consume it whole
-      // (JSON-LD 1.1 API Section 6.1.2)
-      if (container_includes(item_definition, KEYWORD_LANGUAGE) &&
-          !item.defines(KEYWORD_GRAPH, KEYWORD_GRAPH_HASH)) {
+      // carries no language to key by. A graph object proper never arrives:
+      // the graph steps come before the map container ones and consume it
+      // whole (JSON-LD 1.1 API Section 6.1.2)
+      if (container_includes(item_definition, KEYWORD_LANGUAGE)) {
         if (!target.defines(item_property)) {
           target.assign_assume_new(item_property, JSON::make_object());
         }
@@ -619,13 +664,18 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
         // API Section 6.1.2)
         if (compacted.is_object() &&
             item.defines(KEYWORD_ID, KEYWORD_ID_HASH)) {
-          // The member carries an identifier, its compacted form keeps it
-          // under the alias until this very read, and an identifier compacts
-          // to a name
+          // The alias is spelled with the context in force here, while the
+          // member compacted under the scoped context its term carries, which
+          // can retire that spelling, hand it to another property, or name
+          // the identifier some other way. The step reads the entry it names
+          // and nothing else, and a member whose key stayed unset lands under
+          // the none label ("If map key is null, set it to the result of IRI
+          // compacting @none", JSON-LD 1.1 API Section 6.1.2)
           const auto *identifier{compacted.try_at(id_alias)};
-          assert(identifier != nullptr && identifier->is_string());
-          key = identifier->to_string();
-          compacted.erase(id_alias);
+          if (identifier != nullptr && identifier->is_string()) {
+            key = identifier->to_string();
+            compacted.erase(id_alias);
+          }
         }
         add_value(target.at(item_property), key, std::move(compacted),
                   as_array);

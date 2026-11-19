@@ -2039,9 +2039,34 @@ TEST(a_bare_graph_object_holding_one_node_collapses) {
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
 
-TEST(a_named_graph_holding_one_node_keeps_its_array) {
-  // A graph object that carries a name keeps its nodes as an array, so the
-  // name reads as naming a graph rather than as another property of it
+TEST(an_indexed_graph_object_under_a_plain_term_keeps_its_index) {
+  // A graph object proper may carry an index beside its graph, and the wrap
+  // brings it back ("If expanded item contains an @index entry, add an entry
+  // in compacted item using the key from IRI compacting @index and the value
+  // of @index in expanded item", JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://e/p": [
+      { "@graph": [ { "@id": "http://e/n" } ], "@index": "k" }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({ "p": "http://e/p" })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "@graph": { "@id": "http://e/n" }, "@index": "k" },
+    "@context": { "p": "http://e/p" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_named_graph_holding_one_node_collapses_and_keeps_its_name) {
+  // A graph object proper is consumed by the graph steps whole: its contents
+  // compact under the term itself, a lone node standing on its own, and the
+  // wrap brings the name back beside the graph ("Set compacted item to a new
+  // map containing the key from IRI compacting @graph using the original
+  // compacted item as a value. If expanded item contains an @id entry, add an
+  // entry in compacted item...", JSON-LD 1.1 API Section 6.1.2)
   const auto input = sourcemeta::core::parse_json(R"([
     {
       "http://example.com/p": [
@@ -2065,8 +2090,8 @@ TEST(a_named_graph_holding_one_node_keeps_its_array) {
 
   const auto expected = sourcemeta::core::parse_json(R"({
     "p": {
-      "@id": "http://example.com/g",
-      "@graph": [ { "@id": "http://example.com/n", "q": "v" } ]
+      "@graph": { "@id": "http://example.com/n", "q": "v" },
+      "@id": "http://example.com/g"
     },
     "@context": {
       "p": "http://example.com/p",
@@ -2688,6 +2713,31 @@ TEST(a_language_map_term_holding_a_graph_object_keeps_the_graph_shape) {
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
 
+TEST(a_language_map_keys_a_node_beside_its_graph_under_none) {
+  // A node stating more than its graph is no graph object, so the map
+  // container takes it: it carries no value entry, so no language keys it
+  // and it stands under the none label whole (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://e/p": [
+      { "@graph": [ { "@id": "http://e/n" } ],
+        "http://e/q": [ { "@value": 1 } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "http://e/p": { "@container": "@language" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "http://e/p": {
+      "@none": { "@graph": { "@id": "http://e/n" }, "http://e/q": 1 }
+    },
+    "@context": { "http://e/p": { "@container": "@language" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
 TEST(a_named_graph_under_a_plain_term_keeps_its_ordinary_properties) {
   // A node stating more than its graph is compacted whole: the identifier,
   // the graph array, and every ordinary property beside them survive
@@ -2733,6 +2783,99 @@ TEST(an_ordinary_property_compacting_onto_the_identifier_alias) {
     "@context": {
       "m": { "@id": "http://example.com/m", "@container": "@id" },
       "@vocab": "http://example.com/"
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_id_map_member_whose_scope_retires_the_identifier_alias) {
+  // The map key is read from the entry the alias in force here names, while
+  // the member compacted under the scoped context its term carries, which
+  // retired that alias: the identifier stays under its keyword, the named
+  // entry is absent, and the member lands under the none label ("If map key
+  // is null, set it to the result of IRI compacting @none", JSON-LD 1.1 API
+  // Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/m": [
+      { "@id": "http://example.com/n",
+        "http://example.com/q": [ { "@value": 42 } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "id": "@id",
+    "q": "http://example.com/q",
+    "m": { "@id": "http://example.com/m", "@container": "@id",
+           "@context": { "id": null } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "m": { "@none": { "@id": "http://example.com/n", "q": 42 } },
+    "@context": {
+      "id": "@id",
+      "q": "http://example.com/q",
+      "m": { "@id": "http://example.com/m", "@container": "@id",
+             "@context": { "id": null } }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_id_map_member_whose_scope_hands_the_alias_to_a_property) {
+  // The scoped context gives the alias spelling to an ordinary property, so
+  // the entry that spelling names holds a number and names no identifier:
+  // the member keeps every entry and lands under the none label (JSON-LD 1.1
+  // API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/m": [
+      { "@id": "http://example.com/n",
+        "http://example.com/q": [ { "@value": 42 } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "id": "@id",
+    "m": { "@id": "http://example.com/m", "@container": "@id",
+           "@context": { "id": "http://example.com/q" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "m": { "@none": { "@id": "http://example.com/n", "id": 42 } },
+    "@context": {
+      "id": "@id",
+      "m": { "@id": "http://example.com/m", "@container": "@id",
+             "@context": { "id": "http://example.com/q" } }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_id_map_member_whose_scope_names_its_own_identifier_alias) {
+  // With no alias in force here the identifier keyword itself is looked up,
+  // while the member compacted its identifier under the alias its scoped
+  // context introduced: the lookup misses and the member lands under the
+  // none label with that alias intact (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "http://example.com/m": [
+      { "@id": "http://example.com/n",
+        "http://example.com/q": [ { "@value": "v" } ] }
+    ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "m": { "@id": "http://example.com/m", "@container": "@id",
+           "@context": { "i": "@id" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "m": { "@none": { "i": "http://example.com/n",
+                      "http://example.com/q": "v" } },
+    "@context": {
+      "m": { "@id": "http://example.com/m", "@container": "@id",
+             "@context": { "i": "@id" } }
     }
   })");
 

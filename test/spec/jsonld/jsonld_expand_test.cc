@@ -3072,6 +3072,75 @@ TEST(context_defines_a_compact_iri_term_after_its_prefix) {
 
 // The same dependency, with the dependent term given as a string rather than as
 // a definition object
+TEST(context_defines_an_identified_compact_iri_term_before_its_prefix) {
+  // The consistency step settles the term and re-expands it "using local
+  // context, and defined" (JSON-LD 1.1 API Section 4.2.2), so the prefix is
+  // made from the local context even when its entry comes later
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "ex:foo": { "@id": "http://example.com/foo" },
+      "ex": "http://example.com/"
+    },
+    "ex:foo": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/foo": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(context_defines_an_identified_compact_iri_term_after_its_prefix) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "ex": "http://example.com/",
+      "ex:foo": { "@id": "http://example.com/foo" }
+    },
+    "ex:foo": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/foo": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(context_restates_a_compact_iri_term_mapping_before_its_prefix) {
+  // The same consistency step, met through a string definition naming the
+  // IRI the term expands to
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "ex:foo": "http://example.com/foo",
+      "ex": "http://example.com/"
+    },
+    "ex:foo": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/foo": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(context_restates_a_compact_iri_term_mapping_after_its_prefix) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "ex": "http://example.com/",
+      "ex:foo": "http://example.com/foo"
+    },
+    "ex:foo": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/foo": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(context_defines_a_compact_iri_string_term_before_its_prefix) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {

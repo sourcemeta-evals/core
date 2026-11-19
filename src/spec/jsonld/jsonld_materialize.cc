@@ -51,9 +51,9 @@ auto child_range(typename AnnotationIndex<PointerT>::const_iterator &iterator,
                  const PointerT &pointer) -> AnnotationRange<PointerT> {
   const auto depth{pointer.size() - 1};
   const auto &token{pointer.at(depth)};
-  // Annotations that sort before the key in hand are passed over. Whether any
-  // do turns on the order the map is read in, which is the map's own, so this
-  // is not something a test can ask for
+  // Annotations that sort before the key in hand name positions the instance
+  // lacks: the walk reads the instance keys in sorted order, so an annotation
+  // for an absent earlier position is met, and passed over, right here
   while (iterator != end && (*iterator)->pointer.at(depth) < token) {
     iterator += 1;
   }

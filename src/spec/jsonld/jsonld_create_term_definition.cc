@@ -80,11 +80,10 @@ auto finalize_definition(ExpansionState &state, ActiveContext &active_context,
 
 // The mapping a term settles on must name a keyword, an IRI or a blank node,
 // and may not stand in for the keyword that carries a context (JSON-LD 1.1 API
-// Section 4.2.2 step 16.2.3). Both callers reach this past the step that
-// leaves a value shaped like a keyword alone, so the mapping always holds
-// something, and a vocabulary is itself an IRI and so puts a colon in whatever
-// it prefixes. Those two tests stand because the rule they spell out is the
-// one the algorithm names, not because either can settle the outcome
+// Section 4.2.2 step 16.2.3). Both refusals are live: a value leaning on a
+// term that gave up its own mapping expands to nothing and arrives absent,
+// and a slash term with no vocabulary behind it stays a relative reference,
+// carrying no colon
 auto check_iri_mapping([[maybe_unused]] const ActiveContext &active_context,
                        const std::optional<JSON::String> &mapping,
                        const WeakPointer &term_pointer,
@@ -284,10 +283,18 @@ auto create_term_definition(ExpansionState &state,
                                   colon_position != 0 &&
                                   colon_position + 1 != term.size()};
         if (iri_like_colon || term.contains('/')) {
-          auto probe{active_context};
-          const auto expanded_term{expand_iri(state, probe, term, false, true,
-                                              nullptr, nullptr,
-                                              EMPTY_WEAK_POINTER)};
+          // The step settles the term before re-expanding it: "Set the value
+          // associated with defined's term entry to true. If the result of
+          // IRI expanding term using local context, and defined, is not the
+          // same as the IRI mapping of definition, an invalid IRI mapping
+          // error has been detected" (JSON-LD 1.1 API Section 4.2.2), so a
+          // prefix the term leans on is made from the local context whatever
+          // order the entries arrived in, while the settled entry keeps the
+          // term itself from being made again mid-way
+          defined[term] = true;
+          const auto expanded_term{expand_iri(state, active_context, term,
+                                              false, true, &local_context,
+                                              &defined, context_pointer)};
           // A name of keyword form carries nothing but letters after its
           // sign, so a term weighed here for its colon or its slash is of no
           // such form, and that form is the only one expansion answers
@@ -407,10 +414,15 @@ auto create_term_definition(ExpansionState &state,
                                   colon_position != 0 &&
                                   colon_position + 1 != term.size()};
         if (iri_like_colon || term.contains('/')) {
-          auto probe{active_context};
-          const auto expanded_term{expand_iri(state, probe, term, false, true,
-                                              nullptr, nullptr,
-                                              EMPTY_WEAK_POINTER)};
+          // As above, the step reads "Set the value associated with defined's
+          // term entry to true" before re-expanding "using local context, and
+          // defined" (JSON-LD 1.1 API Section 4.2.2), making a prefix the
+          // term leans on from the local context whatever order the entries
+          // arrived in
+          defined[term] = true;
+          const auto expanded_term{expand_iri(state, active_context, term,
+                                              false, true, &local_context,
+                                              &defined, context_pointer)};
           // As above, a name carrying a colon or a slash is of no keyword
           // form, so it never expands to nothing
           assert(expanded_term.has_value());
