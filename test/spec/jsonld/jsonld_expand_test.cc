@@ -425,6 +425,26 @@ TEST(a_term_closing_with_a_colon_escapes_the_vocabulary) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+// A term opening with a colon leans on no prefix, so under a vocabulary it
+// re-expands onto the vocabulary IRI and a mapping naming that spot stands
+TEST(a_term_opening_with_a_colon_expands_onto_the_vocabulary) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "@vocab": "http://example.com/",
+      ":a:b": { "@id": "http://example.com/:a:b" }
+    },
+    ":a:b": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/:a:b": [ { "@value": "v" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(type_coercion_to_id) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {

@@ -283,9 +283,11 @@ auto create_term_definition(ExpansionState &state,
       // refused an absent mapping already
       assert(definition.iri.has_value());
       if (!state.processing_1_0) {
-        const auto colon_position{term.find(':')};
+        // "Anywhere but as the first character" admits a colon standing past
+        // an opening one, so the search starts behind the first character and
+        // only a lone closing colon stays out
+        const auto colon_position{term.find(':', 1)};
         const bool iri_like_colon{colon_position != JSON::String::npos &&
-                                  colon_position != 0 &&
                                   colon_position + 1 != term.size()};
         if (iri_like_colon || term.contains('/')) {
           // The step settles the term before re-expanding it: "Set the value
@@ -383,10 +385,10 @@ auto create_term_definition(ExpansionState &state,
       definition.iri =
           expand_iri(state, active_context, reverse.to_string(), false, true,
                      &local_context, &defined, context_pointer);
-      // A value shaped like a keyword is the only one expansion answers
-      // nothing for, and the step above has already left such a value alone,
-      // so what stands to be settled here is whether the expansion names an
-      // absolute IRI
+      // Expansion answers nothing for a value shaped like a keyword, which
+      // the step above has already left alone, and for a reference to a term
+      // that gave up its mapping, so the guard below settles both that the
+      // expansion named anything and that the name is an absolute IRI
       if (!definition.iri.has_value() ||
           !definition.iri.value().contains(':')) {
         throw JSONLDError("Invalid IRI mapping", term_pointer,
@@ -414,9 +416,11 @@ auto create_term_definition(ExpansionState &state,
       // keyword alone
       assert(mapping.has_value());
       if (!state.processing_1_0) {
-        const auto colon_position{term.find(':')};
+        // As above, the colon search starts behind the first character,
+        // admitting one past an opening colon and leaving out only a lone
+        // closing one
+        const auto colon_position{term.find(':', 1)};
         const bool iri_like_colon{colon_position != JSON::String::npos &&
-                                  colon_position != 0 &&
                                   colon_position + 1 != term.size()};
         if (iri_like_colon || term.contains('/')) {
           // As above, the step reads "Set the value associated with defined's

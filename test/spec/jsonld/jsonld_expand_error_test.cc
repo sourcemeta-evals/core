@@ -117,6 +117,19 @@ TEST(keyword_redefinition) {
                              "Keyword redefinition", "/@context/@type");
 }
 
+// The special definition the type keyword may carry admits only the container
+// and protection entries, so an unknown key is a redefinition no matter what
+// value it holds
+TEST(keyword_redefinition_by_an_unknown_entry_holding_a_keyword) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@type": { "@bogus": "@set" } },
+    "@type": "http://example.com/T"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Keyword redefinition", "/@context/@type");
+}
+
 TEST(protected_term_redefinition) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": [
@@ -3336,8 +3349,26 @@ TEST(a_term_holding_a_slash_that_does_not_expand_onto_its_own_mapping) {
                              "Invalid IRI mapping", "/@context/a~1b/@id");
 }
 
-// A trailing colon leaves no suffix to join to a prefix, so nothing names
-// the term and it keeps no mapping
+// A colon past an opening one still counts as "anywhere but as the first
+// character", so a term opening with a colon and carrying another is held to
+// expanding onto its own mapping just the same
+TEST(a_term_opening_with_a_colon_that_does_not_expand_onto_its_own_mapping) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { ":a:b": { "@id": "http://example.com/x" } } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/:a:b/@id");
+}
+
+// As above, through the shorthand form of the definition
+TEST(a_shorthand_term_opening_with_a_colon_that_does_not_match_its_mapping) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { ":a:b": "http://example.com/x" }, ":a:b": "v" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/:a:b");
+}
+
 // A term carrying no colon or slash of its own derives no mapping when the
 // definition names no identifier and no vocabulary stands (JSON-LD 1.1 API
 // Section 4.2.2)

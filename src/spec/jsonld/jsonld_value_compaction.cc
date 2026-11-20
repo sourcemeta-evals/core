@@ -59,6 +59,12 @@ auto compact_value(const ActiveContext &active_context,
                                 identifier.to_string(), nullptr, true, false)};
       }
     }
+    // A node carrying more than its identifier is no reference, and its
+    // properties compact beside their values in node compaction, so it goes
+    // back whole instead of through the full form below
+    if (extra != 0) {
+      return JSON{value};
+    }
   } else {
     // A caller hands this either a value object or a node reference, so an
     // object carrying no identifier carries a value
@@ -114,7 +120,11 @@ auto compact_value(const ActiveContext &active_context,
   for (const auto &entry : value.as_object()) {
     const auto key{compact_iri(active_context, inverse_context, entry.first,
                                nullptr, true, false)};
-    if (entry.first == KEYWORD_TYPE && entry.second.is_string()) {
+    if (entry.first == KEYWORD_TYPE) {
+      // A value object names its type as one IRI held in a string, and a
+      // node carrying anything beyond its identifier goes back whole before
+      // this loop, so no type array arrives here
+      assert(entry.second.is_string());
       result.assign_assume_new(
           key,
           JSON{compact_iri(active_context, inverse_context,

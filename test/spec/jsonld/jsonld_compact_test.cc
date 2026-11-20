@@ -3389,3 +3389,29 @@ TEST(a_vocabulary_coercion_wins_for_an_identifier_a_term_names) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
+
+// A node carrying more than its identifier is no reference, so its
+// properties are compacted beside their values, where the language-carrying
+// term can be chosen and an IRI spelled like a compact one stays whole
+TEST(an_identified_node_compacts_its_properties_with_their_values) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/a",
+      "ex:name": [ { "@value": "x", "@language": "en" } ]
+    }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"([
+    { "name": { "@id": "ex:name", "@language": "en" } },
+    { "ex": "http://example.org/" }
+  ])");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@id": "http://example.com/a",
+    "name": "x",
+    "@context": [
+      { "name": { "@id": "ex:name", "@language": "en" } },
+      { "ex": "http://example.org/" }
+    ]
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
