@@ -922,6 +922,33 @@ TEST(reverse_term_inside_a_reverse_map_is_reversed_twice) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+// A map of only doubly reversed properties contributes forward properties
+// alone, so the node gains no reverse entry for it and a later aliased entry
+// is free to make one
+TEST(a_reverse_map_of_only_twice_reversed_properties_does_not_collide) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "alias": "@reverse",
+      "rev": { "@reverse": "http://example.com/x" }
+    },
+    "@id": "http://example.com/subject",
+    "@reverse": { "rev": { "@id": "http://example.com/object" } },
+    "alias": { "http://example.com/q": { "@id": "http://example.com/other" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/subject",
+      "http://example.com/x": [ { "@id": "http://example.com/object" } ],
+      "@reverse": {
+        "http://example.com/q": [ { "@id": "http://example.com/other" } ]
+      }
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 // The only keyword a reverse property map may carry is `@context`, which is
 // read as a scoped context rather than rejected
 TEST(context_inside_a_reverse_map_is_allowed) {

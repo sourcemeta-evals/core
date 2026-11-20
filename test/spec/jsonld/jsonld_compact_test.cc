@@ -3234,3 +3234,40 @@ TEST(a_bare_graph_beside_nothing_keeps_its_array_at_the_top_level) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
+
+TEST(an_indexed_list_inside_a_list_keeps_its_index) {
+  // The inner wrapped list is one more list member: its index rides along
+  // and its array stays one, as the list keyword is the item active
+  // property (JSON-LD 1.1 API Section 6.1.2 step 12.8.4)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [
+      { "@list": [ { "@value": "x" } ], "@index": "k" } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({ "p": "urn:p" })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "@list": [ { "@index": "k", "@list": [ "x" ] } ] },
+    "@context": { "p": "urn:p" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_indexed_list_inside_a_list_keeps_its_aliased_index) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [
+      { "@list": [ { "@value": "x" } ], "@index": "k" } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": "urn:p", "list": "@list", "idx": "@index"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "list": [ { "idx": "k", "list": [ "x" ] } ] },
+    "@context": { "p": "urn:p", "list": "@list", "idx": "@index" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}

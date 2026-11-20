@@ -6249,24 +6249,6 @@ TEST(weak_ordered_collection_of_nodes) {
   EXPECT_EQ(result, expected);
 }
 
-TEST(promotion_without_an_identifier_or_an_edge_is_dropped) {
-  // A manufactured node that nothing names and nothing points at is left out,
-  // so an unreferenced scalar cannot put an anonymous subject in the graph
-  const auto instance = sourcemeta::core::parse_json(R"({ "height": 1.85 })");
-
-  sourcemeta::core::JSONLDPromotion promotion;
-  promotion.value = "https://example.com/value";
-
-  sourcemeta::core::JSONLDAnnotationList annotations;
-  annotations.emplace_back(sourcemeta::core::Pointer{},
-                           sourcemeta::core::JSONLDDescriptor{
-                               .edges = {}, .value = std::move(promotion)});
-
-  const auto expected = sourcemeta::core::parse_json("[]");
-  EXPECT_EQ(sourcemeta::core::jsonld_materialize(instance, annotations),
-            expected);
-}
-
 TEST(promotion_without_an_identifier_stands_as_a_collection_member) {
   // A collection member attaches through the collection's own edge, so leaving
   // it out would quietly shorten the collection
@@ -6308,7 +6290,9 @@ TEST(promotion_without_an_identifier_stands_as_a_collection_member) {
 }
 
 TEST(weak_promotion_without_an_identifier_or_an_edge_is_dropped) {
-  const auto instance = sourcemeta::core::parse_json(R"({ "height": 1.85 })");
+  // A manufactured node that nothing names and nothing points at is left out,
+  // so an unreferenced scalar cannot put an anonymous subject in the graph
+  const auto instance = sourcemeta::core::parse_json(R"(1.85)");
 
   sourcemeta::core::JSONLDPromotion promotion;
   promotion.value = "https://example.com/value";

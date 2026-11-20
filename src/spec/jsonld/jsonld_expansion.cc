@@ -446,11 +446,11 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
   expand_entries(state, active_context, type_context, result, origins,
                  active_property, element, pointer);
 
-  // An empty reverse map carries no information.
-  if (const auto *reverse{result.try_at(KEYWORD_REVERSE, KEYWORD_REVERSE_HASH)};
-      reverse != nullptr && reverse->empty()) {
-    result.erase(KEYWORD_REVERSE);
-  }
+  // What writes a reverse entry never leaves it empty: the reverse keyword
+  // step skips over an empty map, and a reverse term assigns at least its
+  // own key
+  assert(result.try_at(KEYWORD_REVERSE, KEYWORD_REVERSE_HASH) == nullptr ||
+         !result.at(KEYWORD_REVERSE, KEYWORD_REVERSE_HASH).empty());
 
   // Post-processing (JSON-LD 1.1 API Section 5.1.2)
   if (const auto *value_entry{
@@ -975,7 +975,14 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                   into_array(JSON{reverse_entry.second}));
           }
         }
-        result.assign(KEYWORD_REVERSE, std::move(reverse_map));
+        // An entry of only doubly reversed properties contributes forward
+        // properties alone, and the node gains no reverse entry for it, so a
+        // later aliased entry is not a collision ("if expanded value contains
+        // an entry other than @reverse", JSON-LD 1.1 API Section 5.1.2 step
+        // 13.4.13.4)
+        if (!reverse_map.empty()) {
+          result.assign(KEYWORD_REVERSE, std::move(reverse_map));
+        }
       }
       continue;
     }

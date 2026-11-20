@@ -648,6 +648,20 @@ TEST(colliding_keywords) {
                              "Colliding keywords", "/id");
 }
 
+// A reverse map holding an ordinary reverse property stands on the node, so
+// an aliased entry after it is a collision
+TEST(colliding_keywords_populated_reverse_map_then_alias) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "alias": "@reverse" },
+    "@id": "http://example.com/subject",
+    "@reverse": { "http://example.com/q": { "@id": "http://example.com/a" } },
+    "alias": { "http://example.com/r": { "@id": "http://example.com/b" } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Colliding keywords", "/alias");
+}
+
 TEST(invalid_id_value) {
   const auto input = sourcemeta::core::parse_json(R"({ "@id": true })");
 
