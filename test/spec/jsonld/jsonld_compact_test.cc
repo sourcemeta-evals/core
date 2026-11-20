@@ -3271,3 +3271,121 @@ TEST(an_indexed_list_inside_a_list_keeps_its_aliased_index) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
+
+// An empty array is the JSON literal itself, not an absence of values, so
+// the property keeps it whole instead of vanishing
+TEST(an_empty_json_literal_array_keeps_its_shape) {
+  const auto input = sourcemeta::core::parse_json(
+      R"([ { "urn:p": [ { "@value": [], "@type": "@json" } ] } ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "p": { "@id": "urn:p", "@type": "@json" } })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": [],
+    "@context": { "p": { "@id": "urn:p", "@type": "@json" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// The members of a compacted JSON literal array are added one by one, so a
+// lone member stands alone under the property
+TEST(a_singleton_json_literal_array_stands_alone) {
+  const auto input = sourcemeta::core::parse_json(
+      R"([ { "urn:p": [ { "@value": [ 1 ], "@type": "@json" } ] } ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "p": { "@id": "urn:p", "@type": "@json" } })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": 1,
+    "@context": { "p": { "@id": "urn:p", "@type": "@json" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// An empty literal stands as the property only when nothing claimed the name
+// before it, so one arriving after another value adds nothing
+TEST(an_empty_json_literal_array_after_another_value_adds_nothing) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@value": [ 1 ], "@type": "@json" },
+        { "@value": [], "@type": "@json" }
+      ]
+    }
+  ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "p": { "@id": "urn:p", "@type": "@json" } })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": 1,
+    "@context": { "p": { "@id": "urn:p", "@type": "@json" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// Of two terms naming the same property under differing coercions, only the
+// identifier one preserves a name an unrelated vocabulary term would capture
+// on the way back (JSON-LD 1.1 API Section 6.1.3)
+TEST(an_identifier_coercion_wins_over_a_vocabulary_one_for_a_shadowed_name) {
+  const auto input =
+      sourcemeta::core::parse_json(R"([ { "urn:p": [ { "@id": "foo" } ] } ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "foo": "urn:other",
+    "i": { "@id": "urn:p", "@type": "@id" },
+    "v": { "@id": "urn:p", "@type": "@vocab" }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "i": "foo",
+    "@context": {
+      "foo": "urn:other",
+      "i": { "@id": "urn:p", "@type": "@id" },
+      "v": { "@id": "urn:p", "@type": "@vocab" }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// A term that gave up its mapping captures nothing, so the identifier
+// coercion still carries the name
+TEST(an_identifier_coercion_wins_when_the_shadowing_term_gave_up_its_mapping) {
+  const auto input =
+      sourcemeta::core::parse_json(R"([ { "urn:p": [ { "@id": "foo" } ] } ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "foo": null,
+    "i": { "@id": "urn:p", "@type": "@id" },
+    "v": { "@id": "urn:p", "@type": "@vocab" }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "i": "foo",
+    "@context": {
+      "foo": null,
+      "i": { "@id": "urn:p", "@type": "@id" },
+      "v": { "@id": "urn:p", "@type": "@vocab" }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// An identifier a term truly names compacts onto that term, and the
+// vocabulary coercion carries it
+TEST(a_vocabulary_coercion_wins_for_an_identifier_a_term_names) {
+  const auto input = sourcemeta::core::parse_json(
+      R"([ { "urn:p": [ { "@id": "urn:other" } ] } ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "foo": "urn:other",
+    "i": { "@id": "urn:p", "@type": "@id" },
+    "v": { "@id": "urn:p", "@type": "@vocab" }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "v": "foo",
+    "@context": {
+      "foo": "urn:other",
+      "i": { "@id": "urn:p", "@type": "@id" },
+      "v": { "@id": "urn:p", "@type": "@vocab" }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}

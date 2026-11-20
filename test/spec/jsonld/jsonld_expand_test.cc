@@ -357,6 +357,74 @@ TEST(compact_iri_via_prefix) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+// A colon closing a term still counts as "a colon (:) anywhere after the
+// first character", so the term derives its mapping from its own spelling,
+// an empty suffix leaving the scheme alone (JSON-LD 1.1 API Section 4.2.2
+// step 15)
+TEST(a_term_closing_with_a_colon_maps_to_itself) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "foo:": { "@type": "@id" } },
+    "foo:": "https://example.com/n"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "foo:": [ { "@id": "https://example.com/n" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(a_term_closing_with_a_colon_keeps_its_shorthand_mapping) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "foo:": "foo:" },
+    "foo:": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "foo:": [ { "@value": "v" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+// The empty suffix rides on the prefix mapping, so the term resolves to the
+// prefix IRI itself
+TEST(a_term_closing_with_a_colon_leans_on_its_prefix) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "foo": "http://example.com/", "foo:": { "@type": "@id" } },
+    "foo:": "https://example.com/n"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/": [ { "@id": "https://example.com/n" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+// The colon step stands before the vocabulary one, so a vocabulary does not
+// capture a term closing with a colon
+TEST(a_term_closing_with_a_colon_escapes_the_vocabulary) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "http://vocab.example/", "foo:": { "@type": "@id" } },
+    "foo:": "https://example.com/n"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "foo:": [ { "@id": "https://example.com/n" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(type_coercion_to_id) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {
@@ -2552,6 +2620,23 @@ TEST(json_literal_under_property_is_preserved) {
   const auto expected = sourcemeta::core::parse_json(R"([
     {
       "urn:p": [ { "@type": "@json", "@value": [ 2, 1 ] } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+// An empty array under a term coerced to a JSON literal is the literal
+// itself, not an absence of values, so it survives the round trip whole
+TEST(an_empty_array_under_a_json_coerced_term_is_the_value) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@type": "@json" } },
+    "p": []
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [ { "@value": [], "@type": "@json" } ]
     }
   ])");
 

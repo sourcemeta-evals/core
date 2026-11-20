@@ -771,6 +771,15 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       // A compacted JSON literal may itself be an array, in which case its
       // members are added individually rather than nesting another array.
       if (compacted.is_array()) {
+        // An empty compacted literal has no members to add one by one, yet
+        // the array itself is the value, so it stands as the property when
+        // nothing claimed the name before it
+        if (compacted.empty()) {
+          if (!target.defines(item_property)) {
+            target.assign(item_property, std::move(compacted));
+          }
+          continue;
+        }
         for (const auto &member : compacted.as_array()) {
           add_value(target, item_property, JSON{member}, as_array);
         }

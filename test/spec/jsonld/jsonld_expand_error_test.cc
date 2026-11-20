@@ -3338,12 +3338,15 @@ TEST(a_term_holding_a_slash_that_does_not_expand_onto_its_own_mapping) {
 
 // A trailing colon leaves no suffix to join to a prefix, so nothing names
 // the term and it keeps no mapping
-TEST(a_term_closing_with_a_colon_and_no_identifier) {
+// A term carrying no colon or slash of its own derives no mapping when the
+// definition names no identifier and no vocabulary stands (JSON-LD 1.1 API
+// Section 4.2.2)
+TEST(an_object_term_without_an_identifier_or_a_vocabulary) {
   const auto input = sourcemeta::core::parse_json(
-      R"({ "@context": { "foo:": { "@type": "@id" } } })");
+      R"({ "@context": { "foo": { "@type": "@id" } } })");
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Invalid IRI mapping", "/@context/foo:");
+                             "Invalid IRI mapping", "/@context/foo");
 }
 
 // JSON-LD 1.0 has no nesting of lists, so a `@list` container holding a list

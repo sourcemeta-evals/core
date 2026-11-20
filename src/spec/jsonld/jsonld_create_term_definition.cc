@@ -439,8 +439,12 @@ auto create_term_definition(ExpansionState &state,
       }
     } else if (explicit_null_id) {
       // No identifier is derived for a term that gave up its own
-    } else if (term.contains(':') && !term.starts_with(':') &&
-               !term.ends_with(':')) {
+    } else if (term.contains(':') && !term.starts_with(':')) {
+      // The step reads "a colon (:) anywhere after the first character",
+      // which a colon closing the term satisfies, so such a term derives its
+      // mapping here with an empty suffix instead of falling through to the
+      // missing-mapping rejection below (JSON-LD 1.1 API Section 4.2.2 step
+      // 15)
       const auto colon{term.find(':')};
       const auto prefix{term.substr(0, colon)};
       const auto suffix{term.substr(colon + 1)};
