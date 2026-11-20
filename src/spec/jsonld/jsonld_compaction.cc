@@ -112,18 +112,19 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       result.push_back(compact(state, active_context, inverse_context,
                                active_property, item, compact_arrays));
     }
-    // The step naming what stays an array names the graph keyword alongside
-    // the set one, but a graph object carrying no name of its own lets its
-    // lone node stand on its own, which three suite entries require, so only
-    // the set keyword is weighed here and a named graph is given its array
-    // back where it is compacted (JSON-LD 1.1 API Section 6.1.2 step 3, suite
-    // entries #t0090, #t0092 and #t0094)
-    // The set keyword does arrive here: a set object carrying a list hands
-    // that list down under the set keyword itself (JSON-LD 1.1 API Section
-    // 6.1.2 step 3.3)
+    // A lone item stands on its own only when the active property is neither
+    // the graph nor the set keyword ("and active property is not @graph or
+    // @set, and compactArrays is true", JSON-LD 1.1 API Section 6.1.2 step
+    // 3.3). The set keyword does arrive here: a set object carrying a list
+    // hands that list down under the set keyword itself, and the graph
+    // keyword arrives from the graph entry of a node, while a graph object
+    // consumed whole by the graph steps compacts its graph under the term
+    // itself, which is how three suite entries see their lone node stand on
+    // its own (suite entries #t0090, #t0092 and #t0094)
     const bool force_array{!compact_arrays ||
                            (active_property.has_value() &&
-                            active_property.value() == KEYWORD_SET) ||
+                            (active_property.value() == KEYWORD_SET ||
+                             active_property.value() == KEYWORD_GRAPH)) ||
                            container_includes(definition, KEYWORD_SET) ||
                            container_includes(definition, KEYWORD_LIST)};
     if (result.size() == 1 && !force_array) {
@@ -324,15 +325,12 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       auto compacted{compact(state, node_context, node_inverse,
                              JSON::String{KEYWORD_GRAPH}, expanded_value,
                              compact_arrays)};
-      // A named graph keeps its @graph as an array; a bare graph object may
-      // collapse to a single value, which the official suite requires
-      // (suite entries #t0090, #t0092 and #t0094)
-      if (element.defines(KEYWORD_ID, KEYWORD_ID_HASH) &&
-          !compacted.is_array()) {
-        auto array{JSON::make_array()};
-        array.push_back(std::move(compacted));
-        compacted = std::move(array);
-      }
+      // A graph entry keeps its array whatever else the node carries: what a
+      // graph entry holds in expanded form is an array, and the graph keyword
+      // as the active property keeps it one through the recursion ("and
+      // active property is not @graph or @set", JSON-LD 1.1 API Section
+      // 6.1.2 step 3.3)
+      assert(compacted.is_array());
       result.assign_assume_new(alias, std::move(compacted));
       continue;
     }
@@ -456,7 +454,12 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       // Only a list object takes the list path: an ordinary value under a
       // term declaring a list container compacts like any other value
       // (JSON-LD 1.1 API Section 6.1.2, the item steps gate on the item being
-      // a list object)
+      // a list object). Under a term whose container names no list, the list
+      // compacts to a wrapper that is carried on into the container steps,
+      // which key it like any other member, the way jsonld.js orders the
+      // steps: an add inside the list step would stand beside the one the
+      // container steps make, holding the member twice
+      std::optional<JSON> list_wrapper;
       if (is_list) {
         const auto &list_value{item.at(KEYWORD_LIST, KEYWORD_LIST_HASH)};
         // What a list entry holds in expanded form is an array, which the
@@ -486,24 +489,21 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
           // step 12.8.7.3): an assignment, so a later list carried by the
           // same term replaces what an earlier one left
           target.assign(item_property, std::move(compacted));
-        } else {
-          const auto list_alias{compact_iri(node_context, node_inverse,
-                                            JSON::String{KEYWORD_LIST}, nullptr,
-                                            true, false)};
-          auto list_object{JSON::make_object()};
-          list_object.assign_assume_new(list_alias, std::move(compacted));
-          if (item.defines(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
-            const auto index_alias{compact_iri(node_context, node_inverse,
-                                               JSON::String{KEYWORD_INDEX},
-                                               nullptr, true, false)};
-            list_object.assign_assume_new(
-                index_alias, JSON{item.at(KEYWORD_INDEX, KEYWORD_INDEX_HASH)});
-          }
-          add_value(target, item_property, std::move(list_object),
-                    container_includes(item_definition, KEYWORD_SET) ||
-                        expanded_property == KEYWORD_LIST || !compact_arrays);
+          continue;
         }
-        continue;
+        const auto list_alias{compact_iri(node_context, node_inverse,
+                                          JSON::String{KEYWORD_LIST}, nullptr,
+                                          true, false)};
+        auto list_object{JSON::make_object()};
+        list_object.assign_assume_new(list_alias, std::move(compacted));
+        if (item.defines(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
+          const auto index_alias{compact_iri(node_context, node_inverse,
+                                             JSON::String{KEYWORD_INDEX},
+                                             nullptr, true, false)};
+          list_object.assign_assume_new(
+              index_alias, JSON{item.at(KEYWORD_INDEX, KEYWORD_INDEX_HASH)});
+        }
+        list_wrapper.emplace(std::move(list_object));
       }
 
       // The items of a list keyword entry keep their array, the way the
@@ -565,9 +565,9 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       // @language map container: the map gathers every member, value objects
       // keyed by their language and reduced to their value, and anything
       // else standing under the none label, as a member carrying no value
-      // carries no language to key by. A graph object proper never arrives:
-      // the graph steps come before the map container ones and consume it
-      // whole (JSON-LD 1.1 API Section 6.1.2)
+      // carries no language to key by, a wrapped list among them. A graph
+      // object proper never arrives: the graph steps come before the map
+      // container ones and consume it whole (JSON-LD 1.1 API Section 6.1.2)
       if (container_includes(item_definition, KEYWORD_LANGUAGE)) {
         if (!target.defines(item_property)) {
           target.assign_assume_new(item_property, JSON::make_object());
@@ -581,8 +581,10 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
                     JSON{item.at(KEYWORD_VALUE, KEYWORD_VALUE_HASH)}, as_array);
         } else {
           add_value(target.at(item_property), none_key,
-                    compact(state, node_context, node_inverse, item_property,
-                            item, compact_arrays),
+                    list_wrapper.has_value()
+                        ? std::move(list_wrapper.value())
+                        : compact(state, node_context, node_inverse,
+                                  item_property, item, compact_arrays),
                     as_array);
         }
         continue;
@@ -599,8 +601,10 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
         // not there, so one stands here
         assert(item_definition != nullptr);
         const bool property_index{item_definition->index_iri.has_value()};
-        auto compacted{compact(state, node_context, node_inverse, item_property,
-                               item, compact_arrays)};
+        auto compacted{list_wrapper.has_value()
+                           ? std::move(list_wrapper.value())
+                           : compact(state, node_context, node_inverse,
+                                     item_property, item, compact_arrays)};
         std::optional<JSON::String> key;
         if (property_index) {
           // The index key is the expanded index mapping, compacted to match the
@@ -655,8 +659,10 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
         if (!target.defines(item_property)) {
           target.assign_assume_new(item_property, JSON::make_object());
         }
-        auto compacted{compact(state, node_context, node_inverse, item_property,
-                               item, compact_arrays)};
+        auto compacted{list_wrapper.has_value()
+                           ? std::move(list_wrapper.value())
+                           : compact(state, node_context, node_inverse,
+                                     item_property, item, compact_arrays)};
         const auto id_alias{compact_iri(node_context, node_inverse,
                                         JSON::String{KEYWORD_ID}, nullptr, true,
                                         false)};
@@ -693,8 +699,10 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
         if (!target.defines(item_property)) {
           target.assign_assume_new(item_property, JSON::make_object());
         }
-        auto compacted{compact(state, node_context, node_inverse, item_property,
-                               item, compact_arrays)};
+        auto compacted{list_wrapper.has_value()
+                           ? std::move(list_wrapper.value())
+                           : compact(state, node_context, node_inverse,
+                                     item_property, item, compact_arrays)};
         JSON::String key{none_key};
         if (compacted.is_object()) {
           const auto type_alias{compact_iri(node_context, node_inverse,
@@ -756,8 +764,10 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
         continue;
       }
 
-      auto compacted{compact(state, node_context, node_inverse, item_property,
-                             item, compact_arrays)};
+      auto compacted{list_wrapper.has_value()
+                         ? std::move(list_wrapper.value())
+                         : compact(state, node_context, node_inverse,
+                                   item_property, item, compact_arrays)};
       // A compacted JSON literal may itself be an array, in which case its
       // members are added individually rather than nesting another array.
       if (compacted.is_array()) {

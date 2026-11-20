@@ -2907,7 +2907,9 @@ TEST(a_language_map_term_holding_a_graph_object_keeps_the_graph_shape) {
 TEST(a_language_map_keys_a_node_beside_its_graph_under_none) {
   // A node stating more than its graph is no graph object, so the map
   // container takes it: it carries no value entry, so no language keys it
-  // and it stands under the none label whole (JSON-LD 1.1 API Section 6.1.2)
+  // and it stands under the none label whole, its graph keeping its array
+  // the way the graph keyword asks for one as the item active property
+  // (JSON-LD 1.1 API Section 6.1.2 step 12.8.4)
   const auto input = sourcemeta::core::parse_json(R"([
     { "http://e/p": [
       { "@graph": [ { "@id": "http://e/n" } ],
@@ -2921,7 +2923,7 @@ TEST(a_language_map_keys_a_node_beside_its_graph_under_none) {
 
   const auto expected = sourcemeta::core::parse_json(R"({
     "http://e/p": {
-      "@none": { "@graph": { "@id": "http://e/n" }, "http://e/q": 1 }
+      "@none": { "@graph": [ { "@id": "http://e/n" } ], "http://e/q": 1 }
     },
     "@context": { "http://e/p": { "@container": "@language" } }
   })");
@@ -3068,6 +3070,166 @@ TEST(an_id_map_member_whose_scope_names_its_own_identifier_alias) {
       "m": { "@id": "http://example.com/m", "@container": "@id",
              "@context": { "i": "@id" } }
     }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_lone_list_under_a_language_container_stands_under_the_none_label) {
+  // A list under a term whose container names no list is wrapped and carried
+  // on into the container steps: it holds no value entry, so no language
+  // keys it and the wrapper lands under the none label (JSON-LD 1.1 API
+  // Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@value": "x" } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@language" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@none": { "@list": [ "x" ] } },
+    "@context": { "urn:p": { "@container": "@language" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_list_then_a_node_under_a_language_container_share_the_none_label) {
+  // A property can mix a list with other members, and the language map
+  // gathers them all: neither carries a value entry, so both stand under
+  // the none label side by side (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@value": "x" } ] }, { "@id": "urn:n" } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@language" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@none": [ { "@list": [ "x" ] }, { "@id": "urn:n" } ] },
+    "@context": { "urn:p": { "@container": "@language" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_list_then_a_node_under_a_language_container_without_compact_arrays) {
+  // The same mix with array compaction off: the none label holds both
+  // members in an array and the lone top level node stands inside the
+  // document graph array (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@value": "x" } ] }, { "@id": "urn:n" } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@language" }
+  })");
+
+  const auto result{sourcemeta::core::jsonld_compact(
+      input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_1, false)};
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@graph": [
+      { "urn:p": { "@none": [ { "@list": [ "x" ] }, { "@id": "urn:n" } ] } }
+    ],
+    "@context": { "urn:p": { "@container": "@language" } }
+  })");
+
+  EXPECT_EQ(result, expected);
+}
+
+TEST(an_indexed_list_under_an_index_container_keys_by_its_index) {
+  // A wrapped list carries its index along, and the index map consumes it
+  // as the key the way it does for any member (JSON-LD 1.1 API Section
+  // 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@value": "x" } ], "@index": "k" } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@index" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "k": { "@list": [ "x" ] } },
+    "@context": { "urn:p": { "@container": "@index" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_lone_list_under_an_index_container_stands_under_the_none_label) {
+  // A list carrying no index gives the index map nothing to key by, so the
+  // wrapper lands under the none label (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@value": "x" } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@index" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@none": { "@list": [ "x" ] } },
+    "@context": { "urn:p": { "@container": "@index" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_lone_list_under_an_identifier_container_stands_under_the_none_label) {
+  // A list object carries no identifier for the id map to key by, so the
+  // wrapper lands under the none label (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@value": "x" } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@id" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@none": { "@list": [ "x" ] } },
+    "@context": { "urn:p": { "@container": "@id" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_lone_list_under_a_type_container_stands_under_the_none_label) {
+  // A list object carries no type for the type map to key by, so the
+  // wrapper lands under the none label (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@value": "x" } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@type" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@none": { "@list": [ "x" ] } },
+    "@context": { "urn:p": { "@container": "@type" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_bare_graph_beside_nothing_keeps_its_array_at_the_top_level) {
+  // A top level node holding only its graph keeps the graph array: the
+  // graph keyword is the item active property and asks for one (JSON-LD
+  // 1.1 API Section 6.1.2 step 12.8.4)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "@graph": [ { "@id": "urn:n", "urn:q": [ { "@value": 1 } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json("{}");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@graph": [ { "@id": "urn:n", "urn:q": 1 } ]
   })");
 
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
