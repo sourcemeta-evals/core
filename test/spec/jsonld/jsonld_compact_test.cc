@@ -3415,3 +3415,179 @@ TEST(an_identified_node_compacts_its_properties_with_their_values) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
+
+// A list carrying no index of its own still lands in an index map, under the
+// none key, when only an index container term names its property
+TEST(an_unindexed_list_lands_in_an_index_map_under_the_none_key) {
+  const auto input = sourcemeta::core::parse_json(
+      R"([ { "http://e/p": [ { "@list": [ { "@value": 1 } ] } ] } ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "p": { "@id": "http://e/p", "@container": "@index" } })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "@none": { "@list": [ 1 ] } },
+    "@context": { "p": { "@id": "http://e/p", "@container": "@index" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// A list carrying its own index takes that key in the map
+TEST(an_indexed_list_lands_in_an_index_map_under_its_own_key) {
+  const auto input = sourcemeta::core::parse_json(
+      R"([ { "http://e/p": [ { "@list": [ { "@value": 1 } ], "@index": "k" } ] } ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "p": { "@id": "http://e/p", "@container": "@index" } })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "k": { "@list": [ 1 ] } },
+    "@context": { "p": { "@id": "http://e/p", "@container": "@index" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// The index fallback arrived with 1.1, so the earlier mode withholds it and
+// the list stays under its own name
+TEST(an_unindexed_list_escapes_the_index_map_in_1_0) {
+  const auto input = sourcemeta::core::parse_json(
+      R"([ { "http://e/p": [ { "@list": [ { "@value": 1 } ] } ] } ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "p": { "@id": "http://e/p", "@container": "@index" } })");
+  const auto result{sourcemeta::core::jsonld_compact(
+      input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0)};
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "http://e/p": { "@list": [ 1 ] },
+    "@context": { "p": { "@id": "http://e/p", "@container": "@index" } }
+  })");
+
+  EXPECT_EQ(result, expected);
+}
+
+// Keyed graphs collect in one map ("initializing it to a new empty map, if
+// necessary", JSON-LD 1.1 API Section 6.1.2 step 12.7)
+TEST(two_keyed_graphs_share_one_index_map) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:g": [
+        { "@index": "k", "@graph": [ { "urn:c": [ { "@value": 3 } ] } ] },
+        { "@graph": [ { "urn:a": [ { "@value": 1 } ] } ] }
+      ]
+    }
+  ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "g": { "@id": "urn:g", "@container": [ "@graph", "@index" ] } })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "g": { "k": { "urn:c": 3 }, "@none": { "urn:a": 1 } },
+    "@context": { "g": { "@id": "urn:g", "@container": [ "@graph", "@index" ] } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// A named graph matches no case of an index map, so it lands beside the map
+// as a wrapped value, and the map keeps collecting the keyed graphs that
+// follow it
+TEST(a_graph_index_map_survives_a_named_graph_between_keyed_entries) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:g": [
+        { "@graph": [ { "urn:a": [ { "@value": 1 } ] } ] },
+        { "@id": "urn:named", "@graph": [ { "urn:b": [ { "@value": 2 } ] } ] },
+        { "@index": "k", "@graph": [ { "urn:c": [ { "@value": 3 } ] } ] }
+      ]
+    }
+  ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "g": { "@id": "urn:g", "@container": [ "@graph", "@index" ] } })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "g": [
+      { "@none": { "urn:a": 1 }, "k": { "urn:c": 3 } },
+      { "@id": "urn:named", "@graph": { "urn:b": 2 } }
+    ],
+    "@context": { "g": { "@id": "urn:g", "@container": [ "@graph", "@index" ] } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// The map a keyed graph lands in is the one the step initializes, not
+// whatever stands under the name, so a named graph standing first keeps its
+// own wrapper to itself
+TEST(a_keyed_graph_does_not_merge_into_a_named_graph_standing_first) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:g": [
+        { "@id": "urn:named", "@graph": [ { "urn:b": [ { "@value": 2 } ] } ] },
+        { "@index": "k", "@graph": [ { "urn:c": [ { "@value": 3 } ] } ] }
+      ]
+    }
+  ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "g": { "@id": "urn:g", "@container": [ "@graph", "@index" ] } })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "g": [
+      { "@id": "urn:named", "@graph": { "urn:b": 2 } },
+      { "k": { "urn:c": 3 } }
+    ],
+    "@context": { "g": { "@id": "urn:g", "@container": [ "@graph", "@index" ] } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// Wrapped graphs standing first share an array, and the map joins them at
+// its back, collecting every keyed graph that follows
+TEST(a_graph_map_joins_wrapped_graphs_at_the_back_of_their_array) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:g": [
+        { "@id": "urn:one", "@graph": [ { "urn:a": [ { "@value": 1 } ] } ] },
+        { "@id": "urn:two", "@graph": [ { "urn:b": [ { "@value": 2 } ] } ] },
+        { "@index": "k", "@graph": [ { "urn:c": [ { "@value": 3 } ] } ] },
+        { "@graph": [ { "urn:d": [ { "@value": 4 } ] } ] }
+      ]
+    }
+  ])");
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "g": { "@id": "urn:g", "@container": [ "@graph", "@index" ] } })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "g": [
+      { "@id": "urn:one", "@graph": { "urn:a": 1 } },
+      { "@id": "urn:two", "@graph": { "urn:b": 2 } },
+      { "k": { "urn:c": 3 }, "@none": { "urn:d": 4 } }
+    ],
+    "@context": { "g": { "@id": "urn:g", "@container": [ "@graph", "@index" ] } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+// A nest mapping moves the whole map into the nest object, where the keyed
+// graphs still find it
+TEST(a_graph_index_map_stands_inside_the_nest_its_term_names) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:g": [
+        { "@index": "k", "@graph": [ { "urn:c": [ { "@value": 3 } ] } ] }
+      ]
+    }
+  ])");
+  const auto context = sourcemeta::core::parse_json(R"({
+    "g": {
+      "@id": "urn:g",
+      "@container": [ "@graph", "@index" ],
+      "@nest": "@nest"
+    }
+  })");
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@nest": { "g": { "k": { "urn:c": 3 } } },
+    "@context": {
+      "g": {
+        "@id": "urn:g",
+        "@container": [ "@graph", "@index" ],
+        "@nest": "@nest"
+      }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}

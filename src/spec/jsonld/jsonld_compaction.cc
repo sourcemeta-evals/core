@@ -6,8 +6,9 @@
 
 #include <algorithm> // std::find, std::sort
 #include <cassert>   // assert
+#include <map>       // std::map
 #include <optional>  // std::optional, std::nullopt
-#include <utility>   // std::move
+#include <utility>   // std::move, std::pair
 #include <vector>    // std::vector
 
 namespace sourcemeta::core {
@@ -203,6 +204,13 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
   const bool inside_reverse{active_property.has_value() &&
                             active_property.value() == KEYWORD_REVERSE};
   auto result{JSON::make_object()};
+  // Where each keyed graph container map stands, by nest name and compacted
+  // property: as the whole entry when nothing else claimed the name, and at
+  // a recorded place of the shared array otherwise, as graph objects
+  // matching no map case land beside the map on the same entry
+  std::map<std::pair<JSON::String, JSON::String>,
+           std::optional<JSON::Array::size_type>>
+      graph_map_slots;
 
   // A type-scoped context from the node's types applies to the remaining
   // properties.
@@ -391,8 +399,50 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
                                         JSON::String{KEYWORD_NONE}, nullptr,
                                         true, false)};
         if (by_id || (by_index && simple_graph)) {
+          // The step reads the map out of the entry, "initializing it to a
+          // new empty map, if necessary" (JSON-LD 1.1 API Section 6.1.2), yet
+          // a graph object matching no map case lands on the same entry as a
+          // wrapped value, so the keyed writes follow the map this step
+          // initialized through the shapes the entry passes rather than
+          // writing into whatever stands under the name
+          JSON *map_object{nullptr};
+          // A term with no definition names no graph container, so a
+          // definition always stands behind this branch
+          assert(item_definition != nullptr);
+          const std::pair<JSON::String, JSON::String> slot_key{
+              item_definition->nest.has_value() ? item_definition->nest.value()
+                                                : JSON::String{},
+              item_property};
           if (!target.defines(item_property)) {
             target.assign_assume_new(item_property, JSON::make_object());
+            graph_map_slots.insert_or_assign(slot_key, std::nullopt);
+            map_object = &target.at(item_property);
+          } else {
+            auto &existing{target.at(item_property)};
+            const auto slot{graph_map_slots.find(slot_key)};
+            if (slot == graph_map_slots.cend()) {
+              // Other values claimed the name first, so the map joins them at
+              // the back of the array they share
+              if (!existing.is_array()) {
+                auto array{JSON::make_array()};
+                array.push_back(std::move(existing));
+                existing = std::move(array);
+              }
+              existing.push_back(JSON::make_object());
+              graph_map_slots.insert_or_assign(slot_key, existing.size() - 1);
+              map_object = &existing.at(existing.size() - 1);
+            } else if (!slot->second.has_value()) {
+              if (existing.is_array()) {
+                // A value added beside a lone map wraps it into an array
+                // first, so the map rides at the front of what they share
+                slot->second = 0;
+                map_object = &existing.at(0);
+              } else {
+                map_object = &existing;
+              }
+            } else {
+              map_object = &existing.at(slot->second.value());
+            }
           }
           JSON::String key{none_key};
           if (by_id && item.defines(KEYWORD_ID, KEYWORD_ID_HASH)) {
@@ -405,7 +455,7 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
           }
           // The graph value is already compacted to an array when the term has
           // an @set container or compactArrays is false, so it is added as-is.
-          add_value(target.at(item_property), key, std::move(compacted), false);
+          add_value(*map_object, key, std::move(compacted), false);
           continue;
         }
         if (simple_graph) {

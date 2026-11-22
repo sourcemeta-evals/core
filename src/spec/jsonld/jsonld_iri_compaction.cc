@@ -233,6 +233,14 @@ auto compact_iri(const ActiveContext &active_context,
       // set and none containers are appended for every value)
       containers.emplace_back(KEYWORD_SET);
       containers.emplace_back(KEYWORD_NONE);
+      // A list with no @index entry may still land in an index map under the
+      // none key, but never under the 1.0 processing mode (JSON-LD 1.1 API
+      // Section 6.2.2)
+      if (!active_context.processing_1_0 && !has_index) {
+        containers.emplace_back(KEYWORD_INDEX);
+        containers.emplace_back(JSON::String{KEYWORD_INDEX} +
+                                JSON::String{KEYWORD_SET});
+      }
     } else if (is_object && value->defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
       const bool has_language{
           value->defines(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH)};
