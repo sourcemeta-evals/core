@@ -225,9 +225,13 @@ auto create_term_definition(ExpansionState &state,
       return;
     }
     if (string_value == term) {
-      // A self-referential simple term resolves through the term itself.
+      // A self-referential simple term resolves through the term itself. The
+      // step reads "a colon (:) at any position other than as the first
+      // character", so a term opening with a colon is no compact IRI and
+      // resolves through the vocabulary below instead (JSON-LD 1.1 API
+      // Section 4.2.2 step 13)
       const auto colon{term.find(':')};
-      if (colon != JSON::String::npos) {
+      if (colon != JSON::String::npos && colon != 0) {
         const auto prefix{term.substr(0, colon)};
         const auto suffix{term.substr(colon + 1)};
         // A term is only ever made while a map of them is being read, so the

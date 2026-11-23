@@ -2093,6 +2093,70 @@ TEST(a_bare_graph_object_holding_one_node_collapses) {
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
 
+TEST(a_graph_container_over_a_graph_that_holds_no_node) {
+  // The @included wrapping step asks for an "array containing more than one
+  // value", which a graph holding no node never is, so each of no members
+  // is added and the name stays out (JSON-LD 1.1 API Section 6.1.2 step
+  // 12.8.9.4)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@graph": [] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "p": { "@id": "urn:p", "@container": "@graph" } })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@container": "@graph" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_graph_set_container_over_a_graph_that_holds_no_node) {
+  // As above, except that a term asking for an array leaves an empty one
+  // where nothing else claimed the name
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@graph": [] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "p": { "@id": "urn:p", "@container": [ "@graph", "@set" ] } })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": [],
+    "@context": { "p": { "@id": "urn:p", "@container": [ "@graph", "@set" ] } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_graph_that_holds_no_node_leaves_an_earlier_member_standing) {
+  // As above, with the empty graph arriving after a member that stands: each
+  // of no members joins what is already there and the entry is unchanged
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        {
+          "@graph": [
+            { "@id": "urn:a", "urn:q": [ { "@value": 1 } ] }
+          ]
+        },
+        { "@graph": [] }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(
+      R"({ "p": { "@id": "urn:p", "@container": [ "@graph", "@set" ] } })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": [ { "@id": "urn:a", "urn:q": 1 } ],
+    "@context": { "p": { "@id": "urn:p", "@container": [ "@graph", "@set" ] } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
 TEST(an_indexed_graph_object_under_a_plain_term_keeps_its_index) {
   // A graph object proper may carry an index beside its graph, and the wrap
   // brings it back ("If expanded item contains an @index entry, add an entry
@@ -2314,6 +2378,41 @@ TEST(a_list_mixing_a_language_tagged_value_with_a_node_reference) {
   const auto expected = sourcemeta::core::parse_json(R"({
     "p": [ { "@value": "x", "@language": "en" }, { "@id": "http://e/n" } ],
     "@context": { "p": { "@id": "http://e/p", "@container": "@list" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_mixed_list_still_selects_a_term_coerced_to_the_shared_language) {
+  // The common language of a list follows its value objects alone: a node
+  // reference among the items carries no language to weigh in, so a term
+  // coerced to the language the values share still stands for the whole
+  // list over a plain term for the same property (JSON-LD 1.1 API Section
+  // 4.4)
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        {
+          "@list": [
+            { "@value": "hello", "@language": "en" },
+            { "@id": "urn:n" }
+          ]
+        }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "english": { "@id": "urn:p", "@container": "@list", "@language": "en" },
+    "mixed": { "@id": "urn:p", "@container": "@list" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "english": [ "hello", { "@id": "urn:n" } ],
+    "@context": {
+      "english": { "@id": "urn:p", "@container": "@list", "@language": "en" },
+      "mixed": { "@id": "urn:p", "@container": "@list" }
+    }
   })");
 
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);

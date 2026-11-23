@@ -3597,6 +3597,16 @@ TEST(self_referential_term_without_a_vocabulary_is_refused) {
                              "Invalid IRI mapping", "/@context/bar");
 }
 
+TEST(a_self_referential_term_opening_with_a_colon_without_a_vocabulary) {
+  // As above: an opening colon makes no compact IRI of the term, so without
+  // a vocabulary it maps to nothing (JSON-LD 1.1 API Section 4.2.2 step 13)
+  const auto input =
+      sourcemeta::core::parse_json(R"({ "@context": { ":foo": ":foo" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/:foo");
+}
+
 TEST(list_container_of_lists_under_no_active_property_in_1_0) {
   // A list container gathers the items it is given, and JSON-LD 1.0 refuses a
   // list among them whichever keyword hands them over. The term stands at the

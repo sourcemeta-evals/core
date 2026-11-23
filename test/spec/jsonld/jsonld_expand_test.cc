@@ -445,6 +445,43 @@ TEST(a_term_opening_with_a_colon_expands_onto_the_vocabulary) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+TEST(a_self_referential_term_opening_with_a_colon_rides_the_vocabulary) {
+  // A colon opening the term is no compact IRI divider: the step reads "a
+  // colon (:) at any position other than as the first character", so the
+  // term resolves through the vocabulary like any colon-free one (JSON-LD
+  // 1.1 API Section 4.2.2 step 13)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "http://v/", ":foo": ":foo" },
+    ":foo": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://v/:foo": [ { "@value": "x" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(a_self_referential_term_opening_with_a_colon_and_carrying_another) {
+  // As above: a second colon standing past the opening one still makes no
+  // compact IRI of the term and no IRI either, so the vocabulary carries
+  // the whole term
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "http://v/", ":a:b": ":a:b" },
+    ":a:b": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://v/:a:b": [ { "@value": "x" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(type_coercion_to_id) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {
@@ -1234,6 +1271,37 @@ TEST(type_map_string_value_uses_the_property_scoped_context) {
         {
           "@id": "http://scoped.example/baz",
           "@type": [ "http://example.org/ns/bar" ]
+        }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(a_type_map_key_without_a_scoped_context_restores_the_outer_context) {
+  // A type map hands its members the previous context whether or not the
+  // key layers a scope of its own on top: "If container mapping includes
+  // @id or @type, initialize map context to the previous context from
+  // active context if it exists" (JSON-LD 1.1 API Section 5.1.2 step
+  // 13.8.3), so the member parts from the enclosing type-scoped mapping
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "name": "urn:outer",
+      "p": { "@id": "urn:p", "@container": "@type" },
+      "T": { "@id": "urn:T", "@context": { "name": "urn:inner" } }
+    },
+    "@type": "T",
+    "p": { "urn:Key": { "name": "value" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@type": [ "urn:T" ],
+      "urn:p": [
+        {
+          "@type": [ "urn:Key" ],
+          "urn:outer": [ { "@value": "value" } ]
         }
       ]
     }

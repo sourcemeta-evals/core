@@ -463,15 +463,25 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
           continue;
         }
         if (simple_graph) {
-          // A single node is inlined, several are wrapped in an @included
-          // block.
-          if (compacted.is_array() && compacted.size() != 1) {
+          // A single node is inlined, and only several are wrapped in an
+          // @included block: the wrapping step asks for an "array containing
+          // more than one value" (JSON-LD 1.1 API Section 6.1.2 step
+          // 12.8.9.4), which a graph holding no node never is
+          if (compacted.is_array() && compacted.size() > 1) {
             const auto included_alias{compact_iri(
                 node_context, node_inverse, JSON::String{KEYWORD_INCLUDED},
                 nullptr, true, false)};
             auto wrapper{JSON::make_object()};
             wrapper.assign_assume_new(included_alias, std::move(compacted));
             compacted = std::move(wrapper);
+          } else if (compacted.is_array() && compacted.empty()) {
+            // A graph holding no node adds each of no members: the entry
+            // stays out, except that a term asking for an array leaves an
+            // empty one behind where nothing claimed the name yet
+            if (graph_as_array && !target.defines(item_property)) {
+              target.assign_assume_new(item_property, JSON::make_array());
+            }
+            continue;
           } else if (compacted.is_array()) {
             auto single{compacted.front()};
             compacted = std::move(single);
