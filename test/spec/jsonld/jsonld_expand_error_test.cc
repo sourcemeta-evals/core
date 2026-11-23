@@ -3782,3 +3782,13 @@ TEST(an_object_alias_of_the_context_keyword_is_refused_as_an_alias) {
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid keyword alias", "/@context/a:b/@id");
 }
+
+TEST(type_mapping_with_a_digit_opened_scheme) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@type": "1bad:type" } },
+    "p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid type mapping", "/@context/p/@type");
+}

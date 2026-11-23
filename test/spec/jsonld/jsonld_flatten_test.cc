@@ -289,3 +289,44 @@ TEST(a_type_naming_an_iri_is_not_relabelled) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_flatten(input), expected);
 }
+
+// A null context asks for no compaction, so the flattened output stays in
+// expanded document form (JSON-LD 1.1 API Section 9.1)
+TEST(a_null_context_leaves_the_flattened_output_expanded) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/a",
+      "http://example.com/p": [
+        { "http://example.com/q": [ { "@value": "x" } ] }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json("null");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "_:b0",
+      "http://example.com/q": [ { "@value": "x" } ]
+    },
+    {
+      "@id": "http://example.com/a",
+      "http://example.com/p": [ { "@id": "_:b0" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_flatten(input, context), expected);
+}
+
+TEST(a_null_context_and_the_context_free_overload_flatten_alike) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/a",
+      "http://example.com/p": [ { "@value": 1 } ]
+    }
+  ])");
+
+  EXPECT_EQ(
+      sourcemeta::core::jsonld_flatten(input, sourcemeta::core::JSON{nullptr}),
+      sourcemeta::core::jsonld_flatten(input));
+}

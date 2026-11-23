@@ -3591,3 +3591,129 @@ TEST(a_graph_index_map_stands_inside_the_nest_its_term_names) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
+
+// A graph object among the members of a non-graph map container matches no
+// map case and lands beside the map, which keeps gathering the keyed
+// members through the shape the shared entry passes (JSON-LD 1.1 API
+// Section 6.1.2)
+TEST(a_language_map_survives_a_graph_object_among_the_members) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@id": "urn:a" },
+        { "@graph": [ { "@id": "urn:b" } ] },
+        { "@id": "urn:c" }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@language" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": [
+      {
+        "@none": [ { "@id": "urn:a" }, { "@id": "urn:c" } ]
+      },
+      {
+        "@graph": { "@id": "urn:b" }
+      }
+    ],
+    "@context": { "urn:p": { "@container": "@language" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_index_map_survives_a_graph_object_among_the_members) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@id": "urn:a", "@index": "x" },
+        { "@graph": [ { "@id": "urn:b" } ] },
+        { "@id": "urn:c", "@index": "y" }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@index" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": [
+      {
+        "x": { "@id": "urn:a" },
+        "y": { "@id": "urn:c" }
+      },
+      {
+        "@graph": { "@id": "urn:b" }
+      }
+    ],
+    "@context": { "urn:p": { "@container": "@index" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(an_id_map_survives_a_graph_object_among_the_members) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@id": "urn:a" },
+        { "@graph": [ { "@id": "urn:b" } ] },
+        { "@id": "urn:c" }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@id" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": [
+      {
+        "urn:a": {},
+        "urn:c": {}
+      },
+      {
+        "@graph": { "@id": "urn:b" }
+      }
+    ],
+    "@context": { "urn:p": { "@container": "@id" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(a_type_map_survives_a_graph_object_among_the_members) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@id": "urn:a", "@type": [ "urn:T" ] },
+        { "@graph": [ { "@id": "urn:b" } ] },
+        { "@id": "urn:c", "@type": [ "urn:T" ] }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": { "@container": "@type" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": [
+      {
+        "urn:T": [ "urn:a", "urn:c" ]
+      },
+      {
+        "@graph": "urn:b"
+      }
+    ],
+    "@context": { "urn:p": { "@container": "@type" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}

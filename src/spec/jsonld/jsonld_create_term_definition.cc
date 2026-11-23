@@ -355,8 +355,12 @@ auto create_term_definition(ExpansionState &state,
 
       const bool keyword_of_1_1{type.value() == KEYWORD_JSON ||
                                 type.value() == KEYWORD_NONE};
+      // The third asks for an IRI proper, which a colon alone does not make:
+      // a value shaped like 1bad:type carries a colon and still names
+      // nothing, as no scheme opens with a digit (JSON-LD 1.1 API Section
+      // 4.2.2 step 12)
       if (type.value() != KEYWORD_ID && type.value() != KEYWORD_VOCAB &&
-          !keyword_of_1_1 && !type.value().contains(':')) {
+          !keyword_of_1_1 && !URI::is_iri(type.value())) {
         throw JSONLDError("Invalid type mapping", term_pointer, {KEYWORD_TYPE});
       }
 

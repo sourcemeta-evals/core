@@ -176,6 +176,13 @@ auto jsonld_flatten(const JSON &input, const JSON &context,
                     const JSON::StringView base_iri,
                     const JSONLDResolver &resolver, const JSONLDVersion version,
                     const bool compact_arrays) -> JSON {
+  // A null context asks for no compaction, so the flattened expanded output
+  // goes back as it stands: the flatten entry point compacts only "if
+  // context is not null" (JSON-LD 1.1 API Section 9.1)
+  if (context.is_null()) {
+    return jsonld_flatten(input);
+  }
+
   // The flattened expanded output is compacted against the given context.
   return jsonld_compact(jsonld_flatten(input), context, base_iri, resolver,
                         version, compact_arrays);
