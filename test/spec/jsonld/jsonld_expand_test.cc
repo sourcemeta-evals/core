@@ -3463,3 +3463,21 @@ TEST(free_floating_node_reference_in_set_is_dropped) {
   const auto expected = sourcemeta::core::parse_json("[]");
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
+
+TEST(coverage_expand_string_property) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/name": "Alice"
+  })");
+
+  const auto result{sourcemeta::core::jsonld_expand(input)};
+  EXPECT_TRUE(sourcemeta::core::jsonld_is_expanded(result));
+}
+
+TEST(coverage_expand_number_property) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/age": 42
+  })");
+
+  const auto result{sourcemeta::core::jsonld_expand(input)};
+  EXPECT_TRUE(sourcemeta::core::jsonld_is_expanded(result));
+}

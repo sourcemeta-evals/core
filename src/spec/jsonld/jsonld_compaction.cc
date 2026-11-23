@@ -323,10 +323,7 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       const auto item_property{compact_iri(node_context, node_inverse,
                                            expanded_property, &expanded_value,
                                            true, inside_reverse)};
-      // An empty array stays empty rather than being wrapped into one.
-      if (!result.defines(item_property)) {
-        result.assign_assume_new(item_property, JSON::make_array());
-      }
+      result.assign_assume_new(item_property, JSON::make_array());
       continue;
     }
 

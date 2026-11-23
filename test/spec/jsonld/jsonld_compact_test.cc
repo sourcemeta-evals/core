@@ -1327,3 +1327,18 @@ TEST(deeply_nested_input_is_rejected) {
     EXPECT_EQ(std::string{error.what()}, "Maximum nesting depth exceeded");
   }
 }
+
+TEST(coverage_compact_simple_term) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/name": [ { "@value": "Alice" } ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "name": "http://example.com/name"
+  })");
+
+  const auto result{sourcemeta::core::jsonld_compact(input, context)};
+  EXPECT_TRUE(result.is_object());
+}
