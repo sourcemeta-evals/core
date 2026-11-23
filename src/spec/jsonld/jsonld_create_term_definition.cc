@@ -87,6 +87,9 @@ auto check_iri_mapping(const std::optional<JSON::String> &mapping,
                        const WeakPointer &term_pointer,
                        const std::initializer_list<JSON::StringView> children)
     -> void {
+  // A value that arrives without a colon never stands under a vocabulary:
+  // IRI expansion joins such a value to the vocabulary mapping, which is
+  // held to an IRI or a blank node and so carries a colon of its own
   if (!mapping.has_value() ||
       (!is_keyword(mapping.value()) && !mapping.value().contains(':'))) {
     throw JSONLDError("Invalid IRI mapping", term_pointer, children);
