@@ -2871,6 +2871,78 @@ TEST(resolved_property_valued_index_control) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+TEST(a_graph_index_term_redefined_as_a_graph_alias_prepends_the_reference) {
+  // The index property re-expands against the context in force where the
+  // member expands, so a later context aliasing it onto the graph keyword
+  // lands the expanded index among the members already gathered, which the
+  // step keeps: "an array consisting of re-expanded index followed by the
+  // existing values" (JSON-LD 1.1 API Section 5.1.2 step 13.8.3.7.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "g": "urn:g",
+        "p": {
+          "@id": "urn:p",
+          "@container": [ "@graph", "@index" ],
+          "@index": "g"
+        }
+      },
+      { "g": "@graph" }
+    ],
+    "p": { "k": { "@id": "urn:a", "urn:q": "v" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        {
+          "@graph": [
+            { "@id": "k" },
+            { "@id": "urn:a", "urn:q": [ { "@value": "v" } ] }
+          ]
+        }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(a_graph_index_term_redefined_as_a_graph_alias_with_a_keyword_form_key) {
+  // As above, with a key of keyword form, which identifier expansion
+  // answers nothing for, leaving a null reference among the members the
+  // way jsonld.js does
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "g": "urn:g",
+        "p": {
+          "@id": "urn:p",
+          "@container": [ "@graph", "@index" ],
+          "@index": "g"
+        }
+      },
+      { "g": "@graph" }
+    ],
+    "p": { "@kw": { "@id": "urn:a", "urn:q": "v" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        {
+          "@graph": [
+            { "@id": null },
+            { "@id": "urn:a", "urn:q": [ { "@value": "v" } ] }
+          ]
+        }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(nest_expands_in_1_1) {
   const auto input = sourcemeta::core::parse_json(R"({
     "urn:q": "y",

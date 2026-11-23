@@ -1080,18 +1080,38 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
               // A term that no longer names anything carries no metadata
               // (JSON-LD 1.1 API Section 5.1.2 step 13.8.3.7.2)
               if (index_property.has_value()) {
-                // The step prepends the key to whatever already stands under
-                // the index property, yet nothing ever does: what holds it is
-                // either a graph object proper, whose entries stop at the
-                // graph, its name, and its label, or a wrapper made just
-                // above, and an index mapping is held to an IRI that is no
-                // keyword when the term is made (JSON-LD 1.1 API Section
-                // 4.2.2 step 21.2)
-                assert(!graph.defines(index_property.value()));
-                graph.assign(
-                    index_property.value(),
-                    into_array(expand_value(state, active_context,
-                                            definition->index, JSON{index})));
+                // The index property re-expands against the current context,
+                // so a later context may alias it onto an entry the graph
+                // wrapper already carries, and the step keeps what stands
+                // there: "an array consisting of re-expanded index followed
+                // by the existing values" (JSON-LD 1.1 API Section 5.1.2
+                // step 13.8.3.7.2)
+                auto combined{JSON::make_array()};
+                if (index_property.value() == KEYWORD_GRAPH) {
+                  // A property standing for the graph keyword takes the
+                  // identifier expansion a graph entry asks for, a node
+                  // reference the way jsonld.js re-expands the index there
+                  auto reference{JSON::make_object()};
+                  const auto identifier{
+                      expand_iri(state, active_context, index, true, false,
+                                 nullptr, nullptr, EMPTY_WEAK_POINTER)};
+                  reference.assign_assume_new(JSON::String{KEYWORD_ID},
+                                              identifier.has_value()
+                                                  ? JSON{identifier.value()}
+                                                  : JSON{nullptr},
+                                              KEYWORD_ID_HASH);
+                  combined.push_back(std::move(reference));
+                } else {
+                  combined = into_array(expand_value(
+                      state, active_context, definition->index, JSON{index}));
+                }
+                if (graph.defines(index_property.value())) {
+                  for (auto &existing :
+                       graph.at(index_property.value()).as_array()) {
+                    combined.push_back(existing);
+                  }
+                }
+                graph.assign(index_property.value(), std::move(combined));
               }
             } else if (!graph.defines(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
               graph.assign_assume_new(JSON::String{KEYWORD_INDEX}, JSON{index},

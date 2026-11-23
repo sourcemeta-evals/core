@@ -2913,6 +2913,34 @@ TEST(an_identifier_map_keys_under_a_property_scoped_base) {
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
 
+TEST(a_property_scoped_context_spells_a_value_object) {
+  // The property-scoped context has its say before the value compacts, so
+  // the scoped keyword aliases and the scoped datatype term spell the value
+  // object, not the outer context (JSON-LD 1.1 API Section 6.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "x", "@type": "urn:T" } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": {
+      "@id": "urn:p",
+      "@context": { "v": "@value", "t": "@type", "T": "urn:T" }
+    }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": { "v": "x", "t": "T" },
+    "@context": {
+      "p": {
+        "@id": "urn:p",
+        "@context": { "v": "@value", "t": "@type", "T": "urn:T" }
+      }
+    }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
 TEST(a_singleton_list_inside_a_list_keeps_its_array) {
   const auto input = sourcemeta::core::parse_json(R"([
     { "urn:p": [ { "@list": [ { "@list": [ { "@value": 1 } ] } ] } ] }
