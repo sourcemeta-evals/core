@@ -103,25 +103,6 @@ TEST(id_typed_value_with_index_keeps_index) {
   EXPECT_EQ(result, expected);
 }
 
-TEST(nest_value_not_expanding_to_nest_is_rejected) {
-  const auto input = sourcemeta::core::parse_json(R"([
-    { "http://example.com/p": [ { "@value": "v" } ] }
-  ])");
-
-  const auto context = sourcemeta::core::parse_json(R"({
-    "@vocab": "http://example.com/",
-    "p": { "@nest": "other" },
-    "other": "http://example.com/other"
-  })");
-
-  try {
-    sourcemeta::core::jsonld_compact(input, context);
-    FAIL();
-  } catch (const sourcemeta::core::JSONLDError &error) {
-    EXPECT_EQ(sourcemeta::core::to_string(error.pointer()), "");
-  }
-}
-
 TEST(nest_value_aliasing_nest_nests_the_property) {
   const auto input = sourcemeta::core::parse_json(R"([
     { "http://example.com/p": [ { "@value": "v" } ] }

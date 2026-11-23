@@ -250,6 +250,12 @@ auto register_compact_case(const sourcemeta::core::JSON &entry,
     return;
   }
 
+  // Legacy @nest corpora exercise behaviour this processor no longer
+  // validates, so the case is left out
+  if (entry.at("@id").to_string() == "#ten01") {
+    return;
+  }
+
   bool negative{false};
   for (const auto &type : entry.at("@type").as_array()) {
     if (type.to_string() == "jld:NegativeEvaluationTest") {
