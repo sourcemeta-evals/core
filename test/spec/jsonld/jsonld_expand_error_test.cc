@@ -582,6 +582,27 @@ TEST(shorthand_term_definition_invalid_iri_mapping) {
                              "Invalid IRI mapping", "/@context/term");
 }
 
+TEST(term_mapping_with_a_malformed_scheme) {
+  // A colon alone does not make an IRI: ex_ opens no scheme the IRI grammar
+  // admits, and the prefix names no term, so the mapping names nothing, the
+  // way jsonld.js refuses it
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "bar": "ex_:foo" }, "bar": "x" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/bar");
+}
+
+TEST(reverse_mapping_with_a_malformed_scheme) {
+  // As above for a reverse mapping, whose scheme no IRI grammar opens with a
+  // digit (JSON-LD 1.1 API Section 4.2.2 step 14.3)
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "p": { "@reverse": "1:x" } }, "p": { "@id": "urn:n" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/p/@reverse");
+}
+
 TEST(shorthand_term_definition_aliasing_context) {
   const auto input =
       sourcemeta::core::parse_json(R"({ "@context": { "term": "@context" } })");

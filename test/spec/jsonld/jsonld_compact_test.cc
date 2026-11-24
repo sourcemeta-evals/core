@@ -1384,8 +1384,8 @@ TEST(deeply_nested_input_is_rejected) {
 }
 
 TEST(list_of_lists_is_rejected_under_the_1_0_processing_mode) {
-  // JSON-LD 1.0 holds that a term with a list container cannot carry two list
-  // objects, and names the refusal "compaction to list of lists" (JSON-LD 1.0
+  // JSON-LD 1.0 holds that a list cannot carry list objects among its own
+  // members, and names the refusal "compaction to list of lists" (JSON-LD 1.0
   // API Section 8.1). JSON-LD 1.1 permits a list of lists and drops that error
   // code from the ones it names (JSON-LD 1.1 API Section 9.6.2), so only the
   // earlier processing mode refuses this
@@ -1409,6 +1409,79 @@ TEST(list_of_lists_is_rejected_under_the_1_0_processing_mode) {
   } catch (const sourcemeta::core::JSONLDError &error) {
     EXPECT_EQ(std::string{error.what()}, "Compaction to list of lists");
   }
+}
+
+TEST(two_sibling_lists_are_rejected_under_the_1_0_processing_mode) {
+  // A second list landing on the same compacted name is refused by the
+  // earlier mode: "if processing mode is json-ld-1.0 and item active
+  // property is a key in nest result, a compaction to list of lists error
+  // has been detected" (JSON-LD 1.1 API Section 6.1.2 step 12.8.7.2).
+  // jsonld.js no longer carries the earlier mode, so the refusal rests on
+  // the step itself
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@list": [ { "@value": "a" } ] },
+        { "@list": [ { "@value": "b" } ] }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": { "@id": "urn:p", "@container": "@list" }
+  })");
+
+  try {
+    sourcemeta::core::jsonld_compact(input, context, "", nullptr,
+                                     sourcemeta::core::JSONLDVersion::V1_0);
+    FAIL();
+  } catch (const sourcemeta::core::JSONLDError &error) {
+    EXPECT_EQ(std::string{error.what()}, "Compaction to list of lists");
+  }
+}
+
+TEST(a_single_list_fills_its_container_under_the_1_0_processing_mode) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@list": [ { "@value": "a" } ] } ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": { "@id": "urn:p", "@container": "@list" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": [ "a" ],
+    "@context": { "p": { "@id": "urn:p", "@container": "@list" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(
+                input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(a_later_sibling_list_replaces_the_earlier_one) {
+  // "Set the value of the item active property entry in nest result to
+  // compacted item" (JSON-LD 1.1 API Section 6.1.2 step 12.8.7.3): an
+  // assignment, so the later list stands alone, the way jsonld.js leaves it
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@list": [ { "@value": "a" } ] },
+        { "@list": [ { "@value": "b" } ] }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "p": { "@id": "urn:p", "@container": "@list" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "p": [ "b" ],
+    "@context": { "p": { "@id": "urn:p", "@container": "@list" } }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
 
 TEST(graph_container_over_a_value_that_is_not_a_graph_object) {

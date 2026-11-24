@@ -571,6 +571,15 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
           compacted = std::move(array);
         }
         if (container_includes(item_definition, KEYWORD_LIST)) {
+          // A second list landing on the same name is refused by the
+          // earlier mode: "if processing mode is json-ld-1.0 and item
+          // active property is a key in nest result, a compaction to list
+          // of lists error has been detected" (JSON-LD 1.1 API Section
+          // 6.1.2 step 12.8.7.2)
+          if (state.processing_1_0 && target.defines(item_property)) {
+            throw JSONLDError("Compaction to list of lists",
+                              EMPTY_WEAK_POINTER);
+          }
           // "Otherwise, set the value of the item active property entry in
           // nest result to compacted item" (JSON-LD 1.1 API Section 6.1.2
           // step 12.8.7.3): an assignment, so a later list carried by the

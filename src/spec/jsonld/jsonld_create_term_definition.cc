@@ -82,16 +82,16 @@ auto finalize_definition(ExpansionState &state, ActiveContext &active_context,
 // and may not stand in for the keyword that carries a context (JSON-LD 1.1 API
 // Section 4.2.2 step 16.2.3). Both refusals are live: a value leaning on a
 // term that gave up its own mapping expands to nothing and arrives absent,
-// and a value that stays a relative reference carries no colon
+// and a colon alone does not make an IRI, as a value shaped like ex_:foo
+// carries one behind no scheme the IRI grammar admits, which jsonld.js
+// likewise refuses
 auto check_iri_mapping(const std::optional<JSON::String> &mapping,
                        const WeakPointer &term_pointer,
                        const std::initializer_list<JSON::StringView> children)
     -> void {
-  // A value that arrives without a colon never stands under a vocabulary:
-  // IRI expansion joins such a value to the vocabulary mapping, which is
-  // held to an IRI or a blank node and so carries a colon of its own
   if (!mapping.has_value() ||
-      (!is_keyword(mapping.value()) && !mapping.value().contains(':'))) {
+      (!is_keyword(mapping.value()) && !URI::is_iri(mapping.value()) &&
+       !mapping.value().starts_with("_:"))) {
     throw JSONLDError("Invalid IRI mapping", term_pointer, children);
   }
 
@@ -399,9 +399,14 @@ auto create_term_definition(ExpansionState &state,
       // Expansion answers nothing for a value shaped like a keyword, which
       // the step above has already left alone, and for a reference to a term
       // that gave up its mapping, so the guard below settles both that the
-      // expansion named anything and that the name is an absolute IRI
+      // expansion named anything and that the name is an IRI or a blank
+      // node: "If the result does not have the form of an IRI or a blank
+      // node identifier, an invalid IRI mapping error has been detected"
+      // (JSON-LD 1.1 API Section 4.2.2 step 14.3), a form a colon behind no
+      // scheme does not reach, which jsonld.js likewise refuses
       if (!definition.iri.has_value() ||
-          !definition.iri.value().contains(':')) {
+          (!URI::is_iri(definition.iri.value()) &&
+           !definition.iri.value().starts_with("_:"))) {
         throw JSONLDError("Invalid IRI mapping", term_pointer,
                           {KEYWORD_REVERSE});
       }

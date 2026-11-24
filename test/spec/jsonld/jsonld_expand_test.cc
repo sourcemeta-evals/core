@@ -3639,13 +3639,57 @@ TEST(context_defines_a_compact_iri_string_term_before_its_prefix) {
 // written. The underscore keeps it from reading as a scheme RFC 3987 defines,
 // so nothing else could have resolved it either
 TEST(context_defines_a_compact_iri_term_whose_prefix_has_no_term) {
+  // The mapping stays as written when its prefix names no term, provided it
+  // is IRI shaped, the way jsonld.js keeps ex:foo while refusing a mapping
+  // whose scheme no IRI grammar admits
   const auto input = sourcemeta::core::parse_json(R"({
-    "@context": { "bar": "ex_:foo" },
+    "@context": { "bar": "ex:foo" },
     "bar": "x"
   })");
 
   const auto expected = sourcemeta::core::parse_json(R"([
-    { "ex_:foo": [ { "@value": "x" } ] }
+    { "ex:foo": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(context_defines_a_term_mapping_to_a_blank_node) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "bar": "_:b0" },
+    "bar": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "_:b0": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(context_defines_a_term_whose_mapping_ends_at_its_colon) {
+  // A scheme followed by nothing is still an IRI, which jsonld.js likewise
+  // accepts as a term mapping
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "bar": "ex:" },
+    "bar": "x"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "ex:": [ { "@value": "x" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(reverse_term_mapping_to_a_blank_node) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@reverse": "_:x" } },
+    "p": { "@id": "urn:n" }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "@reverse": { "_:x": [ { "@id": "urn:n" } ] } }
   ])");
 
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
