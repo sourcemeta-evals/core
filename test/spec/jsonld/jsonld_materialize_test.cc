@@ -1220,6 +1220,75 @@ TEST(named_graph) {
   EXPECT_TRUE(sourcemeta::core::jsonld_is_expanded(result));
 }
 
+// An absent identifier on a root graph node means a fresh blank node, and
+// the graph flag keeps its descendants behind the graph boundary rather
+// than spreading them into the default graph
+TEST(unnamed_root_graph_keeps_its_graph_boundary) {
+  const auto instance = sourcemeta::core::parse_json(R"({ "name": "v" })");
+
+  sourcemeta::core::JSONLDAnnotationList annotations;
+  annotations.emplace_back(
+      sourcemeta::core::Pointer{},
+      sourcemeta::core::JSONLDDescriptor{
+          .edges = {}, .value = sourcemeta::core::JSONLDNode{.graph = true}});
+  annotations.emplace_back(
+      sourcemeta::core::Pointer{"name"},
+      sourcemeta::core::JSONLDDescriptor{
+          .edges = {{.predicate = "https://schema.org/name"}},
+          .value = sourcemeta::core::JSONLDLiteral{}});
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@graph": [
+        {
+          "https://schema.org/name": [ { "@value": "v" } ]
+        }
+      ]
+    }
+  ])");
+
+  const auto result{
+      sourcemeta::core::jsonld_materialize(instance, annotations)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(sourcemeta::core::jsonld_is_expanded(result));
+}
+
+// An identifier on a root graph node denotes the named graph, and the node
+// inside that graph carries the same identifier
+TEST(identified_root_graph_names_the_graph) {
+  const auto instance = sourcemeta::core::parse_json(R"({ "name": "v" })");
+
+  sourcemeta::core::JSONLDAnnotationList annotations;
+  annotations.emplace_back(
+      sourcemeta::core::Pointer{},
+      sourcemeta::core::JSONLDDescriptor{
+          .edges = {},
+          .value = sourcemeta::core::JSONLDNode{
+              .id = "https://example.com/graph", .graph = true}});
+  annotations.emplace_back(
+      sourcemeta::core::Pointer{"name"},
+      sourcemeta::core::JSONLDDescriptor{
+          .edges = {{.predicate = "https://schema.org/name"}},
+          .value = sourcemeta::core::JSONLDLiteral{}});
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "https://example.com/graph",
+      "@graph": [
+        {
+          "@id": "https://example.com/graph",
+          "https://schema.org/name": [ { "@value": "v" } ]
+        }
+      ]
+    }
+  ])");
+
+  const auto result{
+      sourcemeta::core::jsonld_materialize(instance, annotations)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(sourcemeta::core::jsonld_is_expanded(result));
+}
+
 // The free-floating drop applies inside a named graph too (JSON-LD 1.1 API
 // Section 5.1.2: "If active property is null or @graph, drop free-floating
 // values")
@@ -2411,6 +2480,40 @@ TEST(weak_array_root_spreads_into_default_graph) {
     {
       "@id": "https://example.com/b",
       "https://schema.org/name": [ { "@value": "B" } ]
+    }
+  ])");
+
+  const auto result{
+      sourcemeta::core::jsonld_materialize(instance, annotations)};
+  EXPECT_EQ(result, expected);
+  EXPECT_TRUE(sourcemeta::core::jsonld_is_expanded(result));
+}
+
+// The weak representation keeps the same graph boundary for an unnamed
+// root graph
+TEST(weak_unnamed_root_graph_keeps_its_graph_boundary) {
+  const auto instance = sourcemeta::core::parse_json(R"({ "name": "v" })");
+
+  const sourcemeta::core::JSON::String name_key{"name"};
+
+  sourcemeta::core::JSONLDWeakAnnotationList annotations;
+  annotations.emplace_back(
+      sourcemeta::core::WeakPointer{},
+      sourcemeta::core::JSONLDDescriptor{
+          .edges = {}, .value = sourcemeta::core::JSONLDNode{.graph = true}});
+  annotations.emplace_back(
+      sourcemeta::core::WeakPointer{std::cref(name_key)},
+      sourcemeta::core::JSONLDDescriptor{
+          .edges = {{.predicate = "https://schema.org/name"}},
+          .value = sourcemeta::core::JSONLDLiteral{}});
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@graph": [
+        {
+          "https://schema.org/name": [ { "@value": "v" } ]
+        }
+      ]
     }
   ])");
 
