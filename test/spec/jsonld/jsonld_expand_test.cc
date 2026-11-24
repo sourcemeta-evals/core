@@ -3765,15 +3765,20 @@ TEST(context_version_that_is_an_integer) {
   }
 }
 
-// JSON-LD 1.1 API Section 5.1.2 drops a value object that says how to read a
-// value without carrying one, since an index alone names nothing either
-TEST(value_object_with_a_language_and_no_value_is_dropped) {
+// JSON-LD 1.1 API Section 5.1.2 step 18 nulls a map holding only a
+// language, and a language beside an index is no such map, so it stays the
+// way jsonld.js keeps it
+TEST(value_object_with_a_language_and_an_index_but_no_value_is_kept) {
   const auto input = sourcemeta::core::parse_json(R"({
     "http://example.com/p": { "@language": "en", "@index": "i" }
   })");
 
-  EXPECT_EQ(sourcemeta::core::jsonld_expand(input),
-            sourcemeta::core::parse_json("[]"));
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [ { "@index": "i", "@language": "en" } ]
+    }
+  ])");
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
 TEST(value_object_with_a_language_and_an_identifier_is_kept) {

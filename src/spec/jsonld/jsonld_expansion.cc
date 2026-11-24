@@ -545,24 +545,15 @@ auto expand_object(ExpansionState &state, ActiveContext active_context,
     return *set;
   }
 
-  // Drop an incomplete value object that has a language or direction but no
-  // value.
-  if (!result.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH) &&
-      (result.defines(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH) ||
-       result.defines(KEYWORD_DIRECTION, KEYWORD_DIRECTION_HASH))) {
-    bool only_value_keys{true};
-    for (const auto &entry : result.as_object()) {
-      if (!entry.key_equals(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH) &&
-          !entry.key_equals(KEYWORD_DIRECTION, KEYWORD_DIRECTION_HASH) &&
-          !entry.key_equals(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
-        only_value_keys = false;
-      }
-    }
-    if (only_value_keys) {
-      report_drop(state, JSONLDExpandDropReason::IncompleteValueObject, pointer,
-                  element);
-      return JSON{nullptr};
-    }
+  // Drop a map whose sole entry is a language, which tags no value: "if
+  // result contains only the entry @language, set result to null" (JSON-LD
+  // 1.1 API Section 5.1.2 step 18). A direction or an index without a value
+  // stays, the way jsonld.js keeps it
+  if (result.size() == 1 &&
+      result.defines(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH)) {
+    report_drop(state, JSONLDExpandDropReason::IncompleteValueObject, pointer,
+                element);
+    return JSON{nullptr};
   }
 
   // Drop free-floating values when not under a property. A map that expanded

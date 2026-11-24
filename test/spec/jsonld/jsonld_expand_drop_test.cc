@@ -233,17 +233,40 @@ TEST(a_null_value_object_is_reported) {
   EXPECT_JSONLD_EXPAND_DROP(0, NullValueObject, "/p", R"({ "@value": null })");
 }
 
-TEST(a_value_object_without_a_value_is_reported) {
+// A language beside an index is not a map holding only a language, so the
+// step keeps it: "if result contains only the entry @language, set result
+// to null" (JSON-LD 1.1 API Section 5.1.2 step 18), matching jsonld.js
+TEST(a_language_with_an_index_but_no_value_is_kept) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": { "p": "http://example.com/p" },
     "p": { "@language": "en", "@index": "i" }
   })");
 
   const auto drops{collect_drops(input)};
+  EXPECT_TRUE(drops.empty());
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [ { "@index": "i", "@language": "en" } ]
+    }
+  ])");
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+// A map holding only a language tags no value, and the step sets it to
+// null: "if result contains only the entry @language, set result to null"
+// (JSON-LD 1.1 API Section 5.1.2 step 18)
+TEST(a_language_alone_without_a_value_is_reported) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": "http://example.com/p" },
+    "p": { "@language": "en" }
+  })");
+
+  const auto drops{collect_drops(input)};
 
   EXPECT_EQ(drops.size(), 1);
   EXPECT_JSONLD_EXPAND_DROP(0, IncompleteValueObject, "/p",
-                            R"({ "@language": "en", "@index": "i" })");
+                            R"({ "@language": "en" })");
 }
 
 TEST(a_keyword_with_no_handler_is_reported) {
@@ -394,20 +417,24 @@ TEST(expansion_is_unchanged_without_a_callback) {
   EXPECT_EQ(with, without);
 }
 
-TEST(a_value_object_holding_only_a_direction_is_reported) {
-  // A value object with a direction but no value carries nothing, so it is
-  // dropped the same way one holding only a language is (JSON-LD 1.1 API
-  // Section 5.1.2)
+TEST(a_direction_without_a_value_is_kept) {
+  // The step nulls a map holding only a language, nothing else: a direction
+  // without a value is no such map, so it stays (JSON-LD 1.1 API Section
+  // 5.1.2 step 18), matching jsonld.js
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": { "@vocab": "http://example.com/" },
     "p": { "@direction": "ltr" }
   })");
 
   const auto drops{collect_drops(input)};
+  EXPECT_TRUE(drops.empty());
 
-  EXPECT_EQ(drops.size(), 1);
-  EXPECT_JSONLD_EXPAND_DROP(0, IncompleteValueObject, "/p",
-                            R"({ "@direction": "ltr" })");
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/p": [ { "@direction": "ltr" } ]
+    }
+  ])");
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
 TEST(a_list_inside_a_graph_entry_is_reported) {
