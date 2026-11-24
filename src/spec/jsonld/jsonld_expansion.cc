@@ -247,6 +247,66 @@ auto container_includes(const TermDefinition *const definition,
   return false;
 }
 
+// The index of a property-valued index map re-expands as a value of the index
+// property, and value expansion weighs the property before any type mapping:
+// one naming the identifier or the type takes the bare IRI, one naming the
+// graph takes a node reference, and one naming any other keyword keeps the
+// index as written, the way jsonld.js expands a value whose property stands
+// for a keyword (JSON-LD 1.1 API Section 5.1.2 step 13.8.3.7.1)
+auto expand_property_index(ExpansionState &state, ActiveContext &active_context,
+                           const std::optional<JSON::String> &index_term,
+                           const JSON::String &index_property,
+                           const JSON::String &index) -> JSON {
+  if (index_property == KEYWORD_ID || index_property == KEYWORD_TYPE) {
+    const auto identifier{expand_iri(state, active_context, index, true,
+                                     index_property == KEYWORD_TYPE, nullptr,
+                                     nullptr, EMPTY_WEAK_POINTER)};
+    return into_array(identifier.has_value() ? JSON{identifier.value()}
+                                             : JSON{nullptr});
+  }
+
+  if (index_property == KEYWORD_GRAPH) {
+    // A property standing for the graph keyword takes the identifier
+    // expansion a graph entry asks for, a node reference the way jsonld.js
+    // re-expands the index there
+    auto reference{JSON::make_object()};
+    const auto identifier{expand_iri(state, active_context, index, true, false,
+                                     nullptr, nullptr, EMPTY_WEAK_POINTER)};
+    reference.assign_assume_new(
+        JSON::String{KEYWORD_ID},
+        identifier.has_value() ? JSON{identifier.value()} : JSON{nullptr},
+        KEYWORD_ID_HASH);
+    return into_array(std::move(reference));
+  }
+
+  if (is_keyword(index_property)) {
+    return into_array(JSON{index});
+  }
+
+  return into_array(
+      expand_value(state, active_context, index_term, JSON{index}));
+}
+
+// The re-expanded index is prepended to whatever the object already carries
+// under the index property, and a keyword entry standing alone, such as an
+// identifier, joins the array rather than being read as one, the way
+// jsonld.js coerces an existing scalar when prepending (JSON-LD 1.1 API
+// Section 5.1.2 step 13.8.3.7.2)
+auto prepend_property_index(JSON &target, const JSON::String &index_property,
+                            JSON &&combined) -> void {
+  if (target.defines(index_property)) {
+    auto &existing{target.at(index_property)};
+    if (existing.is_array()) {
+      for (auto &element : existing.as_array()) {
+        combined.push_back(element);
+      }
+    } else {
+      combined.push_back(existing);
+    }
+  }
+  target.assign(index_property, std::move(combined));
+}
+
 // Whether the items being expanded become the items of a list, which is
 // either the list they are written in or the one the property they stand
 // under collects them into
@@ -1077,32 +1137,11 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                 // there: "an array consisting of re-expanded index followed
                 // by the existing values" (JSON-LD 1.1 API Section 5.1.2
                 // step 13.8.3.7.2)
-                auto combined{JSON::make_array()};
-                if (index_property.value() == KEYWORD_GRAPH) {
-                  // A property standing for the graph keyword takes the
-                  // identifier expansion a graph entry asks for, a node
-                  // reference the way jsonld.js re-expands the index there
-                  auto reference{JSON::make_object()};
-                  const auto identifier{
-                      expand_iri(state, active_context, index, true, false,
-                                 nullptr, nullptr, EMPTY_WEAK_POINTER)};
-                  reference.assign_assume_new(JSON::String{KEYWORD_ID},
-                                              identifier.has_value()
-                                                  ? JSON{identifier.value()}
-                                                  : JSON{nullptr},
-                                              KEYWORD_ID_HASH);
-                  combined.push_back(std::move(reference));
-                } else {
-                  combined = into_array(expand_value(
-                      state, active_context, definition->index, JSON{index}));
-                }
-                if (graph.defines(index_property.value())) {
-                  for (auto &existing :
-                       graph.at(index_property.value()).as_array()) {
-                    combined.push_back(existing);
-                  }
-                }
-                graph.assign(index_property.value(), std::move(combined));
+                prepend_property_index(
+                    graph, index_property.value(),
+                    expand_property_index(state, active_context,
+                                          definition->index,
+                                          index_property.value(), index));
               }
             } else if (!graph.defines(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
               graph.assign_assume_new(JSON::String{KEYWORD_INDEX}, JSON{index},
@@ -1212,15 +1251,11 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
                           entry_pointer.concat(index), is_value_object));
                 }
                 // The index value is prepended to any existing values.
-                auto combined{into_array(expand_value(
-                    state, active_context, definition->index, JSON{index}))};
-                if (item.defines(index_property.value())) {
-                  for (auto &existing :
-                       item.at(index_property.value()).as_array()) {
-                    combined.push_back(existing);
-                  }
-                }
-                item.assign(index_property.value(), std::move(combined));
+                prepend_property_index(
+                    item, index_property.value(),
+                    expand_property_index(state, active_context,
+                                          definition->index,
+                                          index_property.value(), index));
               }
             } else if (!item.defines(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
               item.assign_assume_new(JSON::String{KEYWORD_INDEX}, JSON{index},

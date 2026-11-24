@@ -3844,3 +3844,166 @@ TEST(a_type_map_survives_a_graph_object_among_the_members) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
 }
+
+// JSON-LD 1.0 knew no step holding a term of IRI form to its own expansion,
+// so such a term may stand for a keyword, and a property can then land on
+// the same compacted name as the keyword's alias. jsonld.js refuses such a
+// context in any mode, so the entries join through "add value" instead of
+// duplicating the key (JSON-LD 1.1 API Section 6.1.2)
+TEST(a_legacy_identifier_alias_collision_joins_an_empty_property) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [], "@id": "urn:s" }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": "@id"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": [ "urn:s" ],
+    "@context": { "urn:p": "@id" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(
+                input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(a_legacy_identifier_alias_collision_joins_whichever_entry_came_first) {
+  // As above, with the identifier arriving before the colliding property,
+  // settling on the same output either way
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "@id": "urn:s", "urn:p": [] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": "@id"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": [ "urn:s" ],
+    "@context": { "urn:p": "@id" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(
+                input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(a_legacy_identifier_alias_collision_joins_a_standing_value) {
+  // As above, with the colliding property carrying a value of its own,
+  // which stays ahead of the identifier under the shared name
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:p": [ { "@value": "v" } ], "@id": "urn:s" }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:p": "@id"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:p": [ "v", "urn:s" ],
+    "@context": { "urn:p": "@id" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(
+                input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(a_legacy_type_alias_collision_joins_a_single_type) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:t": [], "@type": [ "urn:x" ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:t": "@type"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:t": [ "urn:x" ],
+    "@context": { "urn:t": "@type" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(
+                input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(a_legacy_type_alias_collision_joins_every_type) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:t": [], "@type": [ "urn:x", "urn:y" ] }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:t": "@type"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:t": [ "urn:x", "urn:y" ],
+    "@context": { "urn:t": "@type" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(
+                input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(a_legacy_index_alias_collision_joins_the_index) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:i": [], "@index": "x", "@id": "urn:s" }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:i": "@index"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:i": [ "x" ],
+    "@id": "urn:s",
+    "@context": { "urn:i": "@index" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(
+                input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(a_legacy_graph_alias_collision_joins_the_graph_nodes) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:g": [], "@graph": [ { "@id": "urn:n" } ], "@id": "urn:s" }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:g": "@graph"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:g": [ { "@id": "urn:n" } ],
+    "@id": "urn:s",
+    "@context": { "urn:g": "@graph" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(
+                input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}
+
+TEST(a_legacy_reverse_alias_collision_joins_the_map) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "urn:r": [], "@reverse": { "urn:q": [ { "@id": "urn:n" } ] } }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "urn:r": "@reverse"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "urn:r": [ { "urn:q": { "@id": "urn:n" } } ],
+    "@context": { "urn:r": "@reverse" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(
+                input, context, "", {}, sourcemeta::core::JSONLDVersion::V1_0),
+            expected);
+}

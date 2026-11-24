@@ -295,10 +295,15 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       const auto alias{compact_iri(node_context, node_inverse,
                                    JSON::String{KEYWORD_ID}, nullptr, true,
                                    false)};
-      result.assign_assume_new(
-          alias,
+      // In JSON-LD 1.0, a term of IRI form may stand for a keyword, so a
+      // property can land on the same compacted name as the alias, and the
+      // identifier joins what stands there rather than duplicating the key
+      // (JSON-LD 1.1 API Section 6.1.2 "add value")
+      add_value(
+          result, alias,
           JSON{compact_iri(node_context, node_inverse,
-                           expanded_value.to_string(), nullptr, false, false)});
+                           expanded_value.to_string(), nullptr, false, false)},
+          false);
       continue;
     }
 
@@ -317,8 +322,14 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       const bool type_as_array{
           !state.processing_1_0 &&
           container_includes(type_definition, KEYWORD_SET)};
+      // A legacy keyword alias may collide with a property's compacted name,
+      // in which case each type joins what already stands under it
       if (compacted.size() == 1 && compact_arrays && !type_as_array) {
-        result.assign_assume_new(alias, JSON{compacted.front()});
+        add_value(result, alias, JSON{compacted.front()}, false);
+      } else if (result.defines(alias)) {
+        for (auto &member : compacted.as_array()) {
+          add_value(result, alias, JSON{member}, true);
+        }
       } else {
         result.assign_assume_new(alias, std::move(compacted));
       }
@@ -344,7 +355,9 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
         const auto alias{compact_iri(node_context, node_inverse,
                                      JSON::String{KEYWORD_REVERSE}, nullptr,
                                      true, false)};
-        result.assign_assume_new(alias, std::move(reverse_map));
+        // As with the identifier, a legacy alias may collide with a
+        // property's compacted name, and the map joins what stands there
+        add_value(result, alias, std::move(reverse_map), false);
       }
       continue;
     }
@@ -365,7 +378,9 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
     if (entry.key_equals(KEYWORD_INDEX, KEYWORD_INDEX_HASH)) {
       const auto alias{compact_iri(node_context, node_inverse,
                                    expanded_property, nullptr, true, false)};
-      result.assign_assume_new(alias, JSON{expanded_value});
+      // As with the identifier, a legacy alias may collide with a property's
+      // compacted name, and the index joins what stands there
+      add_value(result, alias, JSON{expanded_value}, false);
       continue;
     }
 
@@ -383,7 +398,15 @@ auto compact(ExpansionState &state, const ActiveContext &active_context,
       // active property is not @graph or @set", JSON-LD 1.1 API Section
       // 6.1.2 step 3.3)
       assert(compacted.is_array());
-      result.assign_assume_new(alias, std::move(compacted));
+      // A legacy alias may collide with a property's compacted name, in
+      // which case the graph nodes join what already stands under it
+      if (result.defines(alias)) {
+        for (auto &member : compacted.as_array()) {
+          add_value(result, alias, JSON{member}, true);
+        }
+      } else {
+        result.assign_assume_new(alias, std::move(compacted));
+      }
       continue;
     }
 

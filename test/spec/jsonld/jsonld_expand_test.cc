@@ -2943,6 +2943,205 @@ TEST(a_graph_index_term_redefined_as_a_graph_alias_with_a_keyword_form_key) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+TEST(an_index_term_redefined_as_an_identifier_alias_joins_the_identifier) {
+  // An index property aliased onto the identifier keyword takes the bare
+  // IRI expansion of the key, and the identifier the member already names
+  // joins the array rather than being read as one, the way jsonld.js
+  // prepends onto an existing scalar (JSON-LD 1.1 API Section 5.1.2 steps
+  // 13.8.3.7.1 and 13.8.3.7.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "prop": "urn:prop",
+        "p": { "@id": "urn:p", "@container": "@index", "@index": "prop" }
+      },
+      { "prop": "@id" }
+    ],
+    "p": { "i": { "@id": "urn:child" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@id": [ "i", "urn:child" ] }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(an_index_term_redefined_as_an_identifier_alias_with_a_keyword_form_key) {
+  // As above, with a key of keyword form, which identifier expansion
+  // answers nothing for, leaving a null the way jsonld.js does
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "prop": "urn:prop",
+        "p": { "@id": "urn:p", "@container": "@index", "@index": "prop" }
+      },
+      { "prop": "@id" }
+    ],
+    "p": { "@kw": { "urn:q": "v" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "urn:q": [ { "@value": "v" } ], "@id": [ null ] }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(an_index_term_redefined_as_an_index_alias_keeps_the_key_as_written) {
+  // A property standing for any other keyword keeps the key as written
+  // rather than expanding it as a value, the way jsonld.js withholds value
+  // expansion from keyword values (JSON-LD 1.1 API Section 5.3.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "prop": "urn:prop",
+        "p": { "@id": "urn:p", "@container": "@index", "@index": "prop" }
+      },
+      { "prop": "@index" }
+    ],
+    "p": { "i": { "@id": "urn:child" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@id": "urn:child", "@index": [ "i" ] }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(an_index_term_redefined_as_a_type_alias_prepends_the_key) {
+  // A property aliased onto the type keyword takes the vocabulary expansion
+  // of the key and prepends it to the types the member already names, the
+  // way jsonld.js expands a value whose property stands for the type
+  // keyword (JSON-LD 1.1 API Section 5.3.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "prop": "urn:prop",
+        "p": { "@id": "urn:p", "@container": "@index", "@index": "prop" }
+      },
+      { "prop": "@type" }
+    ],
+    "p": { "i": { "@type": "urn:T" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "@type": [ "i", "urn:T" ] }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(an_index_term_redefined_as_a_graph_alias_adds_a_node_reference) {
+  // A property aliased onto the graph keyword takes the identifier
+  // expansion a graph entry asks for, a node reference the way jsonld.js
+  // re-expands the index there, in an index container as in a graph one
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "prop": "urn:prop",
+        "p": { "@id": "urn:p", "@container": "@index", "@index": "prop" }
+      },
+      { "prop": "@graph" }
+    ],
+    "p": { "i": { "urn:q": "v" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        { "urn:q": [ { "@value": "v" } ], "@graph": [ { "@id": "i" } ] }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(a_graph_index_term_redefined_as_an_identifier_alias_names_the_wrapper) {
+  // In a graph container, the aliased index lands on the graph wrapper, so
+  // an identifier alias names the graph with the bare IRI expansion of the
+  // key (JSON-LD 1.1 API Section 5.1.2 step 13.8.3.7.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "prop": "urn:prop",
+        "p": {
+          "@id": "urn:p",
+          "@container": [ "@graph", "@index" ],
+          "@index": "prop"
+        }
+      },
+      { "prop": "@id" }
+    ],
+    "p": { "i": { "urn:q": "v" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        {
+          "@graph": [ { "urn:q": [ { "@value": "v" } ] } ],
+          "@id": [ "i" ]
+        }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(a_graph_index_term_redefined_as_an_identifier_alias_joins_the_graph_name) {
+  // As above, with a member that already arrives as a named graph, whose
+  // name joins the array rather than being read as one, the way jsonld.js
+  // prepends onto an existing scalar (JSON-LD 1.1 API Section 5.1.2 step
+  // 13.8.3.7.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      {
+        "prop": "urn:prop",
+        "p": {
+          "@id": "urn:p",
+          "@container": [ "@graph", "@index" ],
+          "@index": "prop"
+        }
+      },
+      { "prop": "@id" }
+    ],
+    "p": { "i": { "@graph": { "urn:q": "v" }, "@id": "urn:g" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        {
+          "@graph": [ { "urn:q": [ { "@value": "v" } ] } ],
+          "@id": [ "i", "urn:g" ]
+        }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(nest_expands_in_1_1) {
   const auto input = sourcemeta::core::parse_json(R"({
     "urn:q": "y",
