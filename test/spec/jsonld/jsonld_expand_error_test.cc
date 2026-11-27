@@ -117,6 +117,19 @@ TEST(keyword_redefinition) {
                              "Keyword redefinition", "/@context/@type");
 }
 
+// The special definition the type keyword may carry admits only the container
+// and protection entries, so an unknown key is a redefinition no matter what
+// value it holds
+TEST(keyword_redefinition_by_an_unknown_entry_holding_a_keyword) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@type": { "@bogus": "@set" } },
+    "@type": "http://example.com/T"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Keyword redefinition", "/@context/@type");
+}
+
 TEST(protected_term_redefinition) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": [
@@ -569,6 +582,22 @@ TEST(shorthand_term_definition_invalid_iri_mapping) {
                              "Invalid IRI mapping", "/@context/term");
 }
 
+TEST(term_mapping_with_a_malformed_scheme) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "bar": "ex_:foo" }, "bar": "x" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/bar");
+}
+
+TEST(reverse_mapping_with_a_malformed_scheme) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "p": { "@reverse": "1:x" } }, "p": { "@id": "urn:n" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/p/@reverse");
+}
+
 TEST(shorthand_term_definition_aliasing_context) {
   const auto input =
       sourcemeta::core::parse_json(R"({ "@context": { "term": "@context" } })");
@@ -646,6 +675,20 @@ TEST(colliding_keywords) {
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Colliding keywords", "/id");
+}
+
+// A reverse map holding an ordinary reverse property stands on the node, so
+// an aliased entry after it is a collision
+TEST(colliding_keywords_populated_reverse_map_then_alias) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "alias": "@reverse" },
+    "@id": "http://example.com/subject",
+    "@reverse": { "http://example.com/q": { "@id": "http://example.com/a" } },
+    "alias": { "http://example.com/r": { "@id": "http://example.com/b" } }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Colliding keywords", "/alias");
 }
 
 TEST(invalid_id_value) {
@@ -3322,14 +3365,35 @@ TEST(a_term_holding_a_slash_that_does_not_expand_onto_its_own_mapping) {
                              "Invalid IRI mapping", "/@context/a~1b/@id");
 }
 
-// A trailing colon leaves no suffix to join to a prefix, so nothing names
-// the term and it keeps no mapping
-TEST(a_term_closing_with_a_colon_and_no_identifier) {
+// A colon past an opening one still counts as "anywhere but as the first
+// character", so a term opening with a colon and carrying another is held to
+// expanding onto its own mapping just the same
+TEST(a_term_opening_with_a_colon_that_does_not_expand_onto_its_own_mapping) {
   const auto input = sourcemeta::core::parse_json(
-      R"({ "@context": { "foo:": { "@type": "@id" } } })");
+      R"({ "@context": { ":a:b": { "@id": "http://example.com/x" } } })");
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
-                             "Invalid IRI mapping", "/@context/foo:");
+                             "Invalid IRI mapping", "/@context/:a:b/@id");
+}
+
+// As above, through the shorthand form of the definition
+TEST(a_shorthand_term_opening_with_a_colon_that_does_not_match_its_mapping) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { ":a:b": "http://example.com/x" }, ":a:b": "v" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/:a:b");
+}
+
+// A term carrying no colon or slash of its own derives no mapping when the
+// definition names no identifier and no vocabulary stands (JSON-LD 1.1 API
+// Section 4.2.2)
+TEST(an_object_term_without_an_identifier_or_a_vocabulary) {
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "foo": { "@type": "@id" } } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/foo");
 }
 
 // JSON-LD 1.0 has no nesting of lists, so a `@list` container holding a list
@@ -3375,4 +3439,415 @@ TEST(value_object_with_a_property_under_two_terms) {
 
   EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
                              "Invalid value object", "/http:~1~1e~1q");
+}
+
+TEST(graph_container_with_a_list_is_refused) {
+  // A graph container stands with at most one of an identifier or an index
+  // container, optionally with a set, and nothing else (JSON-LD 1.1 API
+  // Section 4.2.2 step 21.1)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": {
+        "@id": "http://example.com/a",
+        "@container": [ "@graph", "@id", "@list" ]
+      }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid container mapping",
+                             "/@context/a/@container");
+}
+
+TEST(graph_container_with_a_type_is_refused) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": {
+        "@id": "http://example.com/a",
+        "@container": [ "@graph", "@id", "@type" ]
+      }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid container mapping",
+                             "/@context/a/@container");
+}
+
+TEST(graph_container_with_a_language_is_refused) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": {
+        "@id": "http://example.com/a",
+        "@container": [ "@graph", "@id", "@language" ]
+      }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid container mapping",
+                             "/@context/a/@container");
+}
+
+TEST(version_of_the_same_scale_but_a_different_value_is_refused) {
+  // Only the one version is named, and a value is weighed against it after
+  // being reduced, so one written to the same scale is still refused on its
+  // value (JSON-LD 1.1 API Section 4.1.2)
+  const auto input =
+      sourcemeta::core::parse_json(R"({ "@context": { "@version": 1.2 } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid @version value", "/@context/@version");
+}
+
+TEST(vocab_with_keyword_form_is_refused) {
+  // A vocabulary mapping has to come out of expansion as an IRI or a blank
+  // node identifier, and a value shaped like a keyword expands to nothing at
+  // all (JSON-LD 1.1 API Section 4.1.2 step 5.8.3)
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@vocab": "@unknown" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid vocab mapping", "/@context/@vocab");
+}
+
+TEST(import_resolving_to_a_document_without_a_context_is_refused) {
+  // What an import names has to carry a context of its own, so a document
+  // without one is refused rather than treated as empty
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@import": "https://example.com/no-context" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", remote_resolver()),
+      "Invalid remote context", "/@context/@import");
+}
+
+TEST(import_resolving_to_a_non_object_is_refused) {
+  const sourcemeta::core::JSONLDResolver resolver =
+      [](const sourcemeta::core::JSON::StringView identifier)
+      -> std::optional<sourcemeta::core::JSON> {
+    if (identifier == "https://example.com/array") {
+      return sourcemeta::core::parse_json(R"([ 1, 2 ])");
+    }
+    return std::nullopt;
+  };
+
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "@import": "https://example.com/array" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", resolver),
+      "Invalid remote context", "/@context/@import");
+}
+
+TEST(json_type_mapping_is_refused_under_the_1_0_processing_mode) {
+  // "If the expanded type is @json or @none, and processing mode is
+  // json-ld-1.0, an invalid type mapping error has been detected and
+  // processing is aborted" (JSON-LD 1.1 API Section 4.2.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": { "@id": "http://example.com/a", "@type": "@json" }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Invalid type mapping", "/@context/a/@type");
+}
+
+TEST(none_type_mapping_is_refused_under_the_1_0_processing_mode) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "a": { "@id": "http://example.com/a", "@type": "@none" }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "Invalid type mapping", "/@context/a/@type");
+}
+
+TEST(a_bare_term_mapping_stands_where_a_vocabulary_is_set) {
+  // The mapping has to come out as a keyword, an IRI or a blank node
+  // identifier, and a vocabulary is what turns a bare word into an IRI
+  // (JSON-LD 1.1 API Section 4.2.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "http://example.com/", "term": "bare" },
+    "term": "v"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "http://example.com/bare": [ { "@value": "v" } ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(index_mapping_with_keyword_form_is_refused) {
+  // The expansion of an index has to name an IRI, which a value shaped like a
+  // keyword does not (JSON-LD 1.1 API Section 4.2.2 step 21.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": {
+        "@id": "http://example.com/p",
+        "@container": "@index",
+        "@index": "@unknown"
+      }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid term definition", "/@context/p/@index");
+}
+
+TEST(self_referential_term_without_a_vocabulary_is_refused) {
+  // A term that maps onto itself and carries neither a colon nor a slash needs
+  // a vocabulary to become an IRI, and without one it maps to nothing
+  // (JSON-LD 1.1 API Section 4.2.2)
+  const auto input =
+      sourcemeta::core::parse_json(R"({ "@context": { "bar": "bar" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/bar");
+}
+
+TEST(a_self_referential_term_opening_with_a_colon_without_a_vocabulary) {
+  const auto input =
+      sourcemeta::core::parse_json(R"({ "@context": { ":foo": ":foo" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/:foo");
+}
+
+TEST(list_container_of_lists_under_no_active_property_in_1_0) {
+  // A list container gathers the items it is given, and JSON-LD 1.0 refuses a
+  // list among them whichever keyword hands them over. The term stands at the
+  // top of the document, so there is no property above it to trace the
+  // offending member through (JSON-LD 1.0 API Expansion Algorithm step 3.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "items": { "@id": "http://example.com/items", "@container": "@list" }
+    },
+    "items": [ { "@list": [] } ]
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "List of lists", "/items/0");
+}
+
+TEST(reverse_map_narrowing_passes_over_a_keyword_form_key) {
+  // Several keys of a reverse map may reach the same property, so each is
+  // expanded again to find the one holding the offending member. A key of
+  // keyword form names nothing and so matches no property (JSON-LD 1.1 API
+  // Section 4.2.2)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@reverse": {
+      "@unknown": 1,
+      "http://example.com/q": { "@value": "x" }
+    }
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid reverse property value",
+                             "/@reverse/http:~1~1example.com~1q");
+}
+
+TEST(an_unknown_container_item_is_refused) {
+  // A container mapping is made of keywords the step names, and an array of
+  // them is read item by item, so one that is no keyword of that set leaves a
+  // combination the step does not admit (JSON-LD 1.1 API Section 4.2.2 step
+  // 21.1)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "p": { "@id": "http://example.com/p", "@container": [ "@bogus" ] }
+    }
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid container mapping",
+                             "/@context/p/@container/0");
+}
+
+TEST(a_type_redefinition_carrying_an_unknown_entry_is_refused) {
+  // The keyword may be redefined only by a map holding either or both of a set
+  // container and a protected flag, so any other entry leaves a shape the step
+  // does not admit (JSON-LD 1.1 API Section 4.2.2 step 4)
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@type": { "@container": "@set", "@bogus": 1 } }
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Keyword redefinition", "/@context/@type");
+}
+
+TEST(a_term_aliasing_a_term_that_gave_up_its_mapping_is_refused) {
+  // A term that gave up its mapping names nothing, so a term written against
+  // it has nothing to resolve to (JSON-LD 1.1 API Section 4.2.2 step 14)
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "a": null, "b": "a" }, "b": "v" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/b");
+}
+
+TEST(a_reverse_mapping_naming_a_term_that_gave_up_its_mapping_is_refused) {
+  // As above, and a reverse mapping is held to naming an absolute IRI, which
+  // nothing is (JSON-LD 1.1 API Section 4.2.2 step 15.3)
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "a": null, "b": { "@reverse": "a" } } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/b/@reverse");
+}
+
+TEST(a_term_resolving_through_a_prefix_that_names_it_is_cyclic) {
+  // Resolving the term reaches for its own prefix, which is still being made,
+  // so the two name each other (JSON-LD 1.1 API Section 4.2.2 step 3)
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "a": "a:b", "a:b": "a:b" } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Cyclic IRI mapping", "/@context/a");
+}
+
+TEST(a_term_resolving_through_a_prefix_it_is_defining_is_cyclic) {
+  // Defining the prefix reaches for the compact IRI written against it, which
+  // reaches back for the prefix while it is still being made (JSON-LD 1.1 API
+  // Section 4.2.2 step 3)
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "a": "a:b", "a:b": { "@container": "@set" } } })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Cyclic IRI mapping", "/@context/a");
+}
+
+TEST(an_identifier_mapping_that_parts_from_its_term_is_refused) {
+  // A term shaped like an IRI must expand onto the very IRI it maps, and this
+  // one names a prefix that gave up its mapping, so the term expands to itself
+  // and parts from what it was given (JSON-LD 1.1 API Section 4.2.2 step 16)
+  const auto input = sourcemeta::core::parse_json(
+      R"({ "@context": { "a": null, "a:b": { "@id": "http://e/x" } },
+           "a:b": "v" })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/a:b/@id");
+}
+
+TEST(list_of_lists_through_a_container_narrows_to_the_enclosing_member) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "http://example.com/p", "@container": "@list" } },
+    "p": [ [ 1 ] ]
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(
+      sourcemeta::core::jsonld_expand(input, "", {},
+                                      sourcemeta::core::JSONLDVersion::V1_0),
+      "List of lists", "/p/0");
+}
+
+TEST(
+    a_colon_free_mapping_from_an_earlier_context_is_refused_under_a_vocabulary) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": [
+      { "a/b": "a/b" },
+      { "@vocab": "https://example.com/", "p": "a/b" }
+    ],
+    "p": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/0/a~1b");
+}
+
+TEST(a_slash_term_without_a_vocabulary_stays_relative_and_is_refused) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "foo/bar": "foo/bar" },
+    "foo/bar": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/foo~1bar");
+}
+
+// "Term is a relative IRI reference" and the slash step aborts when "the
+// resulting IRI mapping is not an IRI", a bar a blank node mapping does not
+// clear in either spelling (JSON-LD 1.1 API Section 4.2.2 step 16)
+TEST(a_slash_term_expanding_to_a_blank_node_is_refused) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "_:b", "a/b": "a/b" },
+    "a/b": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/a~1b");
+}
+
+TEST(an_object_slash_term_expanding_to_a_blank_node_is_refused) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "@vocab": "_:b", "a/b": {} },
+    "a/b": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid IRI mapping", "/@context/a~1b");
+}
+
+TEST(a_shorthand_alias_of_the_context_keyword_is_refused_as_an_alias) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "a:b": "@context" },
+    "a:b": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid keyword alias", "/@context/a:b");
+}
+
+TEST(an_object_alias_of_the_context_keyword_is_refused_as_an_alias) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "a:b": { "@id": "@context" } },
+    "a:b": "x"
+  })");
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid keyword alias", "/@context/a:b/@id");
+}
+
+TEST(compaction_of_a_string_valued_property) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/c": [ { "@value": "w" } ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json(R"({
+    "c": "http://example.com/c"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"({
+    "c": "w",
+    "@context": { "c": "http://example.com/c" }
+  })");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_compact(input, context), expected);
+}
+
+TEST(cyclic_iri_mapping_checked_by_hand) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "term": { "@id": "term:term" } }
+  })");
+
+  try {
+    [[maybe_unused]] const auto result{sourcemeta::core::jsonld_expand(input)};
+    FAIL();
+  } catch (const sourcemeta::core::JSONLDError &error) {
+    EXPECT_STREQ(error.what(), "Cyclic IRI mapping");
+    EXPECT_EQ(sourcemeta::core::to_string(error.pointer()), "/@context/term");
+  } catch (...) {
+    FAIL();
+  }
+}
+
+TEST(type_mapping_with_a_digit_opened_scheme) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": { "p": { "@id": "urn:p", "@type": "1bad:type" } },
+    "p": "v"
+  })");
+
+  EXPECT_JSONLD_EXPAND_ERROR(sourcemeta::core::jsonld_expand(input),
+                             "Invalid type mapping", "/@context/p/@type");
 }

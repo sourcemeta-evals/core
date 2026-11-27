@@ -10,7 +10,7 @@ namespace sourcemeta::core {
 
 // IRI Expansion (JSON-LD 1.1 API Section 5.2)
 auto expand_iri(ExpansionState &state, ActiveContext &active_context,
-                const JSON::String &value, const bool document_relative,
+                const JSON::String &val, const bool document_relative,
                 const bool vocabulary, const JSON *const local_context,
                 DefinedTerms *const defined, const WeakPointer &context_pointer)
     -> std::optional<JSON::String> {
@@ -20,23 +20,23 @@ auto expand_iri(ExpansionState &state, ActiveContext &active_context,
   assert((local_context == nullptr) == (defined == nullptr));
   assert(local_context == nullptr || local_context->is_object());
 
-  if (is_keyword(value)) {
-    return value;
+  if (is_keyword(val)) {
+    return val;
   }
 
-  if (has_keyword_form(value)) {
+  if (has_keyword_form(val)) {
     return std::nullopt;
   }
 
-  if (local_context != nullptr && local_context->defines(value)) {
-    const auto iterator{defined->find(value)};
+  if (local_context != nullptr && local_context->defines(val)) {
+    const auto iterator{defined->find(val)};
     if (iterator == defined->cend() || !iterator->second) {
-      create_term_definition(state, active_context, *local_context, value,
+      create_term_definition(state, active_context, *local_context, val,
                              *defined, context_pointer);
     }
   }
 
-  const auto term{active_context.terms.find(value)};
+  const auto term{active_context.terms.find(val)};
   if (term != active_context.terms.cend() && term->second.iri.has_value() &&
       is_keyword(term->second.iri.value())) {
     return term->second.iri;
@@ -46,13 +46,13 @@ auto expand_iri(ExpansionState &state, ActiveContext &active_context,
     return term->second.iri;
   }
 
-  if (value.find(':', 1) != JSON::String::npos) {
+  if (val.find(':', 1) != JSON::String::npos) {
     // The term has the form of a compact IRI, so split at the first colon.
-    const auto colon{value.find(':')};
-    const auto prefix{value.substr(0, colon)};
-    const auto suffix{value.substr(colon + 1)};
+    const auto colon{val.find(':')};
+    const auto prefix{val.substr(0, colon)};
+    const auto suffix{val.substr(colon + 1)};
     if (prefix == "_" || suffix.starts_with("//")) {
-      return value;
+      return val;
     }
 
     if (local_context != nullptr && local_context->defines(prefix)) {
@@ -69,15 +69,15 @@ auto expand_iri(ExpansionState &state, ActiveContext &active_context,
       return definition->second.iri.value() + suffix;
     }
 
-    // The value is only already an IRI when its prefix is a valid scheme.
+    // The val is only already an IRI when its prefix is a valid scheme.
     // Otherwise it is resolved against the vocabulary or document base below.
     if (URI::is_scheme(prefix)) {
-      return value;
+      return val;
     }
   }
 
   if (vocabulary && active_context.vocabulary.has_value()) {
-    return active_context.vocabulary.value() + value;
+    return active_context.vocabulary.value() + val;
   }
 
   if (document_relative && active_context.base.has_value()) {
@@ -85,18 +85,18 @@ auto expand_iri(ExpansionState &state, ActiveContext &active_context,
     // parser cannot read is answered with that rather than with an identifier
     // left unresolved
     const auto base{URI::from_iri(active_context.base.value())};
-    // Expansion builds identifiers without validating them, so a value the
+    // Expansion builds identifiers without validating them, so a val the
     // parser cannot read is carried through as it stands rather than
     // surfacing as an exception of another module's kind (JSON-LD 1.1 API
     // Section 5.2 step 5)
     try {
-      return URI::from_iri(value).resolve_from(base).recompose();
+      return URI::from_iri(val).resolve_from(base).recompose();
     } catch (const URIParseError &) {
-      return value;
+      return val;
     }
   }
 
-  return value;
+  return val;
 }
 
 } // namespace sourcemeta::core

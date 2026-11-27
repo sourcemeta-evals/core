@@ -20,7 +20,7 @@ auto lowercase(const JSON::StringView value) -> JSON::String {
   return result;
 }
 
-// Term Selection (JSON-LD 1.1 API Section 4.3.4)
+// Term Selection (JSON-LD 1.1 API Section 4.4.2)
 auto term_selection(const JSON &inverse_context, const JSON::String &variable,
                     const std::vector<JSON::String> &containers,
                     const JSON::StringView type_language,
@@ -78,7 +78,7 @@ auto compact_iri(const ActiveContext &active_context,
   if (vocabulary && inverse_context.defines(variable)) {
     // When a default base direction is set, the default language is the
     // language and direction joined by an underscore, even if there is no
-    // default language (Section 6.2.3).
+    // default language (Section 6.2.2).
     JSON::String default_language{KEYWORD_NONE};
     if (active_context.default_direction.has_value()) {
       default_language =
@@ -112,7 +112,7 @@ auto compact_iri(const ActiveContext &active_context,
       type_language_value = KEYWORD_REVERSE;
       containers.emplace_back(KEYWORD_SET);
       containers.emplace_back(KEYWORD_NONE);
-      // JSON-LD 1.1 API Section 6.2.3: the @index and @index@set candidates are
+      // JSON-LD 1.1 API Section 6.2.2: the @index and @index@set candidates are
       // added only when the processing mode is not json-ld-1.0 and the value
       // carries no @index entry
       if (!active_context.processing_1_0 && !has_index) {
@@ -127,7 +127,7 @@ auto compact_iri(const ActiveContext &active_context,
       // Container preference for a graph object: the @graph@index and @graph@id
       // variants rank first only when the value carries the matching entry,
       // otherwise the plain graph containers rank ahead of them (JSON-LD 1.1
-      // API Section 6.2.3)
+      // API Section 6.2.2)
       if (has_index) {
         containers.emplace_back(graph + JSON::String{KEYWORD_INDEX});
         containers.emplace_back(graph + JSON::String{KEYWORD_INDEX} + set);
@@ -170,8 +170,10 @@ auto compact_iri(const ActiveContext &active_context,
       for (const auto &item : list.as_array()) {
         JSON::String item_language{KEYWORD_NONE};
         JSON::String item_type{KEYWORD_NONE};
-        if (item.is_object() &&
-            item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
+        // What a list holds in expanded form is maps, which the entry point
+        // holds the input to
+        assert(item.is_object());
+        if (item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
           const bool item_has_language{
               item.defines(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH)};
           const bool item_has_direction{
@@ -201,7 +203,6 @@ auto compact_iri(const ActiveContext &active_context,
         if (!common_language.has_value()) {
           common_language = item_language;
         } else if (common_language.value() != item_language &&
-                   item.is_object() &&
                    item.defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
           common_language = JSON::String{KEYWORD_NONE};
         }
@@ -227,8 +228,19 @@ auto compact_iri(const ActiveContext &active_context,
       if (list.empty()) {
         type_language = KEYWORD_ANY;
       }
-      // Fall back to an exact-match term when no list-container term applies.
+      // A set container stands in where no list container term applies, and
+      // an exact-match term after that (JSON-LD 1.1 API Section 6.2.2, the
+      // set and none containers are appended for every value)
+      containers.emplace_back(KEYWORD_SET);
       containers.emplace_back(KEYWORD_NONE);
+      // A list with no @index entry may still land in an index map under the
+      // none key, but never under the 1.0 processing mode (JSON-LD 1.1 API
+      // Section 6.2.2)
+      if (!active_context.processing_1_0 && !has_index) {
+        containers.emplace_back(KEYWORD_INDEX);
+        containers.emplace_back(JSON::String{KEYWORD_INDEX} +
+                                JSON::String{KEYWORD_SET});
+      }
     } else if (is_object && value->defines(KEYWORD_VALUE, KEYWORD_VALUE_HASH)) {
       const bool has_language{
           value->defines(KEYWORD_LANGUAGE, KEYWORD_LANGUAGE_HASH)};
@@ -260,13 +272,13 @@ auto compact_iri(const ActiveContext &active_context,
       containers.emplace_back(KEYWORD_SET);
       containers.emplace_back(KEYWORD_NONE);
       // A value with no @index entry may also match an @index container, but
-      // never under the 1.0 processing mode (JSON-LD 1.1 API Section 6.2.3)
+      // never under the 1.0 processing mode (JSON-LD 1.1 API Section 6.2.2)
       if (!active_context.processing_1_0 && !has_index) {
         containers.emplace_back(KEYWORD_INDEX);
         containers.emplace_back(JSON::String{KEYWORD_INDEX} +
                                 JSON::String{KEYWORD_SET});
       }
-      // JSON-LD 1.1 API Section 6.2.3: a value object carrying only @value also
+      // JSON-LD 1.1 API Section 6.2.2: a value object carrying only @value also
       // matches a language container term as a last resort, but only when the
       // processing mode is not json-ld-1.0
       if (!active_context.processing_1_0 && value->object_size() == 1) {
@@ -278,7 +290,7 @@ auto compact_iri(const ActiveContext &active_context,
       type_language_value = KEYWORD_ID;
       // Container preference for a node reference or null: the @id and @type
       // containers first, then a plain @set, then no container, and an @index
-      // container last (JSON-LD 1.1 API Section 6.2.3)
+      // container last (JSON-LD 1.1 API Section 6.2.2)
       containers.emplace_back(KEYWORD_ID);
       containers.emplace_back(JSON::String{KEYWORD_ID} +
                               JSON::String{KEYWORD_SET});
@@ -287,7 +299,7 @@ auto compact_iri(const ActiveContext &active_context,
                               JSON::String{KEYWORD_TYPE});
       containers.emplace_back(KEYWORD_SET);
       containers.emplace_back(KEYWORD_NONE);
-      // JSON-LD 1.1 API Section 6.2.3: the @index and @index@set candidates are
+      // JSON-LD 1.1 API Section 6.2.2: the @index and @index@set candidates are
       // added only when the processing mode is not json-ld-1.0 and the value
       // carries no @index entry
       if (!active_context.processing_1_0 && !has_index) {
@@ -304,12 +316,19 @@ auto compact_iri(const ActiveContext &active_context,
     if ((type_language_value == KEYWORD_ID ||
          type_language_value == KEYWORD_REVERSE) &&
         is_object && value->defines(KEYWORD_ID, KEYWORD_ID_HASH)) {
+      // An identifier is a string in expanded form, which the entry point
+      // holds the input to
       const auto &identifier{value->at(KEYWORD_ID, KEYWORD_ID_HASH)};
-      if (identifier.is_string()) {
+      assert(identifier.is_string());
+      {
         const auto compacted_id{compact_iri(active_context, inverse_context,
                                             identifier.to_string(), nullptr,
                                             true, false)};
         const auto iterator{active_context.terms.find(compacted_id)};
+        // A term found under the compacted spelling vouches for the
+        // identifier only where it maps that very IRI: a relative identifier
+        // can share its spelling with a term naming elsewhere (JSON-LD 1.1
+        // API Section 6.2.2 step 16.1)
         if (iterator != active_context.terms.cend() &&
             iterator->second.iri.has_value() &&
             iterator->second.iri.value() == identifier.to_string()) {
@@ -324,7 +343,7 @@ auto compact_iri(const ActiveContext &active_context,
       }
     } else if (value == nullptr) {
       // For a bare value the preferred list is the type or language value
-      // followed by @none (JSON-LD 1.1 API Section 6.2.3). The @vocab candidate
+      // followed by @none (JSON-LD 1.1 API Section 6.2.2). The @vocab candidate
       // is not literally listed there for this case, but it is load-bearing:
       // the W3C compaction suite case 0114 regresses without it, so a bare
       // vocabulary reference must also be allowed to match a term coercing
@@ -382,9 +401,16 @@ auto compact_iri(const ActiveContext &active_context,
     compact += ":";
     compact += variable.substr(definition.iri.value().size());
     const auto existing{active_context.terms.find(compact)};
+    // A term already answering to the candidate spelling stands in its way
+    // unless it maps this very IRI and no value narrows the choice: a prefix
+    // redefined by a later context leaves such terms behind (JSON-LD 1.1 API
+    // Section 6.2.2 step 7.3)
     const bool usable{existing == active_context.terms.cend() ||
                       (value == nullptr && existing->second.iri.has_value() &&
                        existing->second.iri.value() == variable)};
+    // The shorter candidate wins, and of two the same length the one that
+    // sorts first, which is what the algorithm asks for (JSON-LD 1.1 API
+    // Section 6.2.2)
     if (usable &&
         (!candidate.has_value() || compact.size() < candidate.value().size() ||
          (compact.size() == candidate.value().size() &&
@@ -397,7 +423,7 @@ auto compact_iri(const ActiveContext &active_context,
   }
 
   // An absolute IRI whose scheme matches a prefix term and that has no
-  // authority would be misread as a compact IRI (Section 6.2.3).
+  // authority would be misread as a compact IRI (Section 6.2.2).
   const auto colon{variable.find(':')};
   if (colon != JSON::String::npos &&
       variable.compare(colon + 1, 2, "//") != 0) {

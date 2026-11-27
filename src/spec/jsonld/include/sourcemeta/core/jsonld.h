@@ -102,6 +102,8 @@ using JSONLDExpandDropCallback = std::function<void(
 /// sourcemeta::core::prettify(expanded, std::cout);
 /// std::cout << std::endl;
 /// ```
+///
+/// Expansion throws a sourcemeta::core::JSONLDError on malformed input
 SOURCEMETA_CORE_JSONLD_EXPORT
 auto jsonld_expand(const JSON &input, const JSON::StringView base_iri = "",
                    const JSONLDResolver &resolver = {},

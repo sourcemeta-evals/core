@@ -226,3 +226,119 @@ TEST(blank_node_identifier_used_twice_names_one_node) {
 
   EXPECT_EQ(sourcemeta::core::jsonld_flatten(input), expected);
 }
+
+TEST(a_blank_node_property_is_relabelled) {
+  // A property may itself be a blank node identifier, and it is relabelled the
+  // way a subject is so that the whole document agrees on the label (JSON-LD
+  // 1.1 API Section 7.1.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/a",
+      "_:prop": [ { "@value": "x" } ]
+    }
+  ])");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/a",
+      "_:b0": [ { "@value": "x" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_flatten(input), expected);
+}
+
+TEST(a_node_reached_twice_under_one_index_is_kept) {
+  // Two node objects naming the same subject are merged, and an index they
+  // agree on stands rather than being refused (JSON-LD 1.1 API Section 7.2.2)
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/a",
+      "@index": "one",
+      "http://example.com/p": [ { "@value": "x" } ]
+    },
+    {
+      "@id": "http://example.com/a",
+      "@index": "one",
+      "http://example.com/q": [ { "@value": "y" } ]
+    }
+  ])");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/a",
+      "@index": "one",
+      "http://example.com/p": [ { "@value": "x" } ],
+      "http://example.com/q": [ { "@value": "y" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_flatten(input), expected);
+}
+
+TEST(a_type_naming_an_iri_is_not_relabelled) {
+  // Only a name that stands for a blank node is relabelled, so a type naming
+  // an IRI is carried over as it was
+  const auto input = sourcemeta::core::parse_json(R"([
+    { "@id": "http://example.com/s", "@type": [ "http://example.com/T" ] }
+  ])");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    { "@id": "http://example.com/s", "@type": [ "http://example.com/T" ] }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_flatten(input), expected);
+}
+
+TEST(expansion_of_a_plain_string_property) {
+  const auto input = sourcemeta::core::parse_json(R"({
+    "http://example.com/flat": "value"
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "http://example.com/flat": [ { "@value": "value" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
+TEST(a_null_context_leaves_the_flattened_output_expanded) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/a",
+      "http://example.com/p": [
+        { "http://example.com/q": [ { "@value": "x" } ] }
+      ]
+    }
+  ])");
+
+  const auto context = sourcemeta::core::parse_json("null");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "_:b0",
+      "http://example.com/q": [ { "@value": "x" } ]
+    },
+    {
+      "@id": "http://example.com/a",
+      "http://example.com/p": [ { "@id": "_:b0" } ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_flatten(input, context), expected);
+}
+
+TEST(a_null_context_and_the_context_free_overload_flatten_alike) {
+  const auto input = sourcemeta::core::parse_json(R"([
+    {
+      "@id": "http://example.com/a",
+      "http://example.com/p": [ { "@value": 1 } ]
+    }
+  ])");
+
+  EXPECT_EQ(
+      sourcemeta::core::jsonld_flatten(input, sourcemeta::core::JSON{nullptr}),
+      sourcemeta::core::jsonld_flatten(input));
+}
