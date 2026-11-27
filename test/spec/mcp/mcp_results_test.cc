@@ -12764,7 +12764,6 @@ TEST(tool_success_rejects_non_object_structured_content_on_2025_11_25) {
       "Legacy structuredContent must be an object");
 }
 
-// The handshake answers with the newest revision it supports that still uses
 // The handshake answers with the newest revision the server serves that still
 // uses a handshake, whichever order the list names them in. The request names
 // a revision the list does not carry, so the answer is the server's own pick
