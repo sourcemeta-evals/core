@@ -1277,6 +1277,14 @@ auto expand_entries(ExpansionState &state, ActiveContext &active_context,
         // that expands to null: the none label adds nothing, while a key
         // shaped like a keyword names a null identifier (JSON-LD 1.1 API
         // Section 5.1.2)
+        // The key expands under the context this loop stands in:
+        // "Initialize expanded index to the result of IRI expanding index"
+        // (JSON-LD 1.1 API Section 5.1.2 step 13.8.3.4) names no other,
+        // where the step for the entry's values below asks for the map
+        // context by name. jsonld.js layers the key's own scoped context
+        // over the key first, letting a scope rename the very key that
+        // carries it, a reading neither the spec text nor the editor's
+        // Ruby implementation shares
         bool none_index{index == KEYWORD_NONE};
         if (!none_index) {
           expanded_index =

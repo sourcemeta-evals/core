@@ -1310,6 +1310,39 @@ TEST(a_type_map_key_without_a_scoped_context_restores_the_outer_context) {
   EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
 }
 
+TEST(a_type_map_key_redefined_by_its_own_scoped_context_keeps_its_mapping) {
+  // The key's scoped context governs the entry's values alone: the key
+  // expands under the enclosing context, whose mapping names urn:T, as
+  // "Initialize expanded index to the result of IRI expanding index"
+  // (JSON-LD 1.1 API Section 5.1.2 step 13.8.3.4) names no other
+  // context. jsonld.js layers the scoped context over the key first and
+  // reads urn:inner, a reading neither the spec text nor the editor's
+  // Ruby implementation shares
+  const auto input = sourcemeta::core::parse_json(R"({
+    "@context": {
+      "T": {
+        "@id": "urn:T",
+        "@context": { "T": "urn:inner", "q": "urn:scoped-q" }
+      },
+      "p": { "@id": "urn:p", "@container": "@type" }
+    },
+    "p": { "T": { "q": "v" } }
+  })");
+
+  const auto expected = sourcemeta::core::parse_json(R"([
+    {
+      "urn:p": [
+        {
+          "urn:scoped-q": [ { "@value": "v" } ],
+          "@type": [ "urn:T" ]
+        }
+      ]
+    }
+  ])");
+
+  EXPECT_EQ(sourcemeta::core::jsonld_expand(input), expected);
+}
+
 TEST(index_map_value_keeps_the_type_scoped_context) {
   const auto input = sourcemeta::core::parse_json(R"({
     "@context": {
