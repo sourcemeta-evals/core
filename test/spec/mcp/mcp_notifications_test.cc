@@ -621,6 +621,69 @@ TEST(request_subscription_id_of_non_object) {
             nullptr);
 }
 
+// A subscription identifier is read out of whichever member of an envelope
+// carries metadata, and it names a request the way any identifier does
+// https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/subscriptions
+TEST(request_subscription_id_reads_metadata_beside_the_envelope) {
+  const auto envelope{sourcemeta::core::parse_json(R"JSON({
+    "jsonrpc": "2.0",
+    "_meta": { "io.modelcontextprotocol/subscriptionId": 7 }
+  })JSON")};
+  EXPECT_EQ(*sourcemeta::core::mcp_request_subscription_id(
+                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
+            sourcemeta::core::JSON{7});
+}
+
+TEST(request_subscription_id_ignores_metadata_that_is_not_an_object) {
+  const auto envelope{sourcemeta::core::parse_json(
+      R"JSON({ "jsonrpc": "2.0", "_meta": 1 })JSON")};
+  EXPECT_EQ(sourcemeta::core::mcp_request_subscription_id(
+                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
+            nullptr);
+}
+
+TEST(request_subscription_id_ignores_an_absent_identifier) {
+  const auto envelope{sourcemeta::core::parse_json(
+      R"JSON({ "jsonrpc": "2.0", "_meta": {} })JSON")};
+  EXPECT_EQ(sourcemeta::core::mcp_request_subscription_id(
+                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
+            nullptr);
+}
+
+TEST(request_subscription_id_ignores_a_fractional_identifier) {
+  const auto envelope{sourcemeta::core::parse_json(R"JSON({
+    "jsonrpc": "2.0",
+    "_meta": { "io.modelcontextprotocol/subscriptionId": 1.5 }
+  })JSON")};
+  EXPECT_EQ(sourcemeta::core::mcp_request_subscription_id(
+                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
+            nullptr);
+}
+
+// The identifier is read out of whichever member carries metadata, so a
+// member that is not an object sends the search on to the next one
+TEST(request_subscription_id_reads_past_positional_parameters) {
+  const auto envelope{sourcemeta::core::parse_json(R"JSON({
+    "jsonrpc": "2.0",
+    "params": [],
+    "_meta": { "io.modelcontextprotocol/subscriptionId": 7 }
+  })JSON")};
+  EXPECT_EQ(*sourcemeta::core::mcp_request_subscription_id(
+                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
+            sourcemeta::core::JSON{7});
+}
+
+TEST(request_subscription_id_reads_past_a_result_that_is_not_an_object) {
+  const auto envelope{sourcemeta::core::parse_json(R"JSON({
+    "jsonrpc": "2.0",
+    "result": true,
+    "_meta": { "io.modelcontextprotocol/subscriptionId": 7 }
+  })JSON")};
+  EXPECT_EQ(*sourcemeta::core::mcp_request_subscription_id(
+                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
+            sourcemeta::core::JSON{7});
+}
+
 TEST(make_notification_client_cancellation_2026_07_28) {
   EXPECT_EQ(sourcemeta::core::mcp_make_notification(
                 sourcemeta::core::MCPProtocolVersion::V_2026_07_28, false,

@@ -11535,7 +11535,7 @@ TEST(prompts_list_result_rejects_an_argument_without_a_name) {
 TEST(prompts_list_result_rejects_a_prompt_that_is_not_an_object) {
   EXPECT_MCP_REJECTS(sourcemeta::core::mcp_make_prompts_list_result(
                          sourcemeta::core::MCPProtocolVersion::V_2026_07_28,
-                         sourcemeta::core::parse_json(R"JSON([true])JSON"),
+                         sourcemeta::core::parse_json(R"JSON([ true ])JSON"),
                          std::nullopt, {}),
                      "Invalid MCP prompt descriptor entry");
 }
@@ -12385,7 +12385,7 @@ TEST(input_required_result_rejects_a_lone_tool_result_without_the_capability) {
 
 // An extension capability maps a prefixed key to an object of its own
 // https://modelcontextprotocol.io/specification/2026-07-28/basic/index#_meta
-TEST(serialize_server_capabilities_rejects_a_non_object_extension_entry) {
+TEST(make_server_discover_result_rejects_a_non_object_extension_entry) {
   sourcemeta::core::MCPServerCapabilities capabilities;
   capabilities.extensions =
       sourcemeta::core::parse_json(R"JSON({ "a.b/x": true })JSON");
@@ -12422,7 +12422,7 @@ TEST(write_result_rejects_an_operation_that_is_not_cacheable) {
       sourcemeta::core::mcp_write_result(
           stream, sourcemeta::core::MCPProtocolVersion::V_2026_07_28, "ping",
           sourcemeta::core::JSON{1},
-          sourcemeta::core::parse_json(R"JSON({"tools": []})JSON"),
+          sourcemeta::core::parse_json(R"JSON({ "tools": [] })JSON"),
           sourcemeta::core::MCPCachePolicy{
               .ttl_ms = 1, .scope = sourcemeta::core::MCPCacheScope::Public}),
       "Writer requires a cacheable operation");
@@ -12465,7 +12465,7 @@ TEST(write_result_rejects_a_discovery_without_supported_versions) {
       sourcemeta::core::mcp_write_result(
           stream, sourcemeta::core::MCPProtocolVersion::V_2026_07_28,
           "server/discover", sourcemeta::core::JSON{1},
-          sourcemeta::core::parse_json(R"JSON({"capabilities": {}})JSON"),
+          sourcemeta::core::parse_json(R"JSON({ "capabilities": {} })JSON"),
           sourcemeta::core::MCPCachePolicy{
               .ttl_ms = 1, .scope = sourcemeta::core::MCPCacheScope::Public}),
       "Invalid discovery result");
@@ -12704,45 +12704,6 @@ TEST(decorate_cacheable_result_rejects_a_non_string_result_type) {
           "tools/list"),
       "The complete-result decorator cannot construct interim or extension "
       "results");
-}
-
-// A subscription identifier is read out of whichever member of an envelope
-// carries metadata, and it names a request the way any identifier does
-// https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/subscriptions
-TEST(request_subscription_id_reads_metadata_beside_the_envelope) {
-  const auto envelope{sourcemeta::core::parse_json(R"JSON({
-    "jsonrpc": "2.0",
-    "_meta": { "io.modelcontextprotocol/subscriptionId": 7 }
-  })JSON")};
-  EXPECT_EQ(*sourcemeta::core::mcp_request_subscription_id(
-                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
-            sourcemeta::core::JSON{7});
-}
-
-TEST(request_subscription_id_ignores_metadata_that_is_not_an_object) {
-  const auto envelope{sourcemeta::core::parse_json(
-      R"JSON({ "jsonrpc": "2.0", "_meta": 1 })JSON")};
-  EXPECT_EQ(sourcemeta::core::mcp_request_subscription_id(
-                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
-            nullptr);
-}
-
-TEST(request_subscription_id_ignores_an_absent_identifier) {
-  const auto envelope{sourcemeta::core::parse_json(
-      R"JSON({ "jsonrpc": "2.0", "_meta": {} })JSON")};
-  EXPECT_EQ(sourcemeta::core::mcp_request_subscription_id(
-                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
-            nullptr);
-}
-
-TEST(request_subscription_id_ignores_a_fractional_identifier) {
-  const auto envelope{sourcemeta::core::parse_json(R"JSON({
-    "jsonrpc": "2.0",
-    "_meta": { "io.modelcontextprotocol/subscriptionId": 1.5 }
-  })JSON")};
-  EXPECT_EQ(sourcemeta::core::mcp_request_subscription_id(
-                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
-            nullptr);
 }
 
 TEST(tool_call_arguments_ignores_a_fractional_identifier) {
@@ -12991,30 +12952,6 @@ TEST(request_state_ignores_an_envelope_without_parameters) {
   EXPECT_FALSE(sourcemeta::core::mcp_request_state(
                    sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope)
                    .has_value());
-}
-
-// The identifier is read out of whichever member carries metadata, so a
-// member that is not an object sends the search on to the next one
-TEST(request_subscription_id_reads_past_positional_parameters) {
-  const auto envelope{sourcemeta::core::parse_json(R"JSON({
-    "jsonrpc": "2.0",
-    "params": [],
-    "_meta": { "io.modelcontextprotocol/subscriptionId": 7 }
-  })JSON")};
-  EXPECT_EQ(*sourcemeta::core::mcp_request_subscription_id(
-                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
-            sourcemeta::core::JSON{7});
-}
-
-TEST(request_subscription_id_reads_past_a_result_that_is_not_an_object) {
-  const auto envelope{sourcemeta::core::parse_json(R"JSON({
-    "jsonrpc": "2.0",
-    "result": true,
-    "_meta": { "io.modelcontextprotocol/subscriptionId": 7 }
-  })JSON")};
-  EXPECT_EQ(*sourcemeta::core::mcp_request_subscription_id(
-                sourcemeta::core::MCPProtocolVersion::V_2026_07_28, envelope),
-            sourcemeta::core::JSON{7});
 }
 
 TEST(write_result_rejects_a_result_type_that_is_not_a_string) {
